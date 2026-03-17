@@ -1,0 +1,100 @@
+# BloodWise - Smart Calorie & Health Calculator
+
+A Next.js application that calculates your maintenance calories (TDEE) and provides personalized health insights from blood report data.
+
+## Features
+
+- **TDEE Calculator**: Calculate your Total Daily Energy Expenditure using the Mifflin-St Jeor equation
+- **Activity-Based Adjustments**: Factor in your activity level and goals (lose, maintain, gain)
+- **Blood Report Analysis**: Upload or manually enter blood marker values
+- **Health Scoring**: Get a comprehensive health score across metabolic, cardiovascular, hormonal, and nutritional categories
+- **Personalized Insights**: Receive targeted recommendations based on your blood markers
+- **Vercel-Ready**: Static export configured for easy deployment
+
+## Tech Stack
+
+- Next.js 14+ with App Router
+- TypeScript
+- Tailwind CSS
+- React Hook Form
+- React Dropzone
+- Tesseract.js (for OCR - demo mode)
+- React Circular Progressbar
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone <repo-url>
+cd bloodwise-calculator
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Run the development server:
+```bash
+npm run dev
+```
+
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Building for Production
+
+```bash
+npm run build
+```
+
+This creates a static export in the `dist` folder, ready for Vercel deployment.
+
+## Deployment
+
+### Vercel (Recommended)
+
+1. Push your code to GitHub
+2. Import the repository in Vercel
+3. Deploy!
+
+The `next.config.js` is already configured for static export.
+
+### Other Static Hosts
+
+The `dist` folder contains all static assets. Upload to any static hosting service.
+
+## Blood Markers Supported
+
+- Glucose (fasting)
+- HbA1c
+- Total Cholesterol
+- LDL Cholesterol
+- HDL Cholesterol
+- Triglycerides
+- TSH (Thyroid)
+- Vitamin D
+- Vitamin B12
+- Ferritin
+- Serum Iron
+
+## Note on OCR
+
+The blood report upload feature currently runs in demo mode with simulated data. For production use, integrate with:
+- Tesseract.js for client-side OCR
+- Cloud Vision API or similar for server-side processing
+- Medical-grade OCR services for better accuracy
+
+## Disclaimer
+
+BloodWise provides estimates and insights for informational purposes only. Always consult healthcare professionals for medical advice.
+
+## License
+
+MIT
