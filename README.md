@@ -70,6 +70,28 @@ The `next.config.js` is already configured for static export.
 
 The `dist` folder contains all static assets. Upload to any static hosting service.
 
+## CodeRabbit Setup (PR Reviews)
+
+This repo includes a starter config at `.coderabbit.yaml`.
+
+1. Install the CodeRabbit GitHub App on your GitHub account/org.
+2. Grant access to this repository.
+3. Open a pull request (or push a new commit to an open PR).
+4. CodeRabbit will automatically review and comment.
+
+### Recommended GitHub Settings
+
+1. In repository settings, enable branch protection for `main`.
+2. Add required status checks, including CodeRabbit and your CI checks.
+3. Optionally require PRs to be up to date before merging.
+
+### What Is Configured Here
+
+- Auto review is enabled for new PRs.
+- Draft PR reviews are disabled.
+- Generated folders (`dist`, `node_modules`) and `package-lock.json` are excluded.
+- Review tone/profile is set to assertive with concise high-level summaries.
+
 ## Blood Markers Supported
 
 - Glucose (fasting)
