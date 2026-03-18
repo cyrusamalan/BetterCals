@@ -385,11 +385,11 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg overflow-hidden bg-transparent flex items-center justify-center">
               <Image
-                src="/brand/bettercals-logo.png"
+                src="/brand/bettercals-mark.png"
                 alt="BetterCals"
                 width={48}
                 height={48}
-                className="w-full h-full object-cover object-left"
+                className="w-full h-full object-contain"
                 priority
               />
             </div>

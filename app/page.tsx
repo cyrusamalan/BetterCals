@@ -134,11 +134,11 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-transparent">
               <Image
-                src="/brand/bettercals-logo.png"
+                src="/brand/bettercals-mark.png"
                 alt="BetterCals"
                 width={64}
                 height={64}
-                className="w-full h-full object-cover object-left"
+                className="w-full h-full object-contain"
                 priority
               />
             </div>
