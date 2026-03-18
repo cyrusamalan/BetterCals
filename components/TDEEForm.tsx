@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm, useWatch } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { UserProfile, ActivityLevel } from '@/types';
 
 interface TDEEFormProps {
@@ -19,7 +19,7 @@ interface FormData {
 }
 
 export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
-  const { register, handleSubmit, formState: { errors }, control } = useForm<FormData>({
+  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     defaultValues: initialValues ? {
       age: initialValues.age,
       gender: initialValues.gender,

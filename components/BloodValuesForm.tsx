@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { BloodMarkers } from '@/types';
 
@@ -9,9 +10,24 @@ interface BloodValuesFormProps {
 }
 
 export default function BloodValuesForm({ onSubmit, initialValues }: BloodValuesFormProps) {
-  const { register, handleSubmit } = useForm<BloodMarkers>({
+  const { register, handleSubmit, reset } = useForm<BloodMarkers>({
     defaultValues: initialValues || {},
   });
+
+  useEffect(() => {
+    reset(initialValues || {});
+  }, [initialValues, reset]);
+
+  const numberField = {
+    setValueAs: (value: unknown) => {
+      if (value === '' || value === null || value === undefined) {
+        return undefined;
+      }
+
+      const parsed = typeof value === 'number' ? value : Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    },
+  };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -23,7 +39,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
           <input
             type="number"
             step="0.1"
-            {...register('glucose', { valueAsNumber: true })}
+            {...register('glucose', numberField)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             placeholder="90"
           />
@@ -37,7 +53,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
           <input
             type="number"
             step="0.1"
-            {...register('hba1c', { valueAsNumber: true })}
+            {...register('hba1c', numberField)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             placeholder="5.4"
           />
@@ -50,7 +66,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
           </label>
           <input
             type="number"
-            {...register('totalCholesterol', { valueAsNumber: true })}
+            {...register('totalCholesterol', numberField)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             placeholder="180"
           />
@@ -63,7 +79,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
           </label>
           <input
             type="number"
-            {...register('ldl', { valueAsNumber: true })}
+            {...register('ldl', numberField)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             placeholder="100"
           />
@@ -76,7 +92,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
           </label>
           <input
             type="number"
-            {...register('hdl', { valueAsNumber: true })}
+            {...register('hdl', numberField)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             placeholder="60"
           />
@@ -89,7 +105,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
           </label>
           <input
             type="number"
-            {...register('triglycerides', { valueAsNumber: true })}
+            {...register('triglycerides', numberField)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             placeholder="120"
           />
@@ -103,7 +119,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
           <input
             type="number"
             step="0.01"
-            {...register('tsh', { valueAsNumber: true })}
+            {...register('tsh', numberField)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             placeholder="2.0"
           />
@@ -116,7 +132,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
           </label>
           <input
             type="number"
-            {...register('vitaminD', { valueAsNumber: true })}
+            {...register('vitaminD', numberField)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             placeholder="30"
           />
@@ -129,7 +145,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
           </label>
           <input
             type="number"
-            {...register('vitaminB12', { valueAsNumber: true })}
+            {...register('vitaminB12', numberField)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             placeholder="400"
           />
@@ -142,7 +158,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
           </label>
           <input
             type="number"
-            {...register('ferritin', { valueAsNumber: true })}
+            {...register('ferritin', numberField)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             placeholder="50"
           />
@@ -155,7 +171,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
           </label>
           <input
             type="number"
-            {...register('iron', { valueAsNumber: true })}
+            {...register('iron', numberField)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             placeholder="80"
           />

@@ -17,7 +17,6 @@ export const REFERENCE_RANGES: Record<keyof BloodMarkers, { min: number; max: nu
 
 export function parseBloodReport(text: string): BloodMarkers {
   const markers: BloodMarkers = {};
-  const normalizedText = text.toLowerCase();
 
   // Glucose patterns
   const glucoseMatch = text.match(/glucose.*?[:\s]+(\d+\.?\d*)/i) || 

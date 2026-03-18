@@ -20,7 +20,7 @@ export default function BloodReportUploader({ onTextExtracted }: BloodReportUplo
     setFileName(file.name);
 
     try {
-      const text = await simulateOCR(file);
+      const text = await simulateOCR();
       onTextExtracted(text);
     } catch (error) {
       console.error('Error processing file:', error);
@@ -39,7 +39,7 @@ export default function BloodReportUploader({ onTextExtracted }: BloodReportUplo
     maxFiles: 1,
   });
 
-  async function simulateOCR(file: File): Promise<string> {
+  async function simulateOCR(): Promise<string> {
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(`

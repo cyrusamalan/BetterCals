@@ -25,6 +25,18 @@ import { parseBloodReport } from '@/lib/bloodParser';
 
 type Step = 'profile' | 'blood' | 'results';
 
+function sanitizeBloodMarkers(input: BloodMarkers): BloodMarkers {
+  const cleaned: BloodMarkers = {};
+
+  for (const [key, value] of Object.entries(input)) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      cleaned[key as keyof BloodMarkers] = value;
+    }
+  }
+
+  return cleaned;
+}
+
 export default function Home() {
   const [step, setStep] = useState<Step>('profile');
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -38,12 +50,14 @@ export default function Home() {
   };
 
   const handleBloodTextExtracted = (text: string) => {
-    const parsed = parseBloodReport(text);
+    const parsed = sanitizeBloodMarkers(parseBloodReport(text));
     setMarkers(parsed);
   };
 
   const handleBloodSubmit = (data: BloodMarkers) => {
-    const mergedMarkers = { ...markers, ...data };
+    const normalizedCurrentMarkers = sanitizeBloodMarkers(markers);
+    const normalizedSubmittedMarkers = sanitizeBloodMarkers(data);
+    const mergedMarkers = { ...normalizedCurrentMarkers, ...normalizedSubmittedMarkers };
     setMarkers(mergedMarkers);
     
     if (profile) {
