@@ -231,7 +231,9 @@ function RangeBar({ markerKey, value, delay }: { markerKey: keyof BloodMarkers; 
 
       <div className="flex justify-between">
         <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>{range?.min}</span>
-        <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>{range?.max} {range?.unit}</span>
+        <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+          {markerKey === 'hdl' ? `60+ ${range?.unit}` : `${range?.max} ${range?.unit}`}
+        </span>
       </div>
     </div>
   );
@@ -353,6 +355,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
   const { tdee, healthScore, insights, deficiencies, risks, calorieTiers, macros, recommendations } = result;
   const grade = getScoreGrade(healthScore.overall);
   const hasMarkers = Object.keys(markers).length > 0;
+  const usedAverageMarkers = result.usedAverageMarkers === true;
 
   return (
     <div
@@ -417,9 +420,27 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
                     Your Results
                   </h1>
                   <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
-                    Based on your profile and blood markers
+                    {usedAverageMarkers ? 'Based on your profile and estimated average markers' : 'Based on your profile and blood markers'}
                   </p>
                 </div>
+
+                {usedAverageMarkers && (
+                  <div
+                    className="rounded-xl px-4 py-3"
+                    style={{
+                      backgroundColor: 'var(--status-info-bg)',
+                      border: '1px solid var(--status-info-border)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                      Using population averages (no report provided)
+                    </p>
+                    <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                      Enter your real blood values for accurate risks, deficiencies, and personalized insights.
+                    </p>
+                  </div>
+                )}
 
                 {/* Inline BMR / TDEE / BMI */}
                 <div className="flex flex-wrap items-center gap-3">
@@ -517,7 +538,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
         </div>
 
         {/* 7. Flags */}
-        {(deficiencies.length > 0 || risks.length > 0) && (
+        {!usedAverageMarkers && (deficiencies.length > 0 || risks.length > 0) && (
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 anim-fade-up delay-10">
             <FlagSection title="Potential Deficiencies" items={deficiencies} variant="warning" />
             <FlagSection title="Health Risks" items={risks} variant="danger" />
@@ -525,7 +546,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
         )}
 
         {/* 8. Insights */}
-        {insights.length > 0 && (
+        {!usedAverageMarkers && insights.length > 0 && (
           <div className="mt-8 anim-fade-up">
             <h2 className="font-display text-xl mb-4" style={{ color: 'var(--text-primary)' }}>
               Insights & Recommendations

@@ -6,7 +6,9 @@ export const REFERENCE_RANGES: Record<keyof BloodMarkers, { min: number; max: nu
   hba1c: { min: 4.0, max: 5.6, unit: '%' },
   totalCholesterol: { min: 0, max: 199, unit: 'mg/dL' },
   ldl: { min: 0, max: 99, unit: 'mg/dL' },
-  hdl: { min: 40, max: 200, unit: 'mg/dL' },
+  // HDL is generally "higher is better"; we treat low HDL as abnormal,
+  // and use 60 as a practical "optimal" threshold for UI range display.
+  hdl: { min: 40, max: 60, unit: 'mg/dL' },
   triglycerides: { min: 0, max: 149, unit: 'mg/dL' },
   tsh: { min: 0.5, max: 4.0, unit: 'mIU/L' },
   vitaminD: { min: 30, max: 100, unit: 'ng/mL' },
@@ -82,6 +84,13 @@ export function parseBloodReport(text: string): BloodMarkers {
 export function getMarkerStatus(marker: keyof BloodMarkers, value: number): 'normal' | 'low' | 'high' | 'critical' {
   const range = REFERENCE_RANGES[marker];
   if (!range) return 'normal';
+
+  // HDL: low is a risk factor; high HDL should not be flagged as "high".
+  if (marker === 'hdl') {
+    if (value < range.min * 0.7) return 'critical';
+    if (value < range.min) return 'low';
+    return 'normal';
+  }
 
   if (value < range.min * 0.7 || value > range.max * 1.5) return 'critical';
   if (value < range.min || value > range.max) return value < range.min ? 'low' : 'high';

@@ -136,6 +136,48 @@ const FIELDS: {
   },
 ];
 
+const HEALTHY_PRESET: BloodMarkers = {
+  glucose: 90,
+  hba1c: 5.2,
+  totalCholesterol: 180,
+  ldl: 90,
+  hdl: 65,
+  triglycerides: 110,
+  tsh: 2.0,
+  vitaminD: 45,
+  vitaminB12: 550,
+  ferritin: 80,
+  iron: 100,
+};
+
+const DEFICIENT_PRESET: BloodMarkers = {
+  glucose: 110,
+  hba1c: 6.3,
+  totalCholesterol: 230,
+  ldl: 150,
+  hdl: 38,
+  triglycerides: 220,
+  tsh: 4.8,
+  vitaminD: 18,
+  vitaminB12: 210,
+  ferritin: 15,
+  iron: 45,
+};
+
+const SUFFICIENT_PRESET: BloodMarkers = {
+  glucose: 98,
+  hba1c: 5.6,
+  totalCholesterol: 195,
+  ldl: 110,
+  hdl: 55,
+  triglycerides: 150,
+  tsh: 3.2,
+  vitaminD: 32,
+  vitaminB12: 380,
+  ferritin: 45,
+  iron: 75,
+};
+
 export default function BloodValuesForm({ onSubmit, initialValues }: BloodValuesFormProps) {
   const { register, handleSubmit, reset, watch } = useForm<BloodMarkers>({
     defaultValues: initialValues || {},
@@ -170,19 +212,69 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {/* Progress indicator */}
-      <div className="flex items-center justify-between px-4 py-3 rounded-lg" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-          Progress: <span style={{ color: 'var(--primary-500)' }}>{filledCount}/{FIELDS.length}</span> markers
-        </p>
-        <div className="w-32 h-1.5 bg-gray-300 rounded-full overflow-hidden">
-          <div
-            className="h-full transition-all duration-300"
+      {/* Progress + presets */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 rounded-lg" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            Progress: <span style={{ color: 'var(--primary-500)' }}>{filledCount}/{FIELDS.length}</span> markers
+          </p>
+          <div className="w-full sm:w-32 h-1.5 bg-gray-300 rounded-full overflow-hidden">
+            <div
+              className="h-full transition-all duration-300"
+              style={{
+                width: `${(filledCount / FIELDS.length) * 100}%`,
+                backgroundColor: 'var(--primary-500)',
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <button
+            type="button"
+            className="text-xs sm:text-sm px-3 py-2 rounded-lg border btn-press text-left"
             style={{
-              width: `${(filledCount / FIELDS.length) * 100}%`,
-              backgroundColor: 'var(--primary-500)',
+              borderColor: 'var(--border)',
+              backgroundColor: 'var(--bg-secondary)',
+              color: 'var(--text-primary)',
             }}
-          />
+            onClick={() => reset(HEALTHY_PRESET)}
+          >
+            <span className="block font-semibold">Healthy</span>
+            <span className="block text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+              Optimal marker ranges
+            </span>
+          </button>
+          <button
+            type="button"
+            className="text-xs sm:text-sm px-3 py-2 rounded-lg border btn-press text-left"
+            style={{
+              borderColor: 'var(--border)',
+              backgroundColor: 'var(--bg-secondary)',
+              color: 'var(--text-primary)',
+            }}
+            onClick={() => reset(DEFICIENT_PRESET)}
+          >
+            <span className="block font-semibold">Deficient</span>
+            <span className="block text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+              Higher risk & low nutrients
+            </span>
+          </button>
+          <button
+            type="button"
+            className="text-xs sm:text-sm px-3 py-2 rounded-lg border btn-press text-left"
+            style={{
+              borderColor: 'var(--border)',
+              backgroundColor: 'var(--bg-secondary)',
+              color: 'var(--text-primary)',
+            }}
+            onClick={() => reset(SUFFICIENT_PRESET)}
+          >
+            <span className="block font-semibold">Sufficient</span>
+            <span className="block text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+              Mostly okay with mild flags
+            </span>
+          </button>
         </div>
       </div>
 
@@ -197,11 +289,11 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
             >
               {cat}
             </p>
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {catFields.map((field) => (
                 <div key={field.key}>
                   <div
-                    className="p-3 rounded-lg border transition-all cursor-pointer"
+                    className="h-full p-3 rounded-lg border transition-all cursor-pointer"
                     style={{
                       backgroundColor: 'var(--bg-secondary)',
                       borderColor:
@@ -274,7 +366,6 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
 
       <button
         type="submit"
-        disabled={filledCount === 0}
         className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl text-sm font-semibold btn-press group transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
         style={{
           background: 'linear-gradient(135deg, #a05a5a 0%, #b86868 100%)',
@@ -282,7 +373,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
           boxShadow: '0 2px 8px rgba(160, 90, 90, 0.3)',
         }}
       >
-        Analyze Blood Values ({filledCount})
+        {filledCount === 0 ? 'Analyze with Averages' : `Analyze Blood Values (${filledCount})`}
         <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
       </button>
     </form>

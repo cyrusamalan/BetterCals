@@ -22,7 +22,7 @@ import {
   calculateRecommendations,
 } from '@/lib/calculations';
 import { parseBloodReport } from '@/lib/bloodParser';
-import AnatomySVG from '@/components/AnatomySVG';
+import { estimateAverageMarkers } from '@/lib/averageMarkers';
 
 type Step = 'profile' | 'blood' | 'results';
 
@@ -55,24 +55,31 @@ export default function Home() {
   const handleBloodSubmit = (data: BloodMarkers) => {
     const normalizedCurrentMarkers = sanitizeBloodMarkers(markers);
     const normalizedSubmittedMarkers = sanitizeBloodMarkers(data);
-    const mergedMarkers = { ...normalizedCurrentMarkers, ...normalizedSubmittedMarkers };
+    let mergedMarkers = { ...normalizedCurrentMarkers, ...normalizedSubmittedMarkers };
+    const usedAverageMarkers = Object.keys(mergedMarkers).length === 0;
+
+    if (usedAverageMarkers) {
+      mergedMarkers = profile ? estimateAverageMarkers(profile) : {};
+    }
+
     setMarkers(mergedMarkers);
 
     if (profile) {
       const tdee = calculateTDEE(profile);
       const healthScore = calculateHealthScore(mergedMarkers);
-      const insights = generateInsights(profile, tdee, mergedMarkers);
-      const deficiencies = identifyDeficiencies(mergedMarkers);
+      const insights = usedAverageMarkers ? [] : generateInsights(profile, tdee, mergedMarkers);
+      const deficiencies = usedAverageMarkers ? [] : identifyDeficiencies(mergedMarkers);
 
       setResult({
         tdee,
         healthScore,
         insights,
         deficiencies,
-        risks: identifyRisks(mergedMarkers),
+        risks: usedAverageMarkers ? [] : identifyRisks(mergedMarkers),
         calorieTiers: calculateCalorieTiers(tdee.tdee),
         macros: calculateMacros(tdee.targetCalories, profile.goal),
         recommendations: calculateRecommendations(profile, mergedMarkers, deficiencies),
+        usedAverageMarkers,
       });
 
       setStep('results');
@@ -192,8 +199,8 @@ export default function Home() {
               </p>
             </div>
 
-            {/* 2-col grid: form + anatomy on lg */}
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-8 items-start">
+            {/* Form container */}
+            <div className="grid grid-cols-1 gap-8 items-start">
               {/* Form card */}
               <div
                 className="relative overflow-hidden rounded-2xl noise anim-fade-up delay-3"
@@ -206,11 +213,6 @@ export default function Home() {
                 <div className="p-6 sm:p-8">
                   <TDEEForm onSubmit={handleProfileSubmit} />
                 </div>
-              </div>
-
-              {/* Anatomy SVG - hidden on mobile, shown on lg+ */}
-              <div className="hidden lg:block w-48 xl:w-56 anim-fade-in delay-5">
-                <AnatomySVG />
               </div>
             </div>
           </div>

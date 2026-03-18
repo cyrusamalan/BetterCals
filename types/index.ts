@@ -85,6 +85,7 @@ export interface AnalysisResult {
   calorieTiers: CalorieTier[];
   macros: MacroBreakdown;
   recommendations: PersonalizedRecs;
+  usedAverageMarkers?: boolean;
 }
 
 export interface ParsedBloodReport {

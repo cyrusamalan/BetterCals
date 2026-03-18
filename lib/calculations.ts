@@ -31,8 +31,6 @@ export function calculateTDEE(profile: UserProfile): TDEEResult {
   const weightKg = lbsToKg(profile.weightLbs);
   const heightCm = feetInchesToCm(profile.heightFeet, profile.heightInches);
   
-  console.log('TDEE Calculation Debug:', { weightLbs: profile.weightLbs, weightKg, heightCm, age: profile.age, gender: profile.gender });
-  
   // Mifflin-St Jeor Equation
   let bmr: number;
   
@@ -41,8 +39,6 @@ export function calculateTDEE(profile: UserProfile): TDEEResult {
   } else {
     bmr = 10 * weightKg + 6.25 * heightCm - 5 * profile.age - 161;
   }
-  
-  console.log('Calculated BMR:', bmr);
 
   const activityMultiplier = ACTIVITY_MULTIPLIERS[profile.activityLevel];
   const tdee = Math.round(bmr * activityMultiplier);
