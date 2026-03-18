@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { AnalysisResult, BloodMarkers, Insight, UserProfile } from '@/types';
 import { REFERENCE_RANGES, getMarkerStatus } from '@/lib/bloodParser';
 import {
@@ -382,7 +383,16 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
             New Analysis
           </button>
           <div className="flex items-center gap-2">
-            <Droplets className="w-4 h-4" style={{ color: 'var(--accent-rose)' }} />
+            <div className="w-6 h-6 rounded-lg overflow-hidden bg-white/70 flex items-center justify-center">
+              <Image
+                src="/brand/bettercals-logo.png"
+                alt="BetterCals"
+                width={48}
+                height={48}
+                className="w-full h-full object-cover"
+                priority
+              />
+            </div>
             <span className="text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
           </div>
         </div>

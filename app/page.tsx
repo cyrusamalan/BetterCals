@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Heart, Activity, FileText, Droplets, ChevronRight } from 'lucide-react';
+import Image from 'next/image';
 import TDEEForm from '@/components/TDEEForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
 import BloodValuesForm from '@/components/BloodValuesForm';
@@ -131,14 +132,15 @@ export default function Home() {
       >
         <div className="max-w-3xl mx-auto px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center relative noise overflow-hidden"
-              style={{
-                background: 'linear-gradient(135deg, #a05a5a 0%, #c07070 100%)',
-                boxShadow: '0 2px 8px rgba(160, 90, 90, 0.25)',
-              }}
-            >
-              <Droplets className="w-[18px] h-[18px] relative z-10" style={{ color: 'var(--text-inverse)' }} />
+            <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-white/70">
+              <Image
+                src="/brand/bettercals-logo.png"
+                alt="BetterCals"
+                width={64}
+                height={64}
+                className="w-full h-full object-cover"
+                priority
+              />
             </div>
             <div>
               <h1 className="text-lg font-bold font-display" style={{ color: 'var(--text-primary)' }}>
