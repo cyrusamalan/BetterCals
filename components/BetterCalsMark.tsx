@@ -18,13 +18,15 @@ export default function BetterCalsMark({
       xmlns="http://www.w3.org/2000/svg"
     >
       <title>{title}</title>
+      {/* Match reference: soft, slightly warm fills */}
+
       {/* Leaf (right) */}
       <path
         d="M66 24
            C79 35 85 51 81 67
            C77 83 60 90 47 84
            C49 70 55 44 66 24 Z"
-        fill="#6F8B73"
+        fill="#6E8A72"
       />
       {/* Leaf inner shade */}
       <path
@@ -32,8 +34,8 @@ export default function BetterCalsMark({
            C78 42 81 54 79 66
            C77 77 67 83 58 82
            C61 69 65 48 70 31 Z"
-        fill="#5E7865"
-        opacity="0.7"
+        fill="#5F7866"
+        opacity="0.55"
       />
 
       {/* Flame (left outer) */}
@@ -44,7 +46,7 @@ export default function BetterCalsMark({
            C20 88 14 81 14 70
            C14 52 30 38 39 26
            C45 18 44 15 41 12 Z"
-        fill="#F28C2B"
+        fill="#F58A22"
       />
       {/* Flame darker inner */}
       <path
@@ -54,8 +56,8 @@ export default function BetterCalsMark({
            C30 77 27 65 29 57
            C32 46 42 39 46 31
            C48 27 48 24 47 21 Z"
-        fill="#E56B22"
-        opacity="0.95"
+        fill="#E8731E"
+        opacity="0.9"
       />
       {/* Red stripe */}
       <path
@@ -65,8 +67,8 @@ export default function BetterCalsMark({
            C41 67 40 59 42 53
            C44 45 50 40 52 34
            C54 30 54 28 53 26 Z"
-        fill="#D94A2A"
-        opacity="0.9"
+        fill="#D9452A"
+        opacity="0.95"
       />
     </svg>
   );
