@@ -132,13 +132,13 @@ export default function Home() {
       >
         <div className="max-w-3xl mx-auto px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-white/70">
+            <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-transparent">
               <Image
                 src="/brand/bettercals-logo.png"
                 alt="BetterCals"
                 width={64}
                 height={64}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover object-left"
                 priority
               />
             </div>

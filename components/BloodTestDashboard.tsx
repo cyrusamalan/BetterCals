@@ -383,13 +383,13 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
             New Analysis
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg overflow-hidden bg-white/70 flex items-center justify-center">
+            <div className="w-6 h-6 rounded-lg overflow-hidden bg-transparent flex items-center justify-center">
               <Image
                 src="/brand/bettercals-logo.png"
                 alt="BetterCals"
                 width={48}
                 height={48}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover object-left"
                 priority
               />
             </div>
