@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileText, Loader2 } from 'lucide-react';
+import { Upload, FileText, Loader2, CheckCircle, Info } from 'lucide-react';
 
 interface BloodReportUploaderProps {
   onTextExtracted: (text: string) => void;
@@ -11,17 +11,20 @@ interface BloodReportUploaderProps {
 export default function BloodReportUploader({ onTextExtracted }: BloodReportUploaderProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (!file) return;
 
     setIsProcessing(true);
+    setDone(false);
     setFileName(file.name);
 
     try {
       const text = await simulateOCR();
       onTextExtracted(text);
+      setDone(true);
     } catch (error) {
       console.error('Error processing file:', error);
       alert('Error processing file. Please try again or enter values manually.');
@@ -44,7 +47,6 @@ export default function BloodReportUploader({ onTextExtracted }: BloodReportUplo
       setTimeout(() => {
         resolve(`
           BLOOD TEST RESULTS
-          
           Glucose: 95 mg/dL
           HbA1c: 5.4%
           Total Cholesterol: 185 mg/dL
@@ -66,36 +68,92 @@ export default function BloodReportUploader({ onTextExtracted }: BloodReportUplo
       <div
         {...getRootProps()}
         className={`
-          border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors
-          ${isDragActive 
-            ? 'border-primary-500 bg-primary-50' 
-            : 'border-gray-300 hover:border-gray-400 bg-gray-50'
-          }
+          relative overflow-hidden rounded-xl border-2 border-dashed p-8 text-center cursor-pointer
+          transition-colors duration-200
+          ${isDragActive ? '' : !fileName ? 'dropzone-idle' : ''}
         `}
+        style={{
+          borderColor: isDragActive
+            ? 'var(--accent)'
+            : done
+            ? 'var(--status-normal-border)'
+            : 'var(--border)',
+          backgroundColor: isDragActive
+            ? 'var(--accent-subtle)'
+            : done
+            ? 'var(--status-normal-bg)'
+            : 'var(--bg-warm)',
+        }}
       >
         <input {...getInputProps()} />
-        
+
         {isProcessing ? (
-          <div className="flex flex-col items-center space-y-3">
-            <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
-            <p className="text-gray-600">Processing your blood report... (simulated)</p>
+          <div className="flex flex-col items-center gap-3 py-2">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center"
+              style={{ backgroundColor: 'var(--accent-subtle)' }}
+            >
+              <Loader2
+                className="w-7 h-7 animate-spin"
+                style={{ color: 'var(--accent)' }}
+              />
+            </div>
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                Processing {fileName}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                Extracting blood marker values...
+              </p>
+            </div>
           </div>
-        ) : fileName ? (
-          <div className="flex flex-col items-center space-y-3">
-            <FileText className="w-12 h-12 text-primary-600" />
-            <p className="text-gray-700 font-medium">{fileName}</p>
-            <p className="text-sm text-gray-500">Drop another file to replace</p>
+        ) : done && fileName ? (
+          <div className="flex flex-col items-center gap-3 py-2">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center anim-scale-in"
+              style={{ backgroundColor: 'var(--status-normal-bg)' }}
+            >
+              <CheckCircle
+                className="w-7 h-7"
+                style={{ color: 'var(--status-normal)' }}
+              />
+            </div>
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                {fileName}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--status-normal)' }}>
+                Values extracted successfully
+              </p>
+            </div>
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              Drop another file to replace
+            </p>
           </div>
         ) : (
-          <div className="flex flex-col items-center space-y-3">
-            <Upload className="w-12 h-12 text-gray-400" />
-            <p className="text-gray-700 font-medium">
-              {isDragActive ? 'Drop your blood report here' : 'Drag & drop your blood report'}
-            </p>
-            <p className="text-sm text-gray-500">Supports PDF, PNG, JPG</p>
+          <div className="flex flex-col items-center gap-3 py-2">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center"
+              style={{ backgroundColor: 'var(--border-light)' }}
+            >
+              <Upload className="w-6 h-6" style={{ color: 'var(--text-tertiary)' }} />
+            </div>
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                {isDragActive ? 'Drop your blood report here' : 'Drag & drop your blood report'}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                PDF, PNG, or JPG
+              </p>
+            </div>
             <button
               type="button"
-              className="mt-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
+              className="mt-1 px-4 py-2 rounded-lg text-xs font-semibold btn-press"
+              style={{
+                backgroundColor: 'var(--accent)',
+                color: 'var(--text-inverse)',
+                boxShadow: '0 2px 6px rgba(107, 143, 113, 0.2)',
+              }}
             >
               Select File
             </button>
@@ -103,11 +161,18 @@ export default function BloodReportUploader({ onTextExtracted }: BloodReportUplo
         )}
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-800">
-          <strong>Demo Mode:</strong> The uploader simulates OCR extraction. 
-          In production, this would use Tesseract.js for client-side OCR or connect to an API 
-          for more accurate medical document parsing.
+      {/* Demo notice */}
+      <div
+        className="flex items-start gap-2.5 rounded-lg p-3"
+        style={{
+          backgroundColor: 'var(--status-info-bg)',
+          border: '1px solid var(--status-info-border)',
+        }}
+      >
+        <Info className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--status-info)' }} />
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          <span className="font-semibold">Demo Mode</span> — The uploader simulates OCR extraction.
+          In production, this would use Tesseract.js or a cloud API for medical document parsing.
         </p>
       </div>
     </div>
