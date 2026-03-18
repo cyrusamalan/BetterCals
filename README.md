@@ -1,4 +1,4 @@
-# BloodWise - Smart Calorie & Health Calculator
+# BetterCals - Smart Calorie & Health Calculator
 
 A Next.js application that calculates your maintenance calories (TDEE) and provides personalized health insights from blood report data.
 
@@ -33,7 +33,7 @@ A Next.js application that calculates your maintenance calories (TDEE) and provi
 1. Clone the repository:
 ```bash
 git clone <repo-url>
-cd bloodwise-calculator
+cd bettercals
 ```
 
 2. Install dependencies:

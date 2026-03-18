@@ -142,7 +142,7 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-lg font-bold font-display" style={{ color: 'var(--text-primary)' }}>
-                BloodWise
+                BetterCals
               </h1>
             </div>
           </div>
@@ -304,7 +304,7 @@ export default function Home() {
       >
         <div className="max-w-3xl mx-auto px-5 text-center">
           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            BloodWise provides estimates for informational purposes only.
+            BetterCals provides estimates for informational purposes only.
             Always consult healthcare professionals for medical advice.
           </p>
         </div>

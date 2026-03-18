@@ -383,7 +383,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
           </button>
           <div className="flex items-center gap-2">
             <Droplets className="w-4 h-4" style={{ color: 'var(--accent-rose)' }} />
-            <span className="text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BloodWise</span>
+            <span className="text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
           </div>
         </div>
       </div>
@@ -562,7 +562,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
         {/* 9. Footer */}
         <div className="mt-12 pt-6 text-center anim-fade-up" style={{ borderTop: '1px solid var(--border-light)' }}>
           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            BloodWise provides estimates for informational purposes only.
+            BetterCals provides estimates for informational purposes only.
             Always consult healthcare professionals for medical advice.
           </p>
         </div>

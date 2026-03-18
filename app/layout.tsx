@@ -16,7 +16,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'BloodWise - Smart Calorie & Health Calculator',
+  title: 'BetterCals - Smart Calorie & Health Calculator',
   description: 'Calculate your maintenance calories and get personalized health insights from your blood reports.',
 };
 
