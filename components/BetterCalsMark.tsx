@@ -12,8 +12,6 @@ export default function BetterCalsMark({
   return (
     <svg
       viewBox="0 0 64 64"
-      width="64"
-      height="64"
       className={clsx('block', className)}
       role="img"
       aria-label={title}
@@ -32,26 +30,39 @@ export default function BetterCalsMark({
         </linearGradient>
       </defs>
 
+      {/* Subtle background circle */}
+      <circle cx="32" cy="34" r="22" fill="#F9F7F2" />
+
       {/* Leaves */}
       <path
-        d="M11 40c0-10 10-18 21-18-2 12-8 22-21 22-1.5 0-2-.7-2-4z"
+        d="M10 40c0-11 10-20 22-20-2.4 13-8.8 24-22 24-1.5 0-2-.7-2-4z"
         fill="url(#bc-leaf)"
       />
       <path
-        d="M53 40c0-10-10-18-21-18 2 12 8 22 21 22 1.5 0 2-.7 2-4z"
+        d="M54 40c0-11-10-20-22-20 2.4 13 8.8 24 22 24 1.5 0 2-.7 2-4z"
         fill="url(#bc-leaf)"
-        opacity="0.98"
+        opacity="0.96"
       />
 
       {/* Flame */}
       <path
-        d="M32 10c6.5 8 8.5 13.5 8.5 18.5C40.5 36 36.8 42 32 42s-8.5-6-8.5-13.5C23.5 23.5 25.5 18 32 10z"
+        d="M32 9c6.8 8.6 9.2 14.3 9.2 19.8C41.2 36.6 37.7 43 32 43s-9.2-6.4-9.2-14.2C22.8 23.3 25.2 17.6 32 9z"
         fill="url(#bc-flame)"
       />
       <path
-        d="M32 18c3.7 4.7 4.8 8 4.8 10.9 0 4.2-2.2 7.6-4.8 7.6s-4.8-3.4-4.8-7.6c0-2.9 1.1-6.2 4.8-10.9z"
+        d="M32 18c3.9 5 5.2 8.7 5.2 11.8 0 4.4-2.4 7.8-5.2 7.8s-5.2-3.4-5.2-7.8c0-3.1 1.3-6.8 5.2-11.8z"
         fill="#FFD6A3"
-        opacity="0.7"
+        opacity="0.8"
+      />
+
+      {/* Flame outline for crispness */}
+      <path
+        d="M32 9c6.8 8.6 9.2 14.3 9.2 19.8C41.2 36.6 37.7 43 32 43s-9.2-6.4-9.2-14.2C22.8 23.3 25.2 17.6 32 9z"
+        fill="none"
+        stroke="#E06D2B"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        opacity="0.8"
       />
     </svg>
   );

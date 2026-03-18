@@ -132,8 +132,8 @@ export default function Home() {
       >
         <div className="max-w-3xl mx-auto px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 flex items-center justify-center">
-              <BetterCalsMark className="w-9 h-9" />
+            <div className="w-10 h-10 flex items-center justify-center">
+              <BetterCalsMark className="w-10 h-10" />
             </div>
             <div>
               <h1 className="text-lg font-bold font-display" style={{ color: 'var(--text-primary)' }}>

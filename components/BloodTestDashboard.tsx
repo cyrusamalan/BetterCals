@@ -383,7 +383,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
             New Analysis
           </button>
           <div className="flex items-center gap-2">
-            <BetterCalsMark className="w-6 h-6" />
+            <BetterCalsMark className="w-7 h-7" />
             <span className="text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
           </div>
         </div>
