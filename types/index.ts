@@ -46,12 +46,45 @@ export interface Insight {
   recommendation?: string;
 }
 
+export interface CalorieTier {
+  label: string;
+  weeklyChange: string;
+  dailyCalories: number;
+  dailyDeficit: number;
+}
+
+export interface MacroBreakdown {
+  protein: { grams: number; pct: number };
+  carbs: { grams: number; pct: number };
+  fat: { grams: number; pct: number };
+  calories: number;
+}
+
+export interface SupplementRec {
+  name: string;
+  dosage: string;
+  reason: string;
+}
+
+export interface PersonalizedRecs {
+  bmi: number;
+  bmiCategory: string;
+  waterIntakeOz: number;
+  ldlHdlRatio: number | null;
+  ldlHdlInterpretation: string | null;
+  supplements: SupplementRec[];
+  exerciseSuggestions: string[];
+}
+
 export interface AnalysisResult {
   tdee: TDEEResult;
   healthScore: HealthScore;
   insights: Insight[];
   deficiencies: string[];
   risks: string[];
+  calorieTiers: CalorieTier[];
+  macros: MacroBreakdown;
+  recommendations: PersonalizedRecs;
 }
 
 export interface ParsedBloodReport {

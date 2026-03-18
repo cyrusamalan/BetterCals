@@ -3,9 +3,40 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  /* ── Core palette ── */
+  --bg-primary: #f6f5f1;
+  --bg-warm: #faf9f6;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --border: #e4e2dc;
+  --border-light: #eeedea;
+  --border-focus: #8b7e6a;
+
+  --text-primary: #1c1b19;
+  --text-secondary: #5c5850;
+  --text-tertiary: #948e84;
+  --text-inverse: #faf9f6;
+
+  /* ── Brand ── */
+  --accent: #6b8f71;
+  --accent-hover: #5a7d60;
+  --accent-subtle: #e8f0e9;
+  --accent-warm: #b8860b;
+  --accent-rose: #a05a5a;
+
+  /* ── Status — desaturated, organic ── */
+  --status-normal: #5a7a62;
+  --status-normal-bg: #eef3ef;
+  --status-normal-border: #d4dfd6;
+  --status-warning: #9c7a3c;
+  --status-warning-bg: #f5f0e4;
+  --status-warning-border: #e5d9bf;
+  --status-danger: #9c4a4a;
+  --status-danger-bg: #f5eaea;
+  --status-danger-border: #e5cfcf;
+  --status-info: #4a6a8c;
+  --status-info-bg: #eaeff5;
+  --status-info-border: #cfd9e5;
 }
 
 * {
@@ -14,24 +45,277 @@
   margin: 0;
 }
 
-html,
-body {
+html, body {
   max-width: 100vw;
   overflow-x: hidden;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* ── Focus ring ── */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+/* ═══════════════════════════════════════
+   Animations
+   ═══════════════════════════════════════ */
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scoreReveal {
+  from { opacity: 0; transform: scale(0.8) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes needlePop {
+  from { opacity: 0; transform: translateX(-50%) scale(0); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+@keyframes trackGrow {
+  from { width: 0%; }
+}
+
+@keyframes ringDraw {
+  from { stroke-dashoffset: 283; }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(107, 143, 113, 0.3); }
+  50%      { box-shadow: 0 0 0 8px rgba(107, 143, 113, 0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-8px) rotate(1.5deg); }
+}
+
+@keyframes dropzoneBreath {
+  0%, 100% { border-color: var(--border); }
+  50%      { border-color: var(--text-tertiary); }
+}
+
+@keyframes organPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+
+@keyframes bloodFlow {
+  from { stroke-dashoffset: 20; }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes organGlow {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.6; }
+}
+
+@keyframes organBreathe {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50%      { transform: scale(1.04); opacity: 0.7; }
+}
+
+@keyframes digestFlow {
+  from { stroke-dashoffset: 20; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* ── Utility classes ── */
+
+.anim-fade-up {
+  animation: fadeUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.anim-fade-in {
+  animation: fadeIn 0.4s ease both;
+}
+
+.anim-scale-in {
+  animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.anim-slide-right {
+  animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Stagger delays */
+.delay-1 { animation-delay: 0.06s; }
+.delay-2 { animation-delay: 0.12s; }
+.delay-3 { animation-delay: 0.18s; }
+.delay-4 { animation-delay: 0.24s; }
+.delay-5 { animation-delay: 0.30s; }
+.delay-6 { animation-delay: 0.36s; }
+.delay-7 { animation-delay: 0.42s; }
+.delay-8 { animation-delay: 0.48s; }
+.delay-9 { animation-delay: 0.54s; }
+.delay-10 { animation-delay: 0.60s; }
+
+/* ── Card hover ── */
+.card-hover {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+}
+.card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+
+/* ── Button press ── */
+.btn-press {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;
+}
+.btn-press:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+.btn-press:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+}
+
+/* ── Noise texture overlay ── */
+.noise::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  border-radius: inherit;
+}
+
+/* ── Score ring ── */
+.score-ring-anim {
+  animation: ringDraw 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+
+.score-enter {
+  animation: scoreReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+}
+
+.needle-pop {
+  animation: needlePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.track-grow {
+  animation: trackGrow 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Form inputs ── */
+.input-field {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+}
+.input-field::placeholder {
+  color: var(--text-tertiary);
+}
+.input-field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(107, 143, 113, 0.12);
+}
+.input-field:hover:not(:focus) {
+  border-color: var(--border-focus);
+}
+
+/* ── Select styling ── */
+.select-field {
+  width: 100%;
+  padding: 0.625rem 2.25rem 0.625rem 0.875rem;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23948e84' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+  cursor: pointer;
+}
+.select-field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(107, 143, 113, 0.12);
+}
+.select-field:hover:not(:focus) {
+  border-color: var(--border-focus);
+}
+
+/* ── Dropzone ── */
+.dropzone-idle {
+  animation: dropzoneBreath 3s ease-in-out infinite;
+}
+.dropzone-idle:hover {
+  animation: none;
+  border-color: var(--accent) !important;
+  background: var(--accent-subtle) !important;
+}
+
+/* ── Anatomy SVG animations ── */
+.anatomy-pulse {
+  transform-origin: center;
+  animation: organPulse 2.5s ease-in-out infinite;
+}
+
+.anatomy-blood-flow {
+  animation: bloodFlow 2s linear infinite;
+}
+
+.anatomy-glow {
+  animation: organGlow 3s ease-in-out infinite;
+}
+
+.anatomy-breathe {
+  transform-origin: center;
+  animation: organBreathe 4s ease-in-out infinite;
+}
+
+.anatomy-digest-flow {
+  animation: digestFlow 3s linear infinite;
 }
