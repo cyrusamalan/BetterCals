@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { Heart, Activity, FileText, Droplets, ChevronRight } from 'lucide-react';
-import Image from 'next/image';
 import TDEEForm from '@/components/TDEEForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
 import BloodValuesForm from '@/components/BloodValuesForm';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
+import BetterCalsMark from '@/components/BetterCalsMark';
 import {
   UserProfile,
   BloodMarkers,
@@ -132,15 +132,8 @@ export default function Home() {
       >
         <div className="max-w-3xl mx-auto px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-transparent">
-              <Image
-                src="/brand/bettercals-mark.png"
-                alt="BetterCals"
-                width={64}
-                height={64}
-                className="w-full h-full object-contain"
-                priority
-              />
+            <div className="w-9 h-9 flex items-center justify-center">
+              <BetterCalsMark className="w-9 h-9" />
             </div>
             <div>
               <h1 className="text-lg font-bold font-display" style={{ color: 'var(--text-primary)' }}>
