@@ -1,4 +1,5 @@
 import { UserProfile, ActivityLevel, TDEEResult, BloodMarkers, HealthScore, Insight, CalorieTier, MacroBreakdown, PersonalizedRecs } from '@/types';
+import { getMarkerInterpretation } from '@/lib/bloodParser';
 
 const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   'sedentary': 1.2,
@@ -59,91 +60,44 @@ export function calculateTDEE(profile: UserProfile): TDEEResult {
   };
 }
 
-export function calculateHealthScore(markers: BloodMarkers): HealthScore {
-  const scores = {
-    metabolic: calculateMetabolicScore(markers),
-    cardiovascular: calculateCardiovascularScore(markers),
-    hormonal: calculateHormonalScore(markers),
-    nutritional: calculateNutritionalScore(markers),
+export function calculateHealthScore(markers: BloodMarkers, profile?: Pick<UserProfile, 'gender'>): HealthScore {
+  const gender = profile?.gender;
+
+  const scoreCategory = (keys: (keyof BloodMarkers)[]): { score: number; hasData: boolean } => {
+    const values = keys
+      .map((k) => {
+        const v = markers[k];
+        if (v === undefined) return null;
+        return getMarkerInterpretation(k, v, gender).score;
+      })
+      .filter((v): v is number => v !== null);
+
+    if (values.length === 0) return { score: 0, hasData: false };
+    const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+    return { score: Math.round(avg), hasData: true };
   };
 
-  const overall = Math.round(
-    (scores.metabolic + scores.cardiovascular + scores.hormonal + scores.nutritional) / 4
-  );
+  const metabolic = scoreCategory(['glucose', 'hba1c']);
+  const cardiovascular = scoreCategory(['totalCholesterol', 'ldl', 'hdl', 'triglycerides']);
+  const hormonal = scoreCategory(['tsh']);
+  const nutritional = scoreCategory(['vitaminD', 'vitaminB12', 'ferritin', 'iron']);
+
+  const validCategoryScores = [metabolic, cardiovascular, hormonal, nutritional]
+    .filter((c) => c.hasData)
+    .map((c) => c.score);
+
+  const overall =
+    validCategoryScores.length === 0
+      ? 0
+      : Math.round(validCategoryScores.reduce((sum, v) => sum + v, 0) / validCategoryScores.length);
 
   return {
     overall,
-    ...scores,
+    metabolic: metabolic.score,
+    cardiovascular: cardiovascular.score,
+    hormonal: hormonal.score,
+    nutritional: nutritional.score,
   };
-}
-
-function calculateMetabolicScore(markers: BloodMarkers): number {
-  let score = 70; // baseline
-  
-  if (markers.glucose !== undefined) {
-    if (markers.glucose < 100) score += 15;
-    else if (markers.glucose < 126) score += 5;
-    else score -= 20;
-  }
-
-  if (markers.hba1c !== undefined) {
-    if (markers.hba1c < 5.7) score += 15;
-    else if (markers.hba1c < 6.5) score += 5;
-    else score -= 20;
-  }
-
-  return Math.max(0, Math.min(100, score));
-}
-
-function calculateCardiovascularScore(markers: BloodMarkers): number {
-  let score = 70;
-
-  if (markers.ldl !== undefined) {
-    if (markers.ldl < 100) score += 10;
-    else if (markers.ldl < 130) score += 5;
-    else if (markers.ldl < 160) score -= 10;
-    else score -= 20;
-  }
-
-  if (markers.hdl !== undefined) {
-    if (markers.hdl > 60) score += 15;
-    else if (markers.hdl > 40) score += 5;
-    else score -= 10;
-  }
-
-  if (markers.triglycerides !== undefined) {
-    if (markers.triglycerides < 150) score += 10;
-    else if (markers.triglycerides < 200) score += 0;
-    else score -= 15;
-  }
-
-  return Math.max(0, Math.min(100, score));
-}
-
-function calculateHormonalScore(markers: BloodMarkers): number {
-  let score = 75;
-
-  if (markers.tsh !== undefined) {
-    if (markers.tsh >= 0.5 && markers.tsh <= 4.0) score += 10;
-    else if (markers.tsh >= 0.3 && markers.tsh <= 5.0) score += 0;
-    else score -= 15;
-  }
-
-  return Math.max(0, Math.min(100, score));
-}
-
-function calculateNutritionalScore(markers: BloodMarkers): number {
-  let score = 70;
-  let deficiencies = 0;
-
-  if (markers.vitaminD !== undefined && markers.vitaminD < 30) deficiencies++;
-  if (markers.vitaminB12 !== undefined && markers.vitaminB12 < 300) deficiencies++;
-  if (markers.ferritin !== undefined && markers.ferritin < 30) deficiencies++;
-  if (markers.iron !== undefined && markers.iron < 60) deficiencies++;
-
-  score -= deficiencies * 10;
-  
-  return Math.max(0, Math.min(100, score));
 }
 
 export function generateInsights(profile: UserProfile, tdee: TDEEResult, markers: BloodMarkers): Insight[] {

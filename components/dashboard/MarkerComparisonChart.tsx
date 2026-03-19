@@ -1,11 +1,12 @@
 'use client';
 
-import { BloodMarkers } from '@/types';
-import { REFERENCE_RANGES, getMarkerStatus } from '@/lib/bloodParser';
+import type { BloodMarkers, UserProfile } from '@/types';
+import { getMarkerDisplayRange, getMarkerInterpretation } from '@/lib/bloodParser';
 import { BarChart, Bar, XAxis, YAxis, ReferenceLine, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface MarkerComparisonChartProps {
   markers: BloodMarkers;
+  gender?: UserProfile['gender'];
 }
 
 const MARKER_SHORT: Record<keyof BloodMarkers, string> = {
@@ -24,24 +25,26 @@ const MARKER_SHORT: Record<keyof BloodMarkers, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   normal: '#5a7a62',
+  optimal: '#3f7a5b',
+  borderline: '#9c7a3c',
   low: '#4a6a8c',
   high: '#9c7a3c',
   critical: '#9c4a4a',
 };
 
-export default function MarkerComparisonChart({ markers }: MarkerComparisonChartProps) {
+export default function MarkerComparisonChart({ markers, gender }: MarkerComparisonChartProps) {
   const data = (Object.keys(markers) as (keyof BloodMarkers)[])
-    .filter((key) => markers[key] !== undefined && REFERENCE_RANGES[key])
+    .filter((key) => markers[key] !== undefined && getMarkerDisplayRange(key, gender))
     .map((key) => {
       const value = markers[key]!;
-      const range = REFERENCE_RANGES[key];
+      const range = getMarkerDisplayRange(key, gender)!;
       const midpoint = (range.min + range.max) / 2;
       const pct = Math.round((value / midpoint) * 100);
-      const status = getMarkerStatus(key, value);
+      const interp = getMarkerInterpretation(key, value, gender);
       return {
         name: MARKER_SHORT[key],
         pct,
-        fill: STATUS_COLORS[status] || STATUS_COLORS.normal,
+        fill: STATUS_COLORS[interp.status] || STATUS_COLORS.normal,
       };
     });
 

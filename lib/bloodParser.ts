@@ -1,20 +1,123 @@
-import { BloodMarkers } from '@/types';
+import type { BloodMarkers, MarkerDefinition, MarkerInterpretation, MarkerRangeTier, UserProfile } from '@/types';
 
-// Reference ranges for common blood markers
-export const REFERENCE_RANGES: Record<keyof BloodMarkers, { min: number; max: number; unit: string }> = {
-  glucose: { min: 70, max: 99, unit: 'mg/dL' },
-  hba1c: { min: 4.0, max: 5.6, unit: '%' },
-  totalCholesterol: { min: 0, max: 199, unit: 'mg/dL' },
-  ldl: { min: 0, max: 99, unit: 'mg/dL' },
-  // HDL is generally "higher is better"; we treat low HDL as abnormal,
-  // and use 60 as a practical "optimal" threshold for UI range display.
-  hdl: { min: 40, max: 60, unit: 'mg/dL' },
-  triglycerides: { min: 0, max: 149, unit: 'mg/dL' },
-  tsh: { min: 0.5, max: 4.0, unit: 'mIU/L' },
-  vitaminD: { min: 30, max: 100, unit: 'ng/mL' },
-  vitaminB12: { min: 300, max: 900, unit: 'pg/mL' },
-  ferritin: { min: 30, max: 300, unit: 'ng/mL' },
-  iron: { min: 60, max: 170, unit: 'mcg/dL' },
+const VERY_HIGH = 999999;
+
+export const MARKER_RULES: Record<keyof BloodMarkers, MarkerDefinition> = {
+  glucose: {
+    unit: 'mg/dL',
+    universal: [
+      { min: 0, max: 69, status: 'low', label: 'Low', score: 55 },
+      { min: 70, max: 99, status: 'normal', label: 'Normal', score: 95 },
+      { min: 100, max: 125, status: 'borderline', label: 'Pre-diabetes', score: 65 },
+      { min: 126, max: 199, status: 'high', label: 'High', score: 40 },
+      { min: 200, max: VERY_HIGH, status: 'critical', label: 'Critical', score: 15 },
+    ],
+  },
+  hba1c: {
+    unit: '%',
+    universal: [
+      { min: 0, max: 5.3, status: 'optimal', label: 'Optimal', score: 100 },
+      { min: 5.4, max: 5.6, status: 'normal', label: 'Normal', score: 92 },
+      { min: 5.7, max: 6.4, status: 'borderline', label: 'Pre-diabetes', score: 60 },
+      { min: 6.5, max: 7.4, status: 'high', label: 'High', score: 35 },
+      { min: 7.5, max: VERY_HIGH, status: 'critical', label: 'Critical', score: 15 },
+    ],
+  },
+  totalCholesterol: {
+    unit: 'mg/dL',
+    universal: [
+      { min: 0, max: 199, status: 'normal', label: 'Desirable', score: 92 },
+      { min: 200, max: 239, status: 'borderline', label: 'Borderline high', score: 65 },
+      { min: 240, max: 299, status: 'high', label: 'High', score: 40 },
+      { min: 300, max: VERY_HIGH, status: 'critical', label: 'Critical', score: 15 },
+    ],
+  },
+  ldl: {
+    unit: 'mg/dL',
+    universal: [
+      { min: 0, max: 99, status: 'optimal', label: 'Optimal', score: 100 },
+      { min: 100, max: 129, status: 'normal', label: 'Near optimal', score: 85 },
+      { min: 130, max: 159, status: 'borderline', label: 'Borderline high', score: 60 },
+      { min: 160, max: 189, status: 'high', label: 'High', score: 35 },
+      { min: 190, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
+  hdl: {
+    unit: 'mg/dL',
+    universal: [
+      { min: 0, max: 39, status: 'low', label: 'Low', score: 45 },
+      { min: 40, max: 59, status: 'normal', label: 'Normal', score: 85 },
+      { min: 60, max: VERY_HIGH, status: 'optimal', label: 'Protective', score: 100 },
+    ],
+  },
+  triglycerides: {
+    unit: 'mg/dL',
+    universal: [
+      { min: 0, max: 149, status: 'normal', label: 'Normal', score: 92 },
+      { min: 150, max: 199, status: 'borderline', label: 'Borderline high', score: 65 },
+      { min: 200, max: 499, status: 'high', label: 'High', score: 35 },
+      { min: 500, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
+  tsh: {
+    unit: 'mIU/L',
+    universal: [
+      { min: 0, max: 0.09, status: 'critical', label: 'Very low', score: 15 },
+      { min: 0.1, max: 0.39, status: 'low', label: 'Low', score: 45 },
+      { min: 0.4, max: 4.0, status: 'normal', label: 'Normal', score: 92 },
+      { min: 4.01, max: 10.0, status: 'high', label: 'High', score: 45 },
+      { min: 10.01, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
+  vitaminD: {
+    unit: 'ng/mL',
+    universal: [
+      { min: 0, max: 11, status: 'critical', label: 'Deficient', score: 15 },
+      { min: 12, max: 19, status: 'low', label: 'Low', score: 40 },
+      { min: 20, max: 29, status: 'borderline', label: 'Insufficient', score: 65 },
+      { min: 30, max: 60, status: 'optimal', label: 'Optimal', score: 100 },
+      { min: 61, max: 100, status: 'normal', label: 'Normal', score: 90 },
+      { min: 101, max: 150, status: 'high', label: 'High', score: 70 },
+      { min: 151, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 40 },
+    ],
+  },
+  vitaminB12: {
+    unit: 'pg/mL',
+    universal: [
+      { min: 0, max: 199, status: 'critical', label: 'Very low', score: 15 },
+      { min: 200, max: 299, status: 'low', label: 'Low', score: 45 },
+      { min: 300, max: 900, status: 'normal', label: 'Normal', score: 92 },
+      { min: 901, max: 2000, status: 'high', label: 'High', score: 85 },
+      { min: 2001, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 70 },
+    ],
+  },
+  ferritin: {
+    unit: 'ng/mL',
+    male: [
+      { min: 0, max: 14, status: 'critical', label: 'Very low', score: 15 },
+      { min: 15, max: 29, status: 'low', label: 'Low', score: 45 },
+      { min: 30, max: 300, status: 'normal', label: 'Normal', score: 92 },
+      { min: 301, max: 500, status: 'high', label: 'High', score: 70 },
+      { min: 501, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 45 },
+    ],
+    female: [
+      { min: 0, max: 9, status: 'critical', label: 'Very low', score: 15 },
+      { min: 10, max: 14, status: 'low', label: 'Low', score: 45 },
+      { min: 15, max: 150, status: 'normal', label: 'Normal', score: 92 },
+      { min: 151, max: 300, status: 'high', label: 'High', score: 70 },
+      { min: 301, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 45 },
+    ],
+  },
+  iron: {
+    unit: 'mcg/dL',
+    universal: [
+      { min: 0, max: 39, status: 'critical', label: 'Very low', score: 15 },
+      { min: 40, max: 59, status: 'low', label: 'Low', score: 45 },
+      { min: 60, max: 170, status: 'normal', label: 'Normal', score: 92 },
+      { min: 171, max: 200, status: 'high', label: 'High', score: 75 },
+      { min: 201, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 50 },
+    ],
+  },
 };
 
 export function parseBloodReport(text: string): BloodMarkers {
@@ -81,24 +184,66 @@ export function parseBloodReport(text: string): BloodMarkers {
   return markers;
 }
 
-export function getMarkerStatus(marker: keyof BloodMarkers, value: number): 'normal' | 'low' | 'high' | 'critical' {
-  const range = REFERENCE_RANGES[marker];
-  if (!range) return 'normal';
+export function getMarkerInterpretation(
+  marker: keyof BloodMarkers,
+  value: number,
+  gender?: UserProfile['gender'],
+): MarkerInterpretation {
+  const def = MARKER_RULES[marker];
+  const tiers = getMarkerTiers(marker, gender);
 
-  // HDL: low is a risk factor; high HDL should not be flagged as "high".
-  if (marker === 'hdl') {
-    if (value < range.min * 0.7) return 'critical';
-    if (value < range.min) return 'low';
-    return 'normal';
+  if (!def || !tiers || !Number.isFinite(value)) {
+    return { status: 'critical', label: 'Critical', score: 0 };
   }
 
-  if (value < range.min * 0.7 || value > range.max * 1.5) return 'critical';
-  if (value < range.min || value > range.max) return value < range.min ? 'low' : 'high';
-  return 'normal';
+  const tier = tiers.find((t) => value >= t.min && value <= t.max);
+  if (tier) return { status: tier.status, label: tier.label, score: tier.score };
+
+  // Out-of-bounds fallback
+  return { status: 'critical', label: 'Critical', score: 0 };
 }
 
 export function formatMarkerValue(marker: keyof BloodMarkers, value: number): string {
-  const range = REFERENCE_RANGES[marker];
-  if (!range) return `${value}`;
-  return `${value} ${range.unit}`;
+  const unit = MARKER_RULES[marker]?.unit;
+  if (!unit) return `${value}`;
+  return `${value} ${unit}`;
+}
+
+export function getMarkerTiers(
+  marker: keyof BloodMarkers,
+  gender?: UserProfile['gender'],
+): MarkerRangeTier[] {
+  const def = MARKER_RULES[marker];
+  if (!def) return [];
+
+  const preferred =
+    gender === 'male' ? def.male :
+    gender === 'female' ? def.female :
+    undefined;
+
+  return preferred ?? def.universal ?? [];
+}
+
+export function getMarkerUnit(marker: keyof BloodMarkers): string | undefined {
+  return MARKER_RULES[marker]?.unit;
+}
+
+export function getMarkerReferenceTier(
+  marker: keyof BloodMarkers,
+  gender?: UserProfile['gender'],
+): MarkerRangeTier | undefined {
+  const tiers = getMarkerTiers(marker, gender);
+  return tiers.find((t) => t.status === 'optimal') ?? tiers.find((t) => t.status === 'normal');
+}
+
+export function getMarkerDisplayRange(
+  marker: keyof BloodMarkers,
+  gender?: UserProfile['gender'],
+): { min: number; max: number; unit: string; maxLabel: string } | null {
+  const unit = getMarkerUnit(marker);
+  const ref = getMarkerReferenceTier(marker, gender);
+  if (!unit || !ref) return null;
+
+  const maxLabel = ref.max >= VERY_HIGH ? `${ref.min}+` : `${ref.max}`;
+  return { min: ref.min, max: ref.max, unit, maxLabel };
 }

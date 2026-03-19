@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { AnalysisResult, BloodMarkers, Insight, UserProfile } from '@/types';
-import { REFERENCE_RANGES, getMarkerStatus } from '@/lib/bloodParser';
+import { getMarkerDisplayRange, getMarkerInterpretation } from '@/lib/bloodParser';
 import BetterCalsMark from '@/components/BetterCalsMark';
 import {
   Heart,
@@ -102,8 +102,12 @@ function getScoreGrade(score: number): { label: string; color: string } {
 
 function getStatusStyle(status: string) {
   switch (status) {
+    case 'optimal':
+      return { color: 'var(--status-normal)', bg: 'var(--status-normal-bg)', label: 'Optimal' };
     case 'normal':
       return { color: 'var(--status-normal)', bg: 'var(--status-normal-bg)', label: 'Normal' };
+    case 'borderline':
+      return { color: 'var(--status-warning)', bg: 'var(--status-warning-bg)', label: 'Borderline' };
     case 'low':
       return { color: 'var(--status-info)', bg: 'var(--status-info-bg)', label: 'Low' };
     case 'high':
@@ -115,19 +119,21 @@ function getStatusStyle(status: string) {
   }
 }
 
-function getRangePercent(key: keyof BloodMarkers, value: number): number {
-  const range = REFERENCE_RANGES[key];
+function getRangePercent(key: keyof BloodMarkers, value: number, gender?: UserProfile['gender']): number {
+  const range = getMarkerDisplayRange(key, gender);
   if (!range) return 50;
-  const visualMin = range.min * 0.5;
+
+  const visualMin = Math.max(0, range.min * 0.5);
   const visualMax = range.max * 1.5;
   const pct = ((value - visualMin) / (visualMax - visualMin)) * 100;
   return Math.max(2, Math.min(98, pct));
 }
 
-function getRangeNormalZone(key: keyof BloodMarkers): { left: number; width: number } {
-  const range = REFERENCE_RANGES[key];
+function getRangeNormalZone(key: keyof BloodMarkers, gender?: UserProfile['gender']): { left: number; width: number } {
+  const range = getMarkerDisplayRange(key, gender);
   if (!range) return { left: 20, width: 60 };
-  const visualMin = range.min * 0.5;
+
+  const visualMin = Math.max(0, range.min * 0.5);
   const visualMax = range.max * 1.5;
   const left = ((range.min - visualMin) / (visualMax - visualMin)) * 100;
   const right = ((range.max - visualMin) / (visualMax - visualMin)) * 100;
@@ -172,12 +178,22 @@ function ScoreRing({ score, size = 150 }: { score: number; size?: number }) {
   );
 }
 
-function RangeBar({ markerKey, value, delay }: { markerKey: keyof BloodMarkers; value: number; delay: number }) {
-  const status = getMarkerStatus(markerKey, value);
-  const style = getStatusStyle(status);
-  const needlePos = getRangePercent(markerKey, value);
-  const normalZone = getRangeNormalZone(markerKey);
-  const range = REFERENCE_RANGES[markerKey];
+function RangeBar({
+  markerKey,
+  value,
+  delay,
+  gender,
+}: {
+  markerKey: keyof BloodMarkers;
+  value: number;
+  delay: number;
+  gender?: UserProfile['gender'];
+}) {
+  const interp = getMarkerInterpretation(markerKey, value, gender);
+  const style = getStatusStyle(interp.status);
+  const needlePos = getRangePercent(markerKey, value, gender);
+  const normalZone = getRangeNormalZone(markerKey, gender);
+  const range = getMarkerDisplayRange(markerKey, gender);
 
   return (
     <div className="space-y-1.5">
@@ -196,7 +212,7 @@ function RangeBar({ markerKey, value, delay }: { markerKey: keyof BloodMarkers; 
             className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
             style={{ color: style.color, backgroundColor: style.bg }}
           >
-            {style.label}
+            {interp.label}
           </span>
         </div>
       </div>
@@ -233,7 +249,7 @@ function RangeBar({ markerKey, value, delay }: { markerKey: keyof BloodMarkers; 
       <div className="flex justify-between">
         <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>{range?.min}</span>
         <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
-          {markerKey === 'hdl' ? `60+ ${range?.unit}` : `${range?.max} ${range?.unit}`}
+          {range ? `${range.maxLabel} ${range.unit}` : ''}
         </span>
       </div>
     </div>
@@ -241,9 +257,13 @@ function RangeBar({ markerKey, value, delay }: { markerKey: keyof BloodMarkers; 
 }
 
 function CategoryCard({
-  category, markers, score, delayBase,
+  category, markers, score, delayBase, gender,
 }: {
-  category: (typeof CATEGORIES)[number]; markers: BloodMarkers; score: number; delayBase: number;
+  category: (typeof CATEGORIES)[number];
+  markers: BloodMarkers;
+  score: number;
+  delayBase: number;
+  gender?: UserProfile['gender'];
 }) {
   const Icon = category.icon;
   const grade = getScoreGrade(score);
@@ -273,7 +293,13 @@ function CategoryCard({
       </div>
       <div className="px-5 py-4 space-y-5">
         {present.map((key, i) => (
-          <RangeBar key={key} markerKey={key} value={markers[key]!} delay={delayBase + i * 100} />
+          <RangeBar
+            key={key}
+            markerKey={key}
+            value={markers[key]!}
+            delay={delayBase + i * 100}
+            gender={gender}
+          />
         ))}
       </div>
     </div>
@@ -527,7 +553,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
         {hasMarkers && (
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-5 anim-fade-up delay-4">
             <HealthRadarChart healthScore={healthScore} />
-            <MarkerComparisonChart markers={markers} />
+            <MarkerComparisonChart markers={markers} gender={profile.gender} />
           </div>
         )}
 
@@ -536,7 +562,13 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-5">
             {CATEGORIES.map((cat, i) => (
               <div key={cat.key} className={`anim-fade-up delay-${i + 5}`}>
-                <CategoryCard category={cat} markers={markers} score={healthScore[cat.scoreKey]} delayBase={400 + i * 150} />
+                <CategoryCard
+                  category={cat}
+                  markers={markers}
+                  score={healthScore[cat.scoreKey]}
+                  delayBase={400 + i * 150}
+                  gender={profile.gender}
+                />
               </div>
             ))}
           </div>

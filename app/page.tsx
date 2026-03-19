@@ -67,7 +67,7 @@ export default function Home() {
 
     if (profile) {
       const tdee = calculateTDEE(profile);
-      const healthScore = calculateHealthScore(mergedMarkers);
+      const healthScore = calculateHealthScore(mergedMarkers, { gender: profile.gender });
       const insights = usedAverageMarkers ? [] : generateInsights(profile, tdee, mergedMarkers);
       const deficiencies = usedAverageMarkers ? [] : identifyDeficiencies(mergedMarkers);
 

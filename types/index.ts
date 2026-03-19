@@ -24,6 +24,35 @@ export interface BloodMarkers {
   iron?: number; // mcg/dL
 }
 
+export type MarkerStatus =
+  | 'low'
+  | 'optimal'
+  | 'normal'
+  | 'borderline'
+  | 'high'
+  | 'critical';
+
+export interface MarkerRangeTier {
+  min: number;
+  max: number;
+  status: MarkerStatus;
+  score: number; // 0-100
+  label: string;
+}
+
+export interface MarkerDefinition {
+  unit: string;
+  universal?: MarkerRangeTier[];
+  male?: MarkerRangeTier[];
+  female?: MarkerRangeTier[];
+}
+
+export interface MarkerInterpretation {
+  status: MarkerStatus;
+  label: string;
+  score: number;
+}
+
 export interface TDEEResult {
   bmr: number;
   tdee: number;
