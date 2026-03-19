@@ -136,6 +136,7 @@ export function generateInsights(profile: UserProfile, tdee: TDEEResult, markers
   const typeFromStatus = (status: ReturnType<typeof getMarkerInterpretation>['status']): Insight['type'] => {
     if (status === 'critical' || status === 'high') return 'danger';
     if (status === 'borderline' || status === 'low') return 'warning';
+    if (status === 'unknown') return 'info';
     // normal / optimal
     return 'success';
   };

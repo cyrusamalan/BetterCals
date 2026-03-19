@@ -118,6 +118,8 @@ function getStatusStyle(status: string) {
       return { color: 'var(--status-warning)', bg: 'var(--status-warning-bg)', label: 'High' };
     case 'critical':
       return { color: 'var(--status-danger)', bg: 'var(--status-danger-bg)', label: 'Critical' };
+    case 'unknown':
+      return { color: 'var(--text-tertiary)', bg: 'var(--border-light)', label: 'Unmapped' };
     default:
       return { color: 'var(--text-secondary)', bg: 'var(--border-light)', label: status };
   }
@@ -553,21 +555,26 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
           <MacroDonutChart macros={macros} />
         </div>
 
-        {/* 4. Charts row — radar + marker comparison */}
+        {/* 4. Charts row — radar, ASCVD, and full-width marker comparison */}
         {hasMarkers && (
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-5 anim-fade-up delay-4">
-            <div className="md:col-span-1">
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-5 anim-fade-up delay-4">
+            {/* Top Left: Radar */}
+            <div className="md:col-span-1 h-full">
               <HealthRadarChart healthScore={healthScore} />
             </div>
-            <div className="md:col-span-1">
-              <MarkerComparisonChart markers={markers} gender={profile.gender} />
-            </div>
-            <div className="md:col-span-1">
+            
+            {/* Top Right: ASCVD Risk */}
+            <div className="md:col-span-1 h-full">
               <ASCVDRiskCard
                 ascvdRiskScore={result.ascvdRiskScore}
                 age={profile.age}
                 hasLipids={markers.totalCholesterol !== undefined && markers.hdl !== undefined}
               />
+            </div>
+            
+            {/* Bottom: Full Width Comparison Chart */}
+            <div className="md:col-span-2">
+              <MarkerComparisonChart markers={markers} gender={profile.gender} />
             </div>
           </div>
         )}

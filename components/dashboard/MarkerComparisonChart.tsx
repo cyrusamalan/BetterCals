@@ -33,6 +33,7 @@ const STATUS_COLORS: Record<string, string> = {
   low: '#4a6a8c',
   high: '#9c7a3c',
   critical: '#9c4a4a',
+  unknown: '#8a857c',
 };
 
 export default function MarkerComparisonChart({ markers, gender }: MarkerComparisonChartProps) {

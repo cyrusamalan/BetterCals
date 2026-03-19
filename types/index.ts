@@ -37,7 +37,8 @@ export type MarkerStatus =
   | 'normal'
   | 'borderline'
   | 'high'
-  | 'critical';
+  | 'critical'
+  | 'unknown';
 
 export interface MarkerRangeTier {
   min: number;

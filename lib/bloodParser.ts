@@ -242,15 +242,16 @@ export function getMarkerInterpretation(
   const def = MARKER_RULES[marker];
   const tiers = getMarkerTiers(marker, gender);
 
-  if (!def || !tiers || !Number.isFinite(value)) {
-    return { status: 'critical', label: 'Critical', score: 0 };
+  // SAFE FALLBACK: missing rules/tiers or invalid value should not trigger "Critical"
+  if (!def || !tiers || tiers.length === 0 || !Number.isFinite(value)) {
+    return { status: 'unknown', label: 'Unmapped', score: 50 };
   }
 
   const tier = tiers.find((t) => value >= t.min && value <= t.max);
   if (tier) return { status: tier.status, label: tier.label, score: tier.score };
 
   // Out-of-bounds fallback
-  return { status: 'critical', label: 'Critical', score: 0 };
+  return { status: 'critical', label: 'Out of Range', score: 0 };
 }
 
 export function formatMarkerValue(marker: keyof BloodMarkers, value: number): string {
