@@ -1,9 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="BetterCals">
-  <path d="M176 66 C206 94 220 132 210 170 C198 214 150 232 118 210 C122 170 140 112 176 66 Z" fill="#6F8B73"/>
-  <path d="M186 84 C203 106 209 132 204 158 C196 190 167 204 145 196 C151 165 162 120 186 84 Z" fill="#5E7865" opacity="0.7"/>
+  <defs>
+    <linearGradient id="bcHeart" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F36A5B"/>
+      <stop offset="60%" stop-color="#E24B4B"/>
+      <stop offset="100%" stop-color="#C93A45"/>
+    </linearGradient>
+    <linearGradient id="bcHeartHighlight" x1="0.2" y1="0" x2="0.9" y2="1">
+      <stop offset="0%" stop-color="#FFD3C7" stop-opacity="0.75"/>
+      <stop offset="70%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
 
-  <path d="M106 26 C142 66 166 100 166 142 C166 202 126 228 88 228 C58 228 38 206 38 178 C38 134 78 106 96 74 C110 50 112 38 106 26 Z" fill="#F28C2B"/>
-  <path d="M122 54 C146 84 150 110 140 134 C124 176 114 194 122 220 C92 202 82 172 86 148 C92 114 120 100 126 76 C128 68 127 60 122 54 Z" fill="#E56B22" opacity="0.95"/>
-  <path d="M138 64 C154 94 152 116 140 136 C124 164 118 184 126 206 C108 192 104 172 110 154 C118 132 136 120 140 102 C144 86 144 74 138 64 Z" fill="#D94A2A" opacity="0.92"/>
+  <path d="M128 220 C96 194 56 160 56 116 C56 88 74 68 100 68 C114 68 124 74 128 82 C132 74 142 68 156 68 C182 68 200 88 200 116 C200 160 160 194 128 220 Z" fill="url(#bcHeart)"/>
+  <path d="M98 84 C86 90 78 102 78 116 C78 140 100 162 128 186 C112 168 100 148 100 126 C100 110 108 98 118 90 C110 84 104 82 98 84 Z" fill="url(#bcHeartHighlight)"/>
 </svg>
 

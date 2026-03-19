@@ -19,72 +19,45 @@ export default function BetterCalsMark({
     >
       <title>{title}</title>
 
-      {/* Leaf (behind, right) */}
+      <defs>
+        <linearGradient id="bcHeart" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#F36A5B" />
+          <stop offset="60%" stopColor="#E24B4B" />
+          <stop offset="100%" stopColor="#C93A45" />
+        </linearGradient>
+        <linearGradient id="bcHeartHighlight" x1="0.2" y1="0" x2="0.9" y2="1">
+          <stop offset="0%" stopColor="#FFD3C7" stopOpacity="0.75" />
+          <stop offset="70%" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+
+      {/* Heart mark */}
       <path
         d="
-          M 176 66
-          C 206 94 220 132 210 170
-          C 198 214 150 232 118 210
-          C 122 170 140 112 176 66
+          M 128 220
+          C 96 194 56 160 56 116
+          C 56 88 74 68 100 68
+          C 114 68 124 74 128 82
+          C 132 74 142 68 156 68
+          C 182 68 200 88 200 116
+          C 200 160 160 194 128 220
           Z
         "
-        fill="#6F8B73"
-      />
-      {/* Leaf inner shade */}
-      <path
-        d="
-          M 186 84
-          C 203 106 209 132 204 158
-          C 196 190 167 204 145 196
-          C 151 165 162 120 186 84
-          Z
-        "
-        fill="#5E7865"
-        opacity="0.7"
+        fill="url(#bcHeart)"
       />
 
-      {/* Flame outer (left) */}
+      {/* Inner highlight */}
       <path
         d="
-          M 106 26
-          C 142 66 166 100 166 142
-          C 166 202 126 228 88 228
-          C 58 228 38 206 38 178
-          C 38 134 78 106 96 74
-          C 110 50 112 38 106 26
+          M 98 84
+          C 86 90 78 102 78 116
+          C 78 140 100 162 128 186
+          C 112 168 100 148 100 126
+          C 100 110 108 98 118 90
+          C 110 84 104 82 98 84
           Z
         "
-        fill="#F28C2B"
-      />
-
-      {/* Flame inner (darker orange) */}
-      <path
-        d="
-          M 122 54
-          C 146 84 150 110 140 134
-          C 124 176 114 194 122 220
-          C 92 202 82 172 86 148
-          C 92 114 120 100 126 76
-          C 128 68 127 60 122 54
-          Z
-        "
-        fill="#E56B22"
-        opacity="0.95"
-      />
-
-      {/* Red stripe */}
-      <path
-        d="
-          M 138 64
-          C 154 94 152 116 140 136
-          C 124 164 118 184 126 206
-          C 108 192 104 172 110 154
-          C 118 132 136 120 140 102
-          C 144 86 144 74 138 64
-          Z
-        "
-        fill="#D94A2A"
-        opacity="0.92"
+        fill="url(#bcHeartHighlight)"
       />
     </svg>
   );
