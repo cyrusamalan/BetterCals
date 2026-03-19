@@ -21,6 +21,7 @@ import {
   calculateCalorieTiers,
   calculateMacros,
   calculateRecommendations,
+  calculateASCVDRiskScore,
 } from '@/lib/calculations';
 import { parseBloodReport } from '@/lib/bloodParser';
 import { estimateAverageMarkers } from '@/lib/averageMarkers';
@@ -69,17 +70,19 @@ export default function Home() {
       const tdee = calculateTDEE(profile);
       const healthScore = calculateHealthScore(mergedMarkers, { gender: profile.gender });
       const insights = usedAverageMarkers ? [] : generateInsights(profile, tdee, mergedMarkers);
-      const deficiencies = usedAverageMarkers ? [] : identifyDeficiencies(mergedMarkers);
+      const deficiencies = usedAverageMarkers ? [] : identifyDeficiencies(mergedMarkers, profile);
+      const ascvdRiskScore = usedAverageMarkers ? undefined : calculateASCVDRiskScore(profile, mergedMarkers) ?? undefined;
 
       setResult({
         tdee,
         healthScore,
         insights,
         deficiencies,
-        risks: usedAverageMarkers ? [] : identifyRisks(mergedMarkers),
+        risks: usedAverageMarkers ? [] : identifyRisks(mergedMarkers, profile),
         calorieTiers: calculateCalorieTiers(tdee.tdee),
         macros: calculateMacros(tdee.targetCalories, profile.goal),
         recommendations: calculateRecommendations(profile, mergedMarkers, deficiencies),
+        ascvdRiskScore,
         usedAverageMarkers,
       });
 

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
+import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
 
 const MacroDonutChart = dynamic(() => import('@/components/dashboard/MacroDonutChart'), { ssr: false });
 const HealthRadarChart = dynamic(() => import('@/components/dashboard/HealthRadarChart'), { ssr: false });
@@ -36,9 +37,12 @@ const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
   glucose: 'Glucose',
   hba1c: 'HbA1c',
   totalCholesterol: 'Total Cholesterol',
+  nonHdl: 'Non-HDL Cholesterol',
   ldl: 'LDL Cholesterol',
   hdl: 'HDL Cholesterol',
   triglycerides: 'Triglycerides',
+  apoB: 'Apolipoprotein B (ApoB)',
+  hsCRP: 'hs-CRP',
   tsh: 'TSH',
   vitaminD: 'Vitamin D',
   vitaminB12: 'Vitamin B12',
@@ -551,9 +555,20 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
 
         {/* 4. Charts row — radar + marker comparison */}
         {hasMarkers && (
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-5 anim-fade-up delay-4">
-            <HealthRadarChart healthScore={healthScore} />
-            <MarkerComparisonChart markers={markers} gender={profile.gender} />
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-5 anim-fade-up delay-4">
+            <div className="md:col-span-1">
+              <HealthRadarChart healthScore={healthScore} />
+            </div>
+            <div className="md:col-span-1">
+              <MarkerComparisonChart markers={markers} gender={profile.gender} />
+            </div>
+            <div className="md:col-span-1">
+              <ASCVDRiskCard
+                ascvdRiskScore={result.ascvdRiskScore}
+                age={profile.age}
+                hasLipids={markers.totalCholesterol !== undefined && markers.hdl !== undefined}
+              />
+            </div>
           </div>
         )}
 

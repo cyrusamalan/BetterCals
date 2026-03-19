@@ -118,6 +118,34 @@ export const MARKER_RULES: Record<keyof BloodMarkers, MarkerDefinition> = {
       { min: 201, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 50 },
     ],
   },
+  nonHdl: {
+    unit: 'mg/dL',
+    universal: [
+      { min: 0, max: 129, status: 'optimal', label: 'Optimal', score: 100 },
+      { min: 130, max: 159, status: 'borderline', label: 'Borderline high', score: 65 },
+      { min: 160, max: 189, status: 'high', label: 'High', score: 40 },
+      { min: 190, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
+  apoB: {
+    unit: 'mg/dL',
+    universal: [
+      { min: 0, max: 89, status: 'optimal', label: 'Optimal', score: 100 },
+      { min: 90, max: 109, status: 'normal', label: 'Normal', score: 85 },
+      { min: 110, max: 129, status: 'borderline', label: 'Borderline high', score: 60 },
+      { min: 130, max: 159, status: 'high', label: 'High', score: 35 },
+      { min: 160, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
+  hsCRP: {
+    unit: 'mg/L',
+    universal: [
+      { min: 0, max: 0.99, status: 'optimal', label: 'Low risk', score: 100 },
+      { min: 1.0, max: 2.99, status: 'borderline', label: 'Average risk', score: 70 },
+      { min: 3.0, max: 9.99, status: 'high', label: 'High risk', score: 40 },
+      { min: 10.0, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
 };
 
 export function parseBloodReport(text: string): BloodMarkers {
@@ -151,6 +179,20 @@ export function parseBloodReport(text: string): BloodMarkers {
                  text.match(/high density lipoprotein.*?[:\s]+(\d+\.?\d*)/i);
   if (hdlMatch) markers.hdl = parseFloat(hdlMatch[1]);
 
+  // ApoB patterns
+  const apoBMatch =
+    text.match(/apo\s*[-]?\s*b\b.*?[:\s]+(\d+\.?\d*)/i) ||
+    text.match(/apolipoprotein\s*b\b.*?[:\s]+(\d+\.?\d*)/i) ||
+    text.match(/\bapob\b.*?[:\s]+(\d+\.?\d*)/i);
+  if (apoBMatch) markers.apoB = parseFloat(apoBMatch[1]);
+
+  // hs-CRP patterns
+  const hsCrpMatch =
+    text.match(/\bhs[\s-]*crp\b.*?[:\s]+(\d+\.?\d*)/i) ||
+    text.match(/\bhigh[\s-]*sensitivity[\s-]*c[\s-]*reactive\s*protein\b.*?[:\s]+(\d+\.?\d*)/i) ||
+    text.match(/\bc[\s-]*reactive\s*protein\b.*?\bhigh[\s-]*sensitivity\b.*?[:\s]+(\d+\.?\d*)/i);
+  if (hsCrpMatch) markers.hsCRP = parseFloat(hsCrpMatch[1]);
+
   // Triglycerides patterns
   const trigMatch = text.match(/triglycerides.*?[:\s]+(\d+\.?\d*)/i);
   if (trigMatch) markers.triglycerides = parseFloat(trigMatch[1]);
@@ -180,6 +222,14 @@ export function parseBloodReport(text: string): BloodMarkers {
   const ironMatch = text.match(/iron[^a-z]*?[:\s]+(\d+\.?\d*)/i) ||
                   text.match(/serum iron.*?[:\s]+(\d+\.?\d*)/i);
   if (ironMatch) markers.iron = parseFloat(ironMatch[1]);
+
+  // Derived markers
+  if (markers.totalCholesterol !== undefined && markers.hdl !== undefined) {
+    const nonHdl = markers.totalCholesterol - markers.hdl;
+    if (Number.isFinite(nonHdl)) {
+      markers.nonHdl = Math.round(nonHdl);
+    }
+  }
 
   return markers;
 }

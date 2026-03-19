@@ -1,5 +1,6 @@
 import { UserProfile, ActivityLevel, TDEEResult, BloodMarkers, HealthScore, Insight, CalorieTier, MacroBreakdown, PersonalizedRecs } from '@/types';
 import { getMarkerInterpretation } from '@/lib/bloodParser';
+import { calculateASCVDRisk } from '@/lib/riskModels';
 
 const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   'sedentary': 1.2,
@@ -115,210 +116,109 @@ export function generateInsights(profile: UserProfile, tdee: TDEEResult, markers
       : `Maintain your current intake of ${tdee.targetCalories} calories.`,
   });
 
-  // Blood marker insights
-  if (markers.glucose !== undefined) {
-    if (markers.glucose >= 126) {
-      insights.push({
-        type: 'danger',
-        title: 'Elevated Fasting Glucose',
-        description: `Your fasting glucose of ${markers.glucose} mg/dL is in the diabetic range.`,
-        recommendation: 'Consult a healthcare provider. Consider reducing refined carbs and increasing fiber intake.',
-      });
-    } else if (markers.glucose >= 100) {
-      insights.push({
-        type: 'warning',
-        title: 'Pre-diabetic Glucose Levels',
-        description: `Your fasting glucose of ${markers.glucose} mg/dL indicates pre-diabetes.`,
-        recommendation: 'Focus on low-glycemic foods, regular exercise, and weight management.',
-      });
-    }
-  }
+  const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
+    glucose: 'Glucose',
+    hba1c: 'HbA1c',
+    totalCholesterol: 'Total Cholesterol',
+    nonHdl: 'Non-HDL Cholesterol',
+    ldl: 'LDL Cholesterol',
+    hdl: 'HDL Cholesterol',
+    triglycerides: 'Triglycerides',
+    apoB: 'Apolipoprotein B (ApoB)',
+    hsCRP: 'hs-CRP',
+    tsh: 'TSH',
+    vitaminD: 'Vitamin D',
+    vitaminB12: 'Vitamin B12',
+    ferritin: 'Ferritin',
+    iron: 'Serum Iron',
+  };
 
-  if (markers.hba1c !== undefined) {
-    if (markers.hba1c >= 6.5) {
-      insights.push({
-        type: 'danger',
-        title: 'Diabetic HbA1c Level',
-        description: `Your HbA1c of ${markers.hba1c}% indicates diabetes.`,
-        recommendation: 'Work with your doctor on a management plan. Consider a low-carb or Mediterranean diet.',
-      });
-    }
-  }
+  const typeFromStatus = (status: ReturnType<typeof getMarkerInterpretation>['status']): Insight['type'] => {
+    if (status === 'critical' || status === 'high') return 'danger';
+    if (status === 'borderline' || status === 'low') return 'warning';
+    // normal / optimal
+    return 'success';
+  };
 
-  if (markers.vitaminD !== undefined && markers.vitaminD < 30) {
+  const getDescription = (marker: keyof BloodMarkers, value: number, label: string): string => {
+    const name = MARKER_NAMES[marker] ?? marker;
+    return `${name}: ${value} (${label}).`;
+  };
+
+  // Blood marker insights (strictly rule-driven)
+  for (const marker of Object.keys(markers) as (keyof BloodMarkers)[]) {
+    const value = markers[marker];
+    if (value === undefined) continue;
+
+    const interp = getMarkerInterpretation(marker, value, profile.gender);
+    const type = typeFromStatus(interp.status);
+
     insights.push({
-      type: 'warning',
-      title: 'Low Vitamin D',
-      description: `Your Vitamin D level of ${markers.vitaminD} ng/mL is below optimal.`,
-      recommendation: 'Consider supplementation (2000-4000 IU daily) and increase sun exposure.',
-    });
-  }
-
-  if (markers.hdl !== undefined && markers.hdl < 40) {
-    insights.push({
-      type: 'warning',
-      title: 'Low HDL Cholesterol',
-      description: `Your HDL of ${markers.hdl} mg/dL is below ideal levels.`,
-      recommendation: 'Increase healthy fats (olive oil, fatty fish), exercise regularly, and consider reducing refined carbs.',
-    });
-  }
-
-  // LDL high
-  if (markers.ldl !== undefined && markers.ldl >= 130) {
-    insights.push({
-      type: markers.ldl >= 160 ? 'danger' : 'warning',
-      title: 'Elevated LDL Cholesterol',
-      description: `Your LDL of ${markers.ldl} mg/dL is above optimal levels (< 100 mg/dL).`,
-      recommendation: 'Reduce saturated fats, increase soluble fiber, and consider plant sterols. Discuss statin therapy with your doctor if levels persist.',
-    });
-  }
-
-  // Triglycerides high
-  if (markers.triglycerides !== undefined && markers.triglycerides >= 150) {
-    insights.push({
-      type: markers.triglycerides >= 200 ? 'danger' : 'warning',
-      title: 'High Triglycerides',
-      description: `Your triglycerides at ${markers.triglycerides} mg/dL exceed the optimal range (< 150 mg/dL).`,
-      recommendation: 'Limit sugar and refined carbs, increase omega-3 fatty acids, and maintain regular physical activity.',
-    });
-  }
-
-  // Total cholesterol high
-  if (markers.totalCholesterol !== undefined && markers.totalCholesterol >= 200) {
-    insights.push({
-      type: markers.totalCholesterol >= 240 ? 'danger' : 'warning',
-      title: 'Elevated Total Cholesterol',
-      description: `Your total cholesterol of ${markers.totalCholesterol} mg/dL is above the desirable range (< 200 mg/dL).`,
-      recommendation: 'Focus on a heart-healthy diet rich in fruits, vegetables, whole grains, and lean proteins.',
-    });
-  }
-
-  // B12 low
-  if (markers.vitaminB12 !== undefined && markers.vitaminB12 < 300) {
-    insights.push({
-      type: 'warning',
-      title: 'Low Vitamin B12',
-      description: `Your B12 level of ${markers.vitaminB12} pg/mL is below the recommended range.`,
-      recommendation: 'Consider B12 supplementation (1000 mcg daily). Include more animal products, fortified cereals, or nutritional yeast.',
-    });
-  }
-
-  // Ferritin low
-  if (markers.ferritin !== undefined && markers.ferritin < 30) {
-    insights.push({
-      type: 'warning',
-      title: 'Low Ferritin (Iron Stores)',
-      description: `Your ferritin of ${markers.ferritin} ng/mL indicates depleted iron reserves.`,
-      recommendation: 'Increase iron-rich foods (red meat, lentils, spinach). Pair with vitamin C for better absorption. Avoid tea/coffee with meals.',
-    });
-  }
-
-  // Iron low
-  if (markers.iron !== undefined && markers.iron < 60) {
-    insights.push({
-      type: 'warning',
-      title: 'Low Serum Iron',
-      description: `Your serum iron of ${markers.iron} mcg/dL is below the normal range.`,
-      recommendation: 'Consider iron supplementation with vitamin C. Include iron-rich foods and cook in cast iron when possible.',
-    });
-  }
-
-  // TSH abnormal
-  if (markers.tsh !== undefined) {
-    if (markers.tsh > 4.0) {
-      insights.push({
-        type: 'warning',
-        title: 'Elevated TSH',
-        description: `Your TSH of ${markers.tsh} mIU/L suggests possible hypothyroidism.`,
-        recommendation: 'Consult an endocrinologist. Symptoms may include fatigue, weight gain, and cold sensitivity.',
-      });
-    } else if (markers.tsh < 0.5) {
-      insights.push({
-        type: 'warning',
-        title: 'Low TSH',
-        description: `Your TSH of ${markers.tsh} mIU/L suggests possible hyperthyroidism.`,
-        recommendation: 'Consult an endocrinologist. Symptoms may include rapid heartbeat, weight loss, and anxiety.',
-      });
-    }
-  }
-
-  // Positive/success insights for optimal ranges
-  if (markers.glucose !== undefined && markers.glucose < 100) {
-    insights.push({
-      type: 'success',
-      title: 'Healthy Fasting Glucose',
-      description: `Your fasting glucose of ${markers.glucose} mg/dL is in the normal range.`,
-    });
-  }
-
-  if (markers.hdl !== undefined && markers.hdl >= 60) {
-    insights.push({
-      type: 'success',
-      title: 'Excellent HDL Cholesterol',
-      description: `Your HDL of ${markers.hdl} mg/dL provides strong cardiovascular protection.`,
-    });
-  }
-
-  if (markers.ldl !== undefined && markers.ldl < 100) {
-    insights.push({
-      type: 'success',
-      title: 'Optimal LDL Cholesterol',
-      description: `Your LDL of ${markers.ldl} mg/dL is in the optimal range.`,
-    });
-  }
-
-  if (markers.vitaminD !== undefined && markers.vitaminD >= 30) {
-    insights.push({
-      type: 'success',
-      title: 'Adequate Vitamin D',
-      description: `Your vitamin D level of ${markers.vitaminD} ng/mL is within the healthy range.`,
-    });
-  }
-
-  if (markers.tsh !== undefined && markers.tsh >= 0.5 && markers.tsh <= 4.0) {
-    insights.push({
-      type: 'success',
-      title: 'Normal Thyroid Function',
-      description: `Your TSH of ${markers.tsh} mIU/L indicates healthy thyroid function.`,
+      type,
+      title: `${MARKER_NAMES[marker]} — ${interp.label}`,
+      description: getDescription(marker, value, interp.label),
     });
   }
 
   return insights;
 }
 
-export function identifyDeficiencies(markers: BloodMarkers): string[] {
+export function identifyDeficiencies(markers: BloodMarkers, profile: Pick<UserProfile, 'gender'>): string[] {
   const deficiencies: string[] = [];
 
-  if (markers.vitaminD !== undefined && markers.vitaminD < 30) {
-    deficiencies.push('Vitamin D');
-  }
-  if (markers.vitaminB12 !== undefined && markers.vitaminB12 < 300) {
-    deficiencies.push('Vitamin B12');
-  }
-  if (markers.ferritin !== undefined && markers.ferritin < 30) {
-    deficiencies.push('Iron (Ferritin)');
-  }
-  if (markers.iron !== undefined && markers.iron < 60) {
-    deficiencies.push('Serum Iron');
+  const DEFICIENCY_LABELS: Partial<Record<keyof BloodMarkers, string>> = {
+    vitaminD: 'Vitamin D',
+    vitaminB12: 'Vitamin B12',
+    ferritin: 'Iron (Ferritin)',
+    iron: 'Serum Iron',
+  };
+
+  for (const marker of Object.keys(markers) as (keyof BloodMarkers)[]) {
+    const value = markers[marker];
+    if (value === undefined) continue;
+    const interp = getMarkerInterpretation(marker, value, profile.gender);
+    if (interp.status === 'low') {
+      deficiencies.push(DEFICIENCY_LABELS[marker] ?? `${marker}`);
+    }
   }
 
   return deficiencies;
 }
 
-export function identifyRisks(markers: BloodMarkers): string[] {
+export function identifyRisks(markers: BloodMarkers, profile: Pick<UserProfile, 'gender'>): string[] {
   const risks: string[] = [];
 
-  if (markers.glucose !== undefined && markers.glucose >= 100) {
-    risks.push('Impaired glucose regulation');
-  }
-  if (markers.hba1c !== undefined && markers.hba1c >= 5.7) {
-    risks.push('Metabolic syndrome risk');
-  }
-  if (markers.ldl !== undefined && markers.ldl >= 130) {
-    risks.push('Cardiovascular disease risk');
-  }
-  if (markers.triglycerides !== undefined && markers.triglycerides >= 150) {
-    risks.push('Dyslipidemia');
+  const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
+    glucose: 'Glucose',
+    hba1c: 'HbA1c',
+    totalCholesterol: 'Total Cholesterol',
+    nonHdl: 'Non-HDL Cholesterol',
+    ldl: 'LDL Cholesterol',
+    hdl: 'HDL Cholesterol',
+    triglycerides: 'Triglycerides',
+    apoB: 'Apolipoprotein B (ApoB)',
+    hsCRP: 'hs-CRP',
+    tsh: 'TSH',
+    vitaminD: 'Vitamin D',
+    vitaminB12: 'Vitamin B12',
+    ferritin: 'Ferritin',
+    iron: 'Serum Iron',
+  };
+
+  const isRiskStatus = (status: ReturnType<typeof getMarkerInterpretation>['status']) =>
+    status === 'borderline' || status === 'high' || status === 'critical';
+
+  const metabolicMarkers: (keyof BloodMarkers)[] = ['glucose', 'hba1c'];
+  const cardiovascularMarkers: (keyof BloodMarkers)[] = ['totalCholesterol', 'ldl', 'hdl', 'triglycerides'];
+
+  for (const marker of [...metabolicMarkers, ...cardiovascularMarkers]) {
+    const value = markers[marker];
+    if (value === undefined) continue;
+
+    const interp = getMarkerInterpretation(marker, value, profile.gender);
+    if (isRiskStatus(interp.status)) {
+      risks.push(`${MARKER_NAMES[marker]}: ${interp.label}`);
+    }
   }
 
   return risks;
@@ -423,4 +323,8 @@ export function calculateRecommendations(
   }
 
   return { bmi, bmiCategory, waterIntakeOz, ldlHdlRatio, ldlHdlInterpretation, supplements, exerciseSuggestions };
+}
+
+export function calculateASCVDRiskScore(profile: UserProfile, markers: BloodMarkers): number | null {
+  return calculateASCVDRisk(profile, markers);
 }

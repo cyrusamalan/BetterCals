@@ -14,9 +14,12 @@ export interface BloodMarkers {
   glucose?: number; // mg/dL (fasting)
   hba1c?: number; // %
   totalCholesterol?: number; // mg/dL
+  nonHdl?: number; // mg/dL (Total Cholesterol - HDL)
   ldl?: number; // mg/dL
   hdl?: number; // mg/dL
   triglycerides?: number; // mg/dL
+  apoB?: number; // mg/dL
+  hsCRP?: number; // mg/L (high-sensitivity C-reactive protein)
   tsh?: number; // mIU/L
   vitaminD?: number; // ng/mL
   vitaminB12?: number; // pg/mL
@@ -114,6 +117,7 @@ export interface AnalysisResult {
   calorieTiers: CalorieTier[];
   macros: MacroBreakdown;
   recommendations: PersonalizedRecs;
+  ascvdRiskScore?: number;
   usedAverageMarkers?: boolean;
 }
 
