@@ -132,8 +132,15 @@ export default function Home() {
       >
         <div className="max-w-3xl mx-auto px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center">
-              <BetterCalsMark className="w-10 h-10" />
+            <div
+              className="w-12 h-12 rounded-[18px] flex items-center justify-center"
+              style={{
+                backgroundColor: '#ffffff',
+                border: '1px solid #d2d2cc',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
+              }}
+            >
+              <BetterCalsMark className="w-8.5 h-8.5" />
             </div>
             <div>
               <h1 className="text-lg font-bold font-display" style={{ color: 'var(--text-primary)' }}>
