@@ -36,6 +36,11 @@ export default function RecommendationsPanel({ recs }: RecommendationsPanelProps
   const glasses = Math.round(recs.waterIntakeOz / 8);
   const bmiColor = getBmiColor(recs.bmiCategory);
   const bmiPos = getBmiPosition(recs.bmi);
+  const tgHdlColor =
+    recs.tgHdlInterpretation === null ? 'var(--text-secondary)' :
+    recs.tgHdlInterpretation === 'Optimal' ? 'var(--status-normal)' :
+    recs.tgHdlInterpretation === 'Borderline' ? 'var(--status-warning)' :
+    'var(--status-danger)';
 
   return (
     <div
@@ -105,31 +110,63 @@ export default function RecommendationsPanel({ recs }: RecommendationsPanelProps
           </div>
         </div>
 
-        {/* LDL/HDL Ratio */}
-        {recs.ldlHdlRatio !== null && recs.ldlHdlInterpretation !== null && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <HeartPulse className="w-4 h-4" style={{ color: 'var(--accent-rose)' }} />
-              <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: 'var(--text-tertiary)' }}>
-                LDL/HDL Ratio
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="font-display text-2xl" style={{ color: getRatioColor(recs.ldlHdlInterpretation) }}>
-                {recs.ldlHdlRatio}
-              </span>
-              <span
-                className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                style={{
-                  backgroundColor: `${getRatioColor(recs.ldlHdlInterpretation)}18`,
-                  color: getRatioColor(recs.ldlHdlInterpretation),
-                }}
-              >
-                {recs.ldlHdlInterpretation}
-              </span>
-            </div>
+        {/* Ratios */}
+        {(recs.ldlHdlRatio !== null && recs.ldlHdlInterpretation !== null) ||
+        (recs.tgHdlRatio !== null && recs.tgHdlInterpretation !== null) ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {/* LDL/HDL */}
+            {recs.ldlHdlRatio !== null && recs.ldlHdlInterpretation !== null && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <HeartPulse className="w-4 h-4" style={{ color: 'var(--accent-rose)' }} />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: 'var(--text-tertiary)' }}>
+                    LDL/HDL Ratio
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-display text-2xl" style={{ color: getRatioColor(recs.ldlHdlInterpretation) }}>
+                    {recs.ldlHdlRatio}
+                  </span>
+                  <span
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                    style={{
+                      backgroundColor: `${getRatioColor(recs.ldlHdlInterpretation)}18`,
+                      color: getRatioColor(recs.ldlHdlInterpretation),
+                    }}
+                  >
+                    {recs.ldlHdlInterpretation}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* TG/HDL */}
+            {recs.tgHdlRatio !== null && recs.tgHdlInterpretation !== null && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <HeartPulse className="w-4 h-4" style={{ color: 'var(--accent-warm)' }} />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: 'var(--text-tertiary)' }}>
+                    TG/HDL Ratio
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-display text-2xl" style={{ color: tgHdlColor }}>
+                    {recs.tgHdlRatio}
+                  </span>
+                  <span
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                    style={{
+                      backgroundColor: `${tgHdlColor}18`,
+                      color: tgHdlColor,
+                    }}
+                  >
+                    {recs.tgHdlInterpretation}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        ) : null}
 
         {/* Supplements */}
         {recs.supplements.length > 0 && (

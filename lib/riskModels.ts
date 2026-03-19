@@ -39,6 +39,7 @@ export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers):
   if (!(tc > 0) || !(hdl > 0)) return null;
 
   const sex: Sex = profile.gender;
+  const race = profile.race === 'black' ? 'black' : 'white';
 
   // Clinical inputs with safe fallbacks
   const sbp = profile.bloodPressureSystolic ?? 120;
@@ -52,9 +53,70 @@ export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers):
   const lnHDL = ln(hdl);
   const lnSBP = ln(sbp);
 
-  // Coefficients: White men / White women (ACC/AHA 2013 PCE)
-  // Source commonly cited in open implementations; kept explicit for auditability.
+  // Coefficients: ACC/AHA 2013 Pooled Cohort Equations.
+  // Race rule (per request): use Black coefficients only when profile.race === 'black';
+  // otherwise default to White coefficients.
+  if (race === 'black' && sex === 'male') {
+    const coef = {
+      lnAge: 2.469,
+      lnAgeSq: 0,
+      lnTC: 0.302,
+      lnAge_lnTC: 0,
+      lnHDL: -0.307,
+      lnAge_lnHDL: 0,
+      lnSBP_untreated: 1.809,
+      lnSBP_treated: 1.916,
+      smoker: 0.549,
+      lnAge_smoker: 0,
+      diabetes: 0.645,
+      s0_10: 0.8954,
+      meanX: 19.54,
+    } as const;
+
+    const sum =
+      coef.lnAge * lnAge +
+      coef.lnTC * lnTC +
+      coef.lnHDL * lnHDL +
+      (treatedSbp ? coef.lnSBP_treated : coef.lnSBP_untreated) * lnSBP +
+      coef.smoker * smoker +
+      coef.diabetes * diabetes;
+
+    const risk = 1 - Math.pow(coef.s0_10, Math.exp(sum - coef.meanX));
+    return Math.round(clamp01(risk) * 1000) / 10;
+  }
+
+  if (race === 'black' && sex === 'female') {
+    const coef = {
+      lnAge: 17.114,
+      lnAgeSq: 0,
+      lnTC: 0.940,
+      lnAge_lnTC: 0,
+      lnHDL: -18.920,
+      lnAge_lnHDL: 4.475,
+      lnSBP_untreated: 27.820,
+      lnSBP_treated: 29.291,
+      smoker: 0.691,
+      lnAge_smoker: 0,
+      diabetes: 0.874,
+      s0_10: 0.9533,
+      meanX: 86.61,
+    } as const;
+
+    const sum =
+      coef.lnAge * lnAge +
+      coef.lnTC * lnTC +
+      coef.lnHDL * lnHDL +
+      coef.lnAge_lnHDL * (lnAge * lnHDL) +
+      (treatedSbp ? coef.lnSBP_treated : coef.lnSBP_untreated) * lnSBP +
+      coef.smoker * smoker +
+      coef.diabetes * diabetes;
+
+    const risk = 1 - Math.pow(coef.s0_10, Math.exp(sum - coef.meanX));
+    return Math.round(clamp01(risk) * 1000) / 10;
+  }
+
   if (sex === 'male') {
+    // White men
     const coef = {
       lnAge: 12.344,
       lnAgeSq: 0,
@@ -83,41 +145,39 @@ export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers):
       coef.diabetes * diabetes;
 
     const risk = 1 - Math.pow(coef.s0_10, Math.exp(sum - coef.meanX));
-    return Math.round(clamp01(risk) * 1000) / 10; // one decimal %
+    return Math.round(clamp01(risk) * 1000) / 10;
   }
 
-  // female
-  {
-    const coef = {
-      lnAge: -29.799,
-      lnAgeSq: 4.884,
-      lnTC: 13.540,
-      lnAge_lnTC: -3.114,
-      lnHDL: -13.578,
-      lnAge_lnHDL: 3.149,
-      lnSBP_untreated: 1.957,
-      lnSBP_treated: 2.019,
-      smoker: 7.574,
-      lnAge_smoker: -1.665,
-      diabetes: 0.661,
-      s0_10: 0.9665,
-      meanX: -29.18,
-    } as const;
+  // White women
+  const coef = {
+    lnAge: -29.799,
+    lnAgeSq: 4.884,
+    lnTC: 13.540,
+    lnAge_lnTC: -3.114,
+    lnHDL: -13.578,
+    lnAge_lnHDL: 3.149,
+    lnSBP_untreated: 1.957,
+    lnSBP_treated: 2.019,
+    smoker: 7.574,
+    lnAge_smoker: -1.665,
+    diabetes: 0.661,
+    s0_10: 0.9665,
+    meanX: -29.18,
+  } as const;
 
-    const sum =
-      coef.lnAge * lnAge +
-      coef.lnAgeSq * (lnAge * lnAge) +
-      coef.lnTC * lnTC +
-      coef.lnAge_lnTC * (lnAge * lnTC) +
-      coef.lnHDL * lnHDL +
-      coef.lnAge_lnHDL * (lnAge * lnHDL) +
-      (treatedSbp ? coef.lnSBP_treated : coef.lnSBP_untreated) * lnSBP +
-      coef.smoker * smoker +
-      coef.lnAge_smoker * (lnAge * smoker) +
-      coef.diabetes * diabetes;
+  const sum =
+    coef.lnAge * lnAge +
+    coef.lnAgeSq * (lnAge * lnAge) +
+    coef.lnTC * lnTC +
+    coef.lnAge_lnTC * (lnAge * lnTC) +
+    coef.lnHDL * lnHDL +
+    coef.lnAge_lnHDL * (lnAge * lnHDL) +
+    (treatedSbp ? coef.lnSBP_treated : coef.lnSBP_untreated) * lnSBP +
+    coef.smoker * smoker +
+    coef.lnAge_smoker * (lnAge * smoker) +
+    coef.diabetes * diabetes;
 
-    const risk = 1 - Math.pow(coef.s0_10, Math.exp(sum - coef.meanX));
-    return Math.round(clamp01(risk) * 1000) / 10; // one decimal %
-  }
+  const risk = 1 - Math.pow(coef.s0_10, Math.exp(sum - coef.meanX));
+  return Math.round(clamp01(risk) * 1000) / 10;
 }
 

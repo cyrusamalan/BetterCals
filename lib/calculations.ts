@@ -293,6 +293,16 @@ export function calculateRecommendations(
     else ldlHdlInterpretation = 'High Risk';
   }
 
+  // TG/HDL ratio
+  let tgHdlRatio: number | null = null;
+  let tgHdlInterpretation: string | null = null;
+  if (markers.triglycerides !== undefined && markers.hdl !== undefined && markers.hdl > 0) {
+    tgHdlRatio = Math.round((markers.triglycerides / markers.hdl) * 10) / 10;
+    if (tgHdlRatio < 2.0) tgHdlInterpretation = 'Optimal';
+    else if (tgHdlRatio < 3.0) tgHdlInterpretation = 'Borderline';
+    else tgHdlInterpretation = 'High Risk (Insulin Resistant)';
+  }
+
   // Supplements from deficiencies
   const supplementMap: Record<string, { dosage: string; reason: string }> = {
     'Vitamin D': { dosage: '2000-4000 IU daily', reason: 'Low vitamin D levels' },
@@ -323,7 +333,17 @@ export function calculateRecommendations(
     exerciseSuggestions.push('Post-meal walks (15 min) can help regulate blood sugar');
   }
 
-  return { bmi, bmiCategory, waterIntakeOz, ldlHdlRatio, ldlHdlInterpretation, supplements, exerciseSuggestions };
+  return {
+    bmi,
+    bmiCategory,
+    waterIntakeOz,
+    ldlHdlRatio,
+    ldlHdlInterpretation,
+    tgHdlRatio,
+    tgHdlInterpretation,
+    supplements,
+    exerciseSuggestions,
+  };
 }
 
 export function calculateASCVDRiskScore(profile: UserProfile, markers: BloodMarkers): number | null {

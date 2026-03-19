@@ -1,6 +1,7 @@
 export interface UserProfile {
   age: number;
   gender: 'male' | 'female';
+  race?: 'white' | 'black' | 'other';
   weightLbs: number; // lbs - user input
   heightFeet: number; // feet - user input
   heightInches: number; // inches - user input
@@ -109,6 +110,8 @@ export interface PersonalizedRecs {
   waterIntakeOz: number;
   ldlHdlRatio: number | null;
   ldlHdlInterpretation: string | null;
+  tgHdlRatio: number | null;
+  tgHdlInterpretation: string | null;
   supplements: SupplementRec[];
   exerciseSuggestions: string[];
 }

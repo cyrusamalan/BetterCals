@@ -12,6 +12,7 @@ interface TDEEFormProps {
 interface FormData {
   age: number;
   gender: 'male' | 'female';
+  race?: 'white' | 'black' | 'other';
   weightLbs: number;
   heightFeet: number;
   heightInches: number;
@@ -33,6 +34,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       heightInches: initialValues.heightInches,
       activityLevel: initialValues.activityLevel,
       goal: initialValues.goal,
+      race: initialValues.race ?? 'white',
       smoker: initialValues.smoker ?? false,
       diabetic: initialValues.diabetic ?? false,
       bloodPressureSystolic: initialValues.bloodPressureSystolic ?? 120,
@@ -45,6 +47,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       heightInches: 7,
       activityLevel: 'moderate',
       goal: 'maintain',
+      race: 'white',
       smoker: false,
       diabetic: false,
       bloodPressureSystolic: 120,
@@ -56,6 +59,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
     onSubmit({
       age: data.age,
       gender: data.gender,
+      race: data.race,
       weightLbs: data.weightLbs,
       heightFeet: data.heightFeet,
       heightInches: data.heightInches,
@@ -193,6 +197,14 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
         </div>
 
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <FieldGroup icon={User} label="Race">
+            <select {...register('race')} className="select-field">
+              <option value="white">White</option>
+              <option value="black">Black / African American</option>
+              <option value="other">Other</option>
+            </select>
+          </FieldGroup>
+
           <div className="flex items-center justify-between gap-4 rounded-xl px-4 py-3" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-light)' }}>
             <div className="min-w-0">
               <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Smoker</p>
