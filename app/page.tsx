@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Heart, Activity, FileText, Droplets, ChevronRight } from 'lucide-react';
 import TDEEForm from '@/components/TDEEForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
@@ -39,10 +39,51 @@ function sanitizeBloodMarkers(input: BloodMarkers): BloodMarkers {
 }
 
 export default function Home() {
+  const [isMounted, setIsMounted] = useState(false);
   const [step, setStep] = useState<Step>('profile');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [markers, setMarkers] = useState<BloodMarkers>({});
   const [result, setResult] = useState<AnalysisResult | null>(null);
+
+  useEffect(() => {
+    try {
+      const savedStep = localStorage.getItem('bettercals_step');
+      const savedProfile = localStorage.getItem('bettercals_profile');
+      const savedMarkers = localStorage.getItem('bettercals_markers');
+      const savedResult = localStorage.getItem('bettercals_result');
+
+      if (savedStep === 'profile' || savedStep === 'blood' || savedStep === 'results') {
+        setStep(savedStep);
+      }
+      if (savedProfile) setProfile(JSON.parse(savedProfile) as UserProfile);
+      if (savedMarkers) setMarkers(JSON.parse(savedMarkers) as BloodMarkers);
+      if (savedResult) setResult(JSON.parse(savedResult) as AnalysisResult);
+    } catch {
+      // If localStorage is corrupted, fail safe and start fresh.
+      try {
+        localStorage.removeItem('bettercals_step');
+        localStorage.removeItem('bettercals_profile');
+        localStorage.removeItem('bettercals_markers');
+        localStorage.removeItem('bettercals_result');
+      } catch {
+        // ignore
+      }
+    } finally {
+      setIsMounted(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    try {
+      localStorage.setItem('bettercals_step', step);
+      localStorage.setItem('bettercals_profile', JSON.stringify(profile));
+      localStorage.setItem('bettercals_markers', JSON.stringify(markers));
+      localStorage.setItem('bettercals_result', JSON.stringify(result));
+    } catch {
+      // ignore (storage quota / blocked storage)
+    }
+  }, [isMounted, step, profile, markers, result]);
 
   const handleProfileSubmit = (data: UserProfile) => {
     setProfile(data);
@@ -95,7 +136,37 @@ export default function Home() {
     setProfile(null);
     setMarkers({});
     setResult(null);
+
+    try {
+      localStorage.removeItem('bettercals_step');
+      localStorage.removeItem('bettercals_profile');
+      localStorage.removeItem('bettercals_markers');
+      localStorage.removeItem('bettercals_result');
+    } catch {
+      // ignore
+    }
   };
+
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div
+          className="w-10 h-10 rounded-full border-2"
+          style={{
+            borderColor: 'var(--border-light)',
+            borderTopColor: 'var(--accent)',
+            animation: 'spin 1s linear infinite',
+          }}
+        />
+        <style jsx global>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   // ── Results: full-page dashboard takeover ──
   if (step === 'results' && result) {

@@ -2,12 +2,13 @@
 
 import dynamic from 'next/dynamic';
 import { AnalysisResult, BloodMarkers, Insight, UserProfile } from '@/types';
-import { getMarkerDisplayRange, getMarkerInterpretation } from '@/lib/bloodParser';
+import { getMarkerDisplayRange, getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
 import BetterCalsMark from '@/components/BetterCalsMark';
 import {
   Heart,
   Flame,
   Activity,
+  Download,
   AlertTriangle,
   CheckCircle,
   Info,
@@ -390,6 +391,78 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
   const hasMarkers = Object.keys(markers).length > 0;
   const usedAverageMarkers = result.usedAverageMarkers === true;
 
+  const handleDownloadPDF = async () => {
+    const pdfEl = document.getElementById('pdf-content') as HTMLElement | null;
+    const screenEl = document.getElementById('screen-content') as HTMLElement | null;
+    if (!pdfEl) return;
+
+    const mod: any = await import('html2pdf.js');
+    const html2pdf = mod?.default ?? mod;
+
+    const prevPdfDisplay = pdfEl.style.display;
+    const prevScreenDisplay = screenEl?.style.display;
+
+    try {
+      // Make sure the element we're capturing is actually rendered (not display:none).
+      pdfEl.style.display = 'block';
+      if (screenEl) screenEl.style.display = 'none';
+
+      // Allow the browser to reflow/layout before snapshotting.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+      await html2pdf()
+        .from(pdfEl)
+        .set({
+          margin: 0.5,
+          filename: 'BetterCals_Report.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          pagebreak: {
+            mode: ['css', 'legacy'],
+            avoid: ['.pdf-avoid-break', 'tr'],
+          },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+          },
+          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+        })
+        .save();
+    } finally {
+      pdfEl.style.display = prevPdfDisplay;
+      if (screenEl) screenEl.style.display = prevScreenDisplay ?? '';
+    }
+  };
+
+  const markerRows = (Object.keys(MARKER_NAMES) as (keyof BloodMarkers)[])
+    .filter((k) => markers[k] !== undefined)
+    .map((k) => {
+      const value = markers[k]!;
+      const interp = getMarkerInterpretation(k, value, profile.gender);
+      const unit = getMarkerUnit(k) ?? '';
+      return { key: k, name: MARKER_NAMES[k], value, unit, status: interp.status, label: interp.label, score: interp.score };
+    });
+
+  const ratioRows: { label: string; value: string; interpretation: string }[] = [];
+  if (recommendations.ldlHdlRatio !== null && recommendations.ldlHdlInterpretation) {
+    ratioRows.push({
+      label: 'LDL/HDL Ratio',
+      value: `${recommendations.ldlHdlRatio}`,
+      interpretation: recommendations.ldlHdlInterpretation,
+    });
+  }
+  if (recommendations.tgHdlRatio !== null && recommendations.tgHdlInterpretation) {
+    ratioRows.push({
+      label: 'TG/HDL Ratio',
+      value: `${recommendations.tgHdlRatio}`,
+      interpretation: recommendations.tgHdlInterpretation,
+    });
+  }
+
+  const ascvdDisplay =
+    result.ascvdRiskScore !== undefined ? `${result.ascvdRiskScore.toFixed(1)}%` : 'N/A';
+
   return (
     <div
       className="min-h-screen pb-16"
@@ -414,23 +487,213 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
             <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" style={{ color: 'var(--text-tertiary)' }} />
             New Analysis
           </button>
-          <div className="flex items-center gap-2">
-            <div
-              className="w-9 h-9 rounded-[14px] flex items-center justify-center"
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
               style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #d2d2cc',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
+                backgroundColor: 'var(--border-light)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
               }}
             >
-              <BetterCalsMark className="w-6.5 h-6.5" />
+              <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+              Download Report
+            </button>
+
+            <div className="flex items-center gap-2">
+              <div
+                className="w-9 h-9 rounded-[14px] flex items-center justify-center"
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #d2d2cc',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
+                }}
+              >
+                <BetterCalsMark className="w-6.5 h-6.5" />
+              </div>
+              <span className="text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
             </div>
-            <span className="text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-5 pt-8">
+      {/* PDF-only, print-friendly content (hidden on screen) */}
+      <div
+        id="pdf-content"
+        style={{
+          display: 'none',
+          width: '7.5in',
+          maxWidth: '7.5in',
+          margin: '0 auto',
+          padding: '0.25in',
+          boxSizing: 'border-box',
+          background: '#ffffff',
+          color: '#111111',
+          fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
+        }}
+      >
+        <style>{`
+          #pdf-content .pdf-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+          #pdf-content table { break-inside: auto; page-break-inside: auto; }
+          #pdf-content thead { display: table-header-group; }
+          #pdf-content tr { break-inside: avoid; page-break-inside: avoid; }
+        `}</style>
+
+        <div className="pdf-avoid-break" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: 0.2 }}>BetterCals Report</div>
+            <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>
+              Generated {new Date().toLocaleString()}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 11, color: '#555' }}>Overall Health Score</div>
+            <div style={{ fontSize: 28, fontWeight: 800 }}>{healthScore.overall}/100</div>
+          </div>
+        </div>
+
+        <div style={{ height: 1, background: '#e5e5e5', margin: '14px 0' }} />
+
+        <div className="pdf-avoid-break" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="pdf-avoid-break" style={{ border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>Profile</div>
+            <div style={{ fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
+              Age: <b>{profile.age}</b><br />
+              Sex: <b>{profile.gender}</b><br />
+              Race: <b>{profile.race ?? 'white'}</b><br />
+              Weight: <b>{profile.weightLbs} lb</b><br />
+              Height: <b>{profile.heightFeet}'{profile.heightInches}"</b><br />
+              Goal: <b>{profile.goal}</b>
+            </div>
+          </div>
+
+          <div className="pdf-avoid-break" style={{ border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>Calories</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+              <div>
+                <div style={{ fontSize: 11, color: '#555' }}>BMR</div>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>{tdee.bmr.toLocaleString()}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: '#555' }}>TDEE</div>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>{tdee.tdee.toLocaleString()}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: '#555' }}>Target</div>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>{tdee.targetCalories.toLocaleString()}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: '#555' }}>BMI</div>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>{recommendations.bmi} ({recommendations.bmiCategory})</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="pdf-avoid-break" style={{ marginTop: 14, border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>Scores</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginTop: 8 }}>
+            <div><div style={{ fontSize: 10, color: '#666' }}>Metabolic</div><div style={{ fontSize: 14, fontWeight: 800 }}>{healthScore.metabolic}</div></div>
+            <div><div style={{ fontSize: 10, color: '#666' }}>Cardiovascular</div><div style={{ fontSize: 14, fontWeight: 800 }}>{healthScore.cardiovascular}</div></div>
+            <div><div style={{ fontSize: 10, color: '#666' }}>Hormonal</div><div style={{ fontSize: 14, fontWeight: 800 }}>{healthScore.hormonal}</div></div>
+            <div><div style={{ fontSize: 10, color: '#666' }}>Nutritional</div><div style={{ fontSize: 14, fontWeight: 800 }}>{healthScore.nutritional}</div></div>
+          </div>
+        </div>
+
+        <div className="pdf-avoid-break" style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="pdf-avoid-break" style={{ border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>ASCVD 10-Year Risk</div>
+            <div style={{ fontSize: 18, fontWeight: 800, marginTop: 6 }}>{ascvdDisplay}</div>
+            <div style={{ fontSize: 10, color: '#666', marginTop: 4 }}>
+              ACC/AHA Pooled Cohort Equations estimate (when eligible).
+            </div>
+          </div>
+
+          <div className="pdf-avoid-break" style={{ border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>Key Ratios</div>
+            {ratioRows.length === 0 ? (
+              <div style={{ fontSize: 11, color: '#666', marginTop: 6 }}>Not available (requires lipid values).</div>
+            ) : (
+              <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+                {ratioRows.map((r) => (
+                  <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ fontSize: 11, color: '#333' }}>{r.label}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700 }}>{r.value} — {r.interpretation}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="pdf-avoid-break" style={{ marginTop: 14, border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>Blood Markers</div>
+          {markerRows.length === 0 ? (
+            <div style={{ fontSize: 11, color: '#666', marginTop: 6 }}>No markers provided.</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8, fontSize: 11 }}>
+              <thead>
+                <tr style={{ textAlign: 'left', color: '#666' }}>
+                  <th style={{ padding: '6px 4px', borderBottom: '1px solid #e5e5e5' }}>Marker</th>
+                  <th style={{ padding: '6px 4px', borderBottom: '1px solid #e5e5e5' }}>Value</th>
+                  <th style={{ padding: '6px 4px', borderBottom: '1px solid #e5e5e5' }}>Interpretation</th>
+                  <th style={{ padding: '6px 4px', borderBottom: '1px solid #e5e5e5' }}>Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {markerRows.map((r) => (
+                  <tr key={r.name} className="pdf-avoid-break">
+                    <td style={{ padding: '6px 4px', borderBottom: '1px solid #f0f0f0' }}>{r.name}</td>
+                    <td style={{ padding: '6px 4px', borderBottom: '1px solid #f0f0f0' }}>{r.value} {r.unit}</td>
+                    <td style={{ padding: '6px 4px', borderBottom: '1px solid #f0f0f0' }}>{r.label}</td>
+                    <td style={{ padding: '6px 4px', borderBottom: '1px solid #f0f0f0' }}>{r.score}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {!usedAverageMarkers && (deficiencies.length > 0 || risks.length > 0) && (
+          <div className="pdf-avoid-break" style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="pdf-avoid-break" style={{ border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>Potential Deficiencies</div>
+              <ul style={{ marginTop: 8, paddingLeft: 16, fontSize: 11, color: '#333' }}>
+                {deficiencies.map((d) => <li key={d} style={{ marginBottom: 4 }}>{d}</li>)}
+              </ul>
+            </div>
+            <div className="pdf-avoid-break" style={{ border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>Health Risks</div>
+              <ul style={{ marginTop: 8, paddingLeft: 16, fontSize: 11, color: '#333' }}>
+                {risks.map((r) => <li key={r} style={{ marginBottom: 4 }}>{r}</li>)}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {!usedAverageMarkers && insights.length > 0 && (
+          <div className="pdf-avoid-break" style={{ marginTop: 14, border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>Insights</div>
+            <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+              {insights.slice(0, 10).map((i, idx) => (
+                <div key={idx} className="pdf-avoid-break" style={{ border: '1px solid #f0f0f0', borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800 }}>{i.title}</div>
+                  <div style={{ fontSize: 11, color: '#333', marginTop: 4 }}>{i.description}</div>
+                  {i.recommendation && <div style={{ fontSize: 10, color: '#666', marginTop: 6 }}>{i.recommendation}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginTop: 14, fontSize: 9, color: '#777' }}>
+          Disclaimer: BetterCals provides estimates for informational purposes only and is not medical advice.
+        </div>
+      </div>
+
+      {/* Screen UI */}
+      <div id="screen-content" className="max-w-5xl mx-auto px-5 pt-8">
         {/* 1. Hero: Score + BMR/TDEE inline + BMI badge */}
         <div className="anim-fade-up delay-1">
           <div
