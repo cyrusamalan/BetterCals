@@ -8,6 +8,7 @@ import {
   Heart,
   Flame,
   Activity,
+  Download,
   AlertTriangle,
   CheckCircle,
   Info,
@@ -390,6 +391,25 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
   const hasMarkers = Object.keys(markers).length > 0;
   const usedAverageMarkers = result.usedAverageMarkers === true;
 
+  const handleDownloadPDF = async () => {
+    const el = document.getElementById('pdf-content');
+    if (!el) return;
+
+    const mod: any = await import('html2pdf.js');
+    const html2pdf = mod?.default ?? mod;
+
+    html2pdf()
+      .from(el)
+      .set({
+        margin: 0.5,
+        filename: 'BetterCals_Report.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+      })
+      .save();
+  };
+
   return (
     <div
       className="min-h-screen pb-16"
@@ -414,23 +434,38 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
             <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" style={{ color: 'var(--text-tertiary)' }} />
             New Analysis
           </button>
-          <div className="flex items-center gap-2">
-            <div
-              className="w-9 h-9 rounded-[14px] flex items-center justify-center"
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
               style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #d2d2cc',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
+                backgroundColor: 'var(--border-light)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
               }}
             >
-              <BetterCalsMark className="w-6.5 h-6.5" />
+              <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+              Download Report
+            </button>
+
+            <div className="flex items-center gap-2">
+              <div
+                className="w-9 h-9 rounded-[14px] flex items-center justify-center"
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #d2d2cc',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
+                }}
+              >
+                <BetterCalsMark className="w-6.5 h-6.5" />
+              </div>
+              <span className="text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
             </div>
-            <span className="text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-5 pt-8">
+      <div id="pdf-content" className="max-w-5xl mx-auto px-5 pt-8">
         {/* 1. Hero: Score + BMR/TDEE inline + BMI badge */}
         <div className="anim-fade-up delay-1">
           <div
