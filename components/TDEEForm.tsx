@@ -2,7 +2,7 @@
 
 import { useForm } from 'react-hook-form';
 import { UserProfile, ActivityLevel } from '@/types';
-import { ArrowRight, User, Ruler, Weight, Zap, Target } from 'lucide-react';
+import { ArrowRight, User, Ruler, Weight, Zap, Target, Activity } from 'lucide-react';
 
 interface TDEEFormProps {
   onSubmit: (profile: UserProfile) => void;
@@ -17,6 +17,10 @@ interface FormData {
   heightInches: number;
   activityLevel: ActivityLevel;
   goal: 'lose' | 'maintain' | 'gain';
+  smoker?: boolean;
+  diabetic?: boolean;
+  bloodPressureSystolic?: number;
+  treatedForHypertension?: boolean;
 }
 
 export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
@@ -29,6 +33,10 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       heightInches: initialValues.heightInches,
       activityLevel: initialValues.activityLevel,
       goal: initialValues.goal,
+      smoker: initialValues.smoker ?? false,
+      diabetic: initialValues.diabetic ?? false,
+      bloodPressureSystolic: initialValues.bloodPressureSystolic ?? 120,
+      treatedForHypertension: initialValues.treatedForHypertension ?? false,
     } : {
       age: 30,
       gender: 'male',
@@ -37,6 +45,10 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       heightInches: 7,
       activityLevel: 'moderate',
       goal: 'maintain',
+      smoker: false,
+      diabetic: false,
+      bloodPressureSystolic: 120,
+      treatedForHypertension: false,
     },
   });
 
@@ -49,6 +61,10 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       heightInches: data.heightInches,
       activityLevel: data.activityLevel,
       goal: data.goal,
+      smoker: data.smoker,
+      diabetic: data.diabetic,
+      bloodPressureSystolic: data.bloodPressureSystolic,
+      treatedForHypertension: data.treatedForHypertension,
     });
   };
 
@@ -155,6 +171,76 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
             <option value="gain">Build Muscle (+10%)</option>
           </select>
         </FieldGroup>
+      </div>
+
+      {/* Row 4: Clinical History (ASCVD) */}
+      <div
+        className="rounded-2xl p-5"
+        style={{
+          backgroundColor: 'var(--bg-warm)',
+          border: '1px solid var(--border-light)',
+        }}
+      >
+        <div className="flex items-baseline justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+              Clinical History (ASCVD)
+            </p>
+            <p className="text-[11px] mt-1" style={{ color: 'var(--text-tertiary)' }}>
+              Optional — improves 10-year ASCVD risk estimate.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="flex items-center justify-between gap-4 rounded-xl px-4 py-3" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-light)' }}>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Smoker</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Currently smokes cigarettes</p>
+            </div>
+            <input
+              type="checkbox"
+              {...register('smoker')}
+              className="h-5 w-5 accent-[color:var(--accent)]"
+              aria-label="Smoker"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-xl px-4 py-3" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-light)' }}>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Diabetes</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Diagnosed diabetes</p>
+            </div>
+            <input
+              type="checkbox"
+              {...register('diabetic')}
+              className="h-5 w-5 accent-[color:var(--accent)]"
+              aria-label="Diabetic"
+            />
+          </div>
+
+          <FieldGroup icon={Activity} label="Systolic Blood Pressure" error={errors.bloodPressureSystolic?.message}>
+            <input
+              type="number"
+              {...register('bloodPressureSystolic', { min: 70, max: 250, valueAsNumber: true })}
+              className="input-field"
+              placeholder="e.g., 120"
+            />
+          </FieldGroup>
+
+          <div className="flex items-center justify-between gap-4 rounded-xl px-4 py-3" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-light)' }}>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Treated for hypertension</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>On BP medication</p>
+            </div>
+            <input
+              type="checkbox"
+              {...register('treatedForHypertension')}
+              className="h-5 w-5 accent-[color:var(--accent)]"
+              aria-label="Treated for hypertension"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Submit */}

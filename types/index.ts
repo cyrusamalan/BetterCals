@@ -6,6 +6,10 @@ export interface UserProfile {
   heightInches: number; // inches - user input
   activityLevel: ActivityLevel;
   goal: 'lose' | 'maintain' | 'gain';
+  smoker?: boolean;
+  diabetic?: boolean;
+  bloodPressureSystolic?: number;
+  treatedForHypertension?: boolean;
 }
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active';

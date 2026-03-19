@@ -15,16 +15,16 @@ function clamp01(x: number) {
  *
  * Inputs:
  * - Official model is validated for ages 40–79; we return null if out of bounds.
- * - Uses: age, sex, total cholesterol, HDL.
- * - Assumptions (per request):
- *   - Non-smoker
- *   - No diabetes
- *   - Untreated SBP = 120
+ * - Uses: age, sex, total cholesterol, HDL, systolic BP, smoker, diabetes, and BP treatment.
+ * - If optional clinical fields are missing, we fall back to safe defaults:
+ *   - smoker = false
+ *   - diabetic = false
+ *   - bloodPressureSystolic = 120
+ *   - treatedForHypertension = false
  *
  * Notes:
  * - The full published model is race-specific (White/Black) and includes SBP treatment status.
- * - Because `UserProfile` does not include race and SBP, this implements the "White" sex-specific coefficients
- *   with the above assumptions.
+ * - Because `UserProfile` does not include race, this implements the "White" sex-specific coefficients.
  *
  * Returns:
  * - Risk as a percentage (0–100), e.g. 7.5 means 7.5% 10-year risk.
@@ -40,11 +40,12 @@ export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers):
 
   const sex: Sex = profile.gender;
 
-  // Assumptions requested
-  const sbp = 120;
-  const smoker = 0;
-  const diabetes = 0;
-  const treatedSbp = 0;
+  // Clinical inputs with safe fallbacks
+  const sbp = profile.bloodPressureSystolic ?? 120;
+  if (!(sbp > 0)) return null;
+  const smoker = profile.smoker ? 1 : 0;
+  const diabetes = profile.diabetic ? 1 : 0;
+  const treatedSbp = profile.treatedForHypertension ? 1 : 0;
 
   const lnAge = ln(age);
   const lnTC = ln(tc);
