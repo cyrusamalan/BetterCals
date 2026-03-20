@@ -129,10 +129,15 @@ export default function SignInPage() {
 
   return (
     <div className="auth-single-page">
-      <div className="auth-single-top-left">
-        <DonutHero sizePx={44} />
-        <span className="text-white/90 text-[20px] font-bold tracking-tight">BetterCals</span>
-      </div>
+      <header className="auth-topbar">
+        <div className="auth-topbar-left">
+          <DonutHero sizePx={44} />
+          <span className="text-white/90 text-[20px] font-bold tracking-tight">BetterCals</span>
+        </div>
+
+        <div className="auth-topbar-center" />
+        <div className="auth-topbar-right" />
+      </header>
 
       <div className="auth-single-main">
         <div className="w-full max-w-[400px] mx-auto">
@@ -140,13 +145,20 @@ export default function SignInPage() {
           <div className="mb-7">
             <h1
               className="auth-text-enter font-display text-[1.75rem] leading-tight"
-              style={{ color: 'var(--text-primary)' }}
+              style={{
+                color: '#ffffff',
+                textShadow: '0 2px 18px rgba(0,0,0,0.55)',
+              }}
             >
               Welcome back
             </h1>
             <p
               className="auth-text-enter text-sm mt-1.5"
-              style={{ color: 'var(--text-tertiary)', animationDelay: '0.15s' }}
+              style={{
+                color: 'rgba(255,255,255,0.7)',
+                animationDelay: '0.15s',
+                textShadow: '0 2px 18px rgba(0,0,0,0.35)',
+              }}
             >
               Sign in to your BetterCals account
             </p>
@@ -271,7 +283,7 @@ export default function SignInPage() {
           {/* Footer link */}
           <p
             className="auth-single-footer auth-text-enter text-center text-sm"
-            style={{ color: 'var(--text-tertiary)', animationDelay: '0.4s' }}
+            style={{ color: 'rgba(255,255,255,0.65)', animationDelay: '0.4s' }}
           >
             Don&apos;t have an account?{' '}
             <Link

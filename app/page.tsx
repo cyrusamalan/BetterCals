@@ -7,7 +7,7 @@ import TDEEForm from '@/components/TDEEForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
 import BloodValuesForm from '@/components/BloodValuesForm';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
-import BetterCalsMark from '@/components/BetterCalsMark';
+import VitalsMark from '@/components/VitalsMark';
 import Link from 'next/link';
 import {
   UserProfile,
@@ -226,53 +226,58 @@ export default function Home() {
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
         }}
       >
-        <div className="max-w-3xl mx-auto px-5 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="w-full px-5 py-3.5 grid grid-cols-[auto_1fr_auto] items-center">
+          {/* Left: logo */}
+          <div className="flex items-center gap-3 justify-start">
             <div
-              className="w-11 h-11 flex items-center justify-center"
+              className="w-10 h-10 flex items-center justify-center"
               style={{ background: 'transparent' }}
             >
-              <BetterCalsMark className="w-9 h-9" />
+              <VitalsMark sizePx={34} />
             </div>
             <div>
-              <h1 className="text-[22px] font-bold font-display" style={{ color: 'var(--text-primary)' }}>
+              <h1
+                className="text-[22px] font-bold font-display"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 BetterCals
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Step pills */}
-            <div className="hidden sm:flex items-center gap-1">
-              {steps.map((s, i) => (
-                <div key={s.key} className="flex items-center gap-1">
-                  <div
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-300"
+          {/* Center: step pills */}
+          <div className="hidden sm:flex items-center gap-1 justify-center">
+            {steps.map((s, i) => (
+              <div key={s.key} className="flex items-center gap-1">
+                <div
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-300"
+                  style={{
+                    backgroundColor: i <= currentStepIdx ? 'var(--accent-subtle)' : 'transparent',
+                    color: i <= currentStepIdx ? 'var(--accent)' : 'var(--text-tertiary)',
+                  }}
+                >
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-300"
                     style={{
-                      backgroundColor: i <= currentStepIdx ? 'var(--accent-subtle)' : 'transparent',
-                      color: i <= currentStepIdx ? 'var(--accent)' : 'var(--text-tertiary)',
+                      backgroundColor: i <= currentStepIdx ? 'var(--accent)' : 'var(--border)',
+                      color: i <= currentStepIdx ? 'var(--text-inverse)' : 'var(--text-tertiary)',
+                      boxShadow:
+                        i === currentStepIdx ? '0 0 0 3px rgba(107, 143, 113, 0.15)' : 'none',
                     }}
                   >
-                    <span
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-300"
-                      style={{
-                        backgroundColor: i <= currentStepIdx ? 'var(--accent)' : 'var(--border)',
-                        color: i <= currentStepIdx ? 'var(--text-inverse)' : 'var(--text-tertiary)',
-                        boxShadow: i === currentStepIdx ? '0 0 0 3px rgba(107, 143, 113, 0.15)' : 'none',
-                      }}
-                    >
-                      {i < currentStepIdx ? '\u2713' : s.num}
-                    </span>
-                    {s.label}
-                  </div>
-                  {i < steps.length - 1 && (
-                    <ChevronRight className="w-3 h-3" style={{ color: 'var(--border)' }} />
-                  )}
+                    {i < currentStepIdx ? '\u2713' : s.num}
+                  </span>
+                  {s.label}
                 </div>
-              ))}
-            </div>
+                {i < steps.length - 1 && (
+                  <ChevronRight className="w-3 h-3" style={{ color: 'var(--border)' }} />
+                )}
+              </div>
+            ))}
+          </div>
 
-            {/* Auth */}
+          {/* Right: Auth */}
+          <div className="flex items-center justify-end">
             {!isSignedIn ? (
               <Link
                 href="/sign-in"
@@ -280,7 +285,8 @@ export default function Home() {
                 style={{
                   background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
                   color: 'var(--text-inverse)',
-                  boxShadow: '0 2px 6px rgba(107, 143, 113, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)',
+                  boxShadow:
+                    '0 2px 6px rgba(107, 143, 113, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)',
                 }}
               >
                 Sign in
