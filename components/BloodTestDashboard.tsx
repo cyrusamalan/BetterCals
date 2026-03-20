@@ -19,6 +19,10 @@ import {
   Zap,
   Pill,
   Shield,
+  FlaskConical,
+  Bean,
+  Save,
+  Check,
 } from 'lucide-react';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
@@ -50,13 +54,19 @@ const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
   vitaminB12: 'Vitamin B12',
   ferritin: 'Ferritin',
   iron: 'Serum Iron',
+  alt: 'ALT (Liver)',
+  ast: 'AST (Liver)',
+  albumin: 'Albumin',
+  creatinine: 'Creatinine',
+  uricAcid: 'Uric Acid',
+  fastingInsulin: 'Fasting Insulin',
 };
 
 const CATEGORIES: {
   key: string;
   label: string;
   icon: React.ElementType;
-  scoreKey: 'metabolic' | 'cardiovascular' | 'hormonal' | 'nutritional';
+  scoreKey: 'metabolic' | 'cardiovascular' | 'hormonal' | 'nutritional' | 'hepatic' | 'renal';
   markers: (keyof BloodMarkers)[];
   accent: string;
   accentBg: string;
@@ -66,7 +76,7 @@ const CATEGORIES: {
     label: 'Metabolic',
     icon: Flame,
     scoreKey: 'metabolic',
-    markers: ['glucose', 'hba1c'],
+    markers: ['glucose', 'hba1c', 'fastingInsulin'],
     accent: 'var(--accent-warm)',
     accentBg: '#f9f5ec',
   },
@@ -96,6 +106,24 @@ const CATEGORIES: {
     markers: ['vitaminD', 'vitaminB12', 'ferritin', 'iron'],
     accent: 'var(--accent)',
     accentBg: '#ecf3ee',
+  },
+  {
+    key: 'hepatic',
+    label: 'Hepatic',
+    icon: FlaskConical,
+    scoreKey: 'hepatic',
+    markers: ['alt', 'ast', 'albumin'],
+    accent: 'var(--accent-warm)',
+    accentBg: '#f6f0ec',
+  },
+  {
+    key: 'renal',
+    label: 'Renal',
+    icon: Bean,
+    scoreKey: 'renal',
+    markers: ['creatinine', 'uricAcid'],
+    accent: 'var(--status-warning)',
+    accentBg: '#f6f3ec',
   },
 ];
 
@@ -392,6 +420,8 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
   const hasMarkers = Object.keys(markers).length > 0;
   const usedAverageMarkers = result.usedAverageMarkers === true;
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const handleDownloadPDF = async () => {
     setDownloadError(null);
@@ -438,6 +468,26 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
     } finally {
       pdfEl.style.display = prevPdfDisplay;
       if (screenEl instanceof HTMLElement) screenEl.style.display = prevScreenDisplay ?? '';
+    }
+  };
+
+  const handleSaveToHistory = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/analyses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile, markers, result }),
+      });
+      if (res.ok) {
+        setSaved(true);
+      } else {
+        console.error('Save failed:', await res.text());
+      }
+    } catch (err) {
+      console.error('Save failed:', err);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -505,6 +555,24 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
               >
                 <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
                 Download Report
+              </button>
+
+              <button
+                onClick={handleSaveToHistory}
+                disabled={saving || saved}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press disabled:opacity-50"
+                style={{
+                  backgroundColor: saved ? 'var(--status-normal-bg)' : 'var(--border-light)',
+                  color: saved ? 'var(--status-normal)' : 'var(--text-primary)',
+                  border: `1px solid ${saved ? 'var(--status-normal-border)' : 'var(--border)'}`,
+                }}
+              >
+                {saved ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <Save className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                )}
+                {saving ? 'Saving...' : saved ? 'Saved' : 'Save to History'}
               </button>
 
               <div className="flex items-center gap-2">

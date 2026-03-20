@@ -11,6 +11,8 @@ export interface UserProfile {
   diabetic?: boolean;
   bloodPressureSystolic?: number;
   treatedForHypertension?: boolean;
+  waistInches?: number;
+  hipInches?: number;
 }
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active';
@@ -30,6 +32,12 @@ export interface BloodMarkers {
   vitaminB12?: number; // pg/mL
   ferritin?: number; // ng/mL
   iron?: number; // mcg/dL
+  alt?: number; // U/L (alanine aminotransferase)
+  ast?: number; // U/L (aspartate aminotransferase)
+  albumin?: number; // g/dL
+  creatinine?: number; // mg/dL
+  uricAcid?: number; // mg/dL
+  fastingInsulin?: number; // mIU/L
 }
 
 export type MarkerStatus =
@@ -75,6 +83,8 @@ export interface HealthScore {
   cardiovascular: number;
   hormonal: number;
   nutritional: number;
+  hepatic: number;
+  renal: number;
 }
 
 export interface Insight {
@@ -112,6 +122,8 @@ export interface PersonalizedRecs {
   ldlHdlInterpretation: string | null;
   tgHdlRatio: number | null;
   tgHdlInterpretation: string | null;
+  waistToHipRatio: number | null;
+  waistToHipInterpretation: string | null;
   supplements: SupplementRec[];
   exerciseSuggestions: string[];
 }
@@ -133,4 +145,12 @@ export interface ParsedBloodReport {
   markers: BloodMarkers;
   confidence: number;
   rawText: string;
+}
+
+export interface AnalysisHistory {
+  id: number;
+  createdAt: string;
+  profile: UserProfile;
+  markers: BloodMarkers;
+  result: AnalysisResult;
 }

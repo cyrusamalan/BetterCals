@@ -146,6 +146,87 @@ export const MARKER_RULES: Record<keyof BloodMarkers, MarkerDefinition> = {
       { min: 10.0, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
     ],
   },
+  alt: {
+    unit: 'U/L',
+    male: [
+      { min: 0, max: 41, status: 'normal', label: 'Normal', score: 92 },
+      { min: 42, max: 63, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 64, max: 200, status: 'high', label: 'Elevated', score: 35 },
+      { min: 201, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+    female: [
+      { min: 0, max: 33, status: 'normal', label: 'Normal', score: 92 },
+      { min: 34, max: 55, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 56, max: 200, status: 'high', label: 'Elevated', score: 35 },
+      { min: 201, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
+  ast: {
+    unit: 'U/L',
+    male: [
+      { min: 0, max: 40, status: 'normal', label: 'Normal', score: 92 },
+      { min: 41, max: 60, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 61, max: 200, status: 'high', label: 'Elevated', score: 35 },
+      { min: 201, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+    female: [
+      { min: 0, max: 32, status: 'normal', label: 'Normal', score: 92 },
+      { min: 33, max: 50, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 51, max: 200, status: 'high', label: 'Elevated', score: 35 },
+      { min: 201, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
+  albumin: {
+    unit: 'g/dL',
+    universal: [
+      { min: 0, max: 2.9, status: 'critical', label: 'Very low', score: 15 },
+      { min: 3.0, max: 3.4, status: 'low', label: 'Low', score: 45 },
+      { min: 3.5, max: 5.5, status: 'normal', label: 'Normal', score: 92 },
+      { min: 5.6, max: VERY_HIGH, status: 'high', label: 'High', score: 70 },
+    ],
+  },
+  creatinine: {
+    unit: 'mg/dL',
+    male: [
+      { min: 0, max: 0.69, status: 'low', label: 'Low', score: 55 },
+      { min: 0.7, max: 1.3, status: 'normal', label: 'Normal', score: 92 },
+      { min: 1.31, max: 1.8, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 1.81, max: 3.0, status: 'high', label: 'Elevated', score: 35 },
+      { min: 3.01, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+    female: [
+      { min: 0, max: 0.59, status: 'low', label: 'Low', score: 55 },
+      { min: 0.6, max: 1.1, status: 'normal', label: 'Normal', score: 92 },
+      { min: 1.11, max: 1.5, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 1.51, max: 3.0, status: 'high', label: 'Elevated', score: 35 },
+      { min: 3.01, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
+  uricAcid: {
+    unit: 'mg/dL',
+    male: [
+      { min: 0, max: 3.49, status: 'low', label: 'Low', score: 55 },
+      { min: 3.5, max: 7.2, status: 'normal', label: 'Normal', score: 92 },
+      { min: 7.21, max: 9.0, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 9.01, max: VERY_HIGH, status: 'high', label: 'High', score: 35 },
+    ],
+    female: [
+      { min: 0, max: 2.59, status: 'low', label: 'Low', score: 55 },
+      { min: 2.6, max: 6.0, status: 'normal', label: 'Normal', score: 92 },
+      { min: 6.01, max: 8.0, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 8.01, max: VERY_HIGH, status: 'high', label: 'High', score: 35 },
+    ],
+  },
+  fastingInsulin: {
+    unit: 'mIU/L',
+    universal: [
+      { min: 0, max: 1.99, status: 'low', label: 'Low', score: 55 },
+      { min: 2.0, max: 6.0, status: 'optimal', label: 'Optimal', score: 100 },
+      { min: 6.01, max: 25.0, status: 'normal', label: 'Normal', score: 85 },
+      { min: 25.01, max: 50.0, status: 'high', label: 'High', score: 40 },
+      { min: 50.01, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
 };
 
 export function parseBloodReport(text: string): BloodMarkers {
@@ -222,6 +303,35 @@ export function parseBloodReport(text: string): BloodMarkers {
   const ironMatch = text.match(/iron[^a-z]*?[:\s]+(\d+\.?\d*)/i) ||
                   text.match(/serum iron.*?[:\s]+(\d+\.?\d*)/i);
   if (ironMatch) markers.iron = parseFloat(ironMatch[1]);
+
+  // ALT patterns
+  const altMatch = text.match(/\balt\b.*?[:\s]+(\d+\.?\d*)/i) ||
+                   text.match(/alanine\s*(?:amino)?transferase.*?[:\s]+(\d+\.?\d*)/i) ||
+                   text.match(/sgpt.*?[:\s]+(\d+\.?\d*)/i);
+  if (altMatch) markers.alt = parseFloat(altMatch[1]);
+
+  // AST patterns
+  const astMatch = text.match(/\bast\b.*?[:\s]+(\d+\.?\d*)/i) ||
+                   text.match(/aspartate\s*(?:amino)?transferase.*?[:\s]+(\d+\.?\d*)/i) ||
+                   text.match(/sgot.*?[:\s]+(\d+\.?\d*)/i);
+  if (astMatch) markers.ast = parseFloat(astMatch[1]);
+
+  // Albumin patterns
+  const albuminMatch = text.match(/\balbumin\b.*?[:\s]+(\d+\.?\d*)/i);
+  if (albuminMatch) markers.albumin = parseFloat(albuminMatch[1]);
+
+  // Creatinine patterns
+  const creatinineMatch = text.match(/creatinine.*?[:\s]+(\d+\.?\d*)/i);
+  if (creatinineMatch) markers.creatinine = parseFloat(creatinineMatch[1]);
+
+  // Uric Acid patterns
+  const uricAcidMatch = text.match(/uric\s*acid.*?[:\s]+(\d+\.?\d*)/i) ||
+                         text.match(/urate.*?[:\s]+(\d+\.?\d*)/i);
+  if (uricAcidMatch) markers.uricAcid = parseFloat(uricAcidMatch[1]);
+
+  // Fasting Insulin patterns
+  const insulinMatch = text.match(/(?:fasting\s+)?insulin.*?[:\s]+(\d+\.?\d*)/i);
+  if (insulinMatch) markers.fastingInsulin = parseFloat(insulinMatch[1]);
 
   // Derived markers
   if (markers.totalCholesterol !== undefined && markers.hdl !== undefined) {

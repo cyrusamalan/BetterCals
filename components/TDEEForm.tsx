@@ -22,6 +22,8 @@ interface FormData {
   diabetic?: boolean;
   bloodPressureSystolic?: number;
   treatedForHypertension?: boolean;
+  waistInches?: number;
+  hipInches?: number;
 }
 
 export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
@@ -39,6 +41,8 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       diabetic: initialValues.diabetic ?? false,
       bloodPressureSystolic: initialValues.bloodPressureSystolic ?? 120,
       treatedForHypertension: initialValues.treatedForHypertension ?? false,
+      waistInches: initialValues.waistInches,
+      hipInches: initialValues.hipInches,
     } : {
       age: 30,
       gender: 'male',
@@ -69,6 +73,8 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       diabetic: data.diabetic,
       bloodPressureSystolic: data.bloodPressureSystolic,
       treatedForHypertension: data.treatedForHypertension,
+      waistInches: data.waistInches,
+      hipInches: data.hipInches,
     });
   };
 
@@ -146,6 +152,45 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
                 in
               </span>
             </div>
+          </div>
+        </FieldGroup>
+      </div>
+
+      {/* Row 2b: Body Composition (Optional) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <FieldGroup icon={Ruler} label="Waist (optional)">
+          <div className="relative">
+            <input
+              type="number"
+              step="0.5"
+              {...register('waistInches', { min: 15, max: 80, valueAsNumber: true })}
+              className="input-field pr-12"
+              placeholder="32"
+            />
+            <span
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              in
+            </span>
+          </div>
+        </FieldGroup>
+
+        <FieldGroup icon={Ruler} label="Hip (optional)">
+          <div className="relative">
+            <input
+              type="number"
+              step="0.5"
+              {...register('hipInches', { min: 20, max: 80, valueAsNumber: true })}
+              className="input-field pr-12"
+              placeholder="38"
+            />
+            <span
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              in
+            </span>
           </div>
         </FieldGroup>
       </div>
