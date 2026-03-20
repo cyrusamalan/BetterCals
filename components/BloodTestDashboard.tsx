@@ -24,7 +24,7 @@ import {
   Save,
   Check,
 } from 'lucide-react';
-import { useAuth, SignInButton } from '@clerk/nextjs';
+import { Show, SignInButton } from '@clerk/nextjs';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
 import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
@@ -423,7 +423,6 @@ function FlagSection({ title, items, variant }: { title: string; items: string[]
 // ── Main Dashboard ──
 
 export default function BloodTestDashboard({ result, markers, profile, onReset }: BloodTestDashboardProps) {
-  const { isSignedIn } = useAuth();
   const { tdee, healthScore, insights, deficiencies, risks, calorieTiers, macros, recommendations } = result;
   const grade = getScoreGrade(healthScore.overall);
   const hasMarkers = Object.keys(markers).length > 0;
@@ -566,7 +565,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
                 Download Report
               </button>
 
-              {isSignedIn ? (
+              <Show when="signed-in">
                 <button
                   onClick={handleSaveToHistory}
                   disabled={saving || saved}
@@ -584,7 +583,8 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
                   )}
                   {saving ? 'Saving...' : saved ? 'Saved' : 'Save to History'}
                 </button>
-              ) : (
+              </Show>
+              <Show when="signed-out">
                 <SignInButton mode="modal">
                   <button
                     className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
@@ -598,7 +598,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
                     Sign in to Save
                   </button>
                 </SignInButton>
-              )}
+              </Show>
 
               <div className="flex items-center gap-2">
                 <div

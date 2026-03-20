@@ -12,7 +12,10 @@
       "Bash(grep -E \"^d|\\\\.ts$|\\\\.js$|\\\\.json$\")",
       "Bash(mkdir -p C:/Users/cyrus/camalan/Projects/BloodWise/app/sign-in/[[...sign-in]])",
       "Bash(mkdir -p C:/Users/cyrus/camalan/Projects/BloodWise/app/sign-up/[[...sign-up]])",
-      "Bash(node -e \"const c = require\\(''@clerk/nextjs''\\); console.log\\(Object.keys\\(c\\).filter\\(k => k.startsWith\\(''Sign''\\)\\).join\\('', ''\\)\\)\")"
+      "Bash(node -e \"const c = require\\(''@clerk/nextjs''\\); console.log\\(Object.keys\\(c\\).filter\\(k => k.startsWith\\(''Sign''\\)\\).join\\('', ''\\)\\)\")",
+      "Bash(node -e \"const c = require\\(''@clerk/nextjs''\\); console.log\\(Object.keys\\(c\\).filter\\(k => /sign/i.test\\(k\\)\\).join\\(''\\\\n''\\)\\)\")",
+      "Bash(node -e \":*)",
+      "Bash(node -e \"const c = require\\(''@clerk/nextjs''\\); console.log\\(Object.keys\\(c\\).filter\\(k => /Show|Sign|User|Auth/i.test\\(k\\)\\).sort\\(\\).join\\(''\\\\n''\\)\\)\")"
     ]
   },
   "enabledPlugins": {

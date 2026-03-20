@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Heart, Activity, FileText, Droplets, ChevronRight } from 'lucide-react';
-import { SignInButton, UserButton, useAuth } from '@clerk/nextjs';
+import { Show, SignInButton, UserButton } from '@clerk/nextjs';
 import TDEEForm from '@/components/TDEEForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
 import BloodValuesForm from '@/components/BloodValuesForm';
@@ -40,7 +40,6 @@ function sanitizeBloodMarkers(input: BloodMarkers): BloodMarkers {
 }
 
 export default function Home() {
-  const { isSignedIn } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const [step, setStep] = useState<Step>('profile');
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -260,7 +259,7 @@ export default function Home() {
             </div>
 
             {/* Auth */}
-            {!isSignedIn ? (
+            <Show when="signed-out">
               <SignInButton mode="modal">
                 <button
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold btn-press"
@@ -272,9 +271,10 @@ export default function Home() {
                   Sign in
                 </button>
               </SignInButton>
-            ) : (
+            </Show>
+            <Show when="signed-in">
               <UserButton />
-            )}
+            </Show>
           </div>
         </div>
       </header>
