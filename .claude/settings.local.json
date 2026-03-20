@@ -1,10 +1,13 @@
 {
-  "enabledPlugins": {
-    "frontend-design@claude-plugins-official": true
-  },
   "permissions": {
     "allow": [
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(grep -r \"tesseract\\\\|Tesseract\" C:/Users/cyrus/camalan/Projects/BloodWise --include=*.ts --include=*.tsx --include=*.js --include=*.json)",
+      "Bash(find C:/Users/cyrus/camalan/Projects/BloodWise -name .env* -o -name *config* -type f)",
+      "Bash(npm install:*)"
     ]
+  },
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true
   }
 }

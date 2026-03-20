@@ -24,6 +24,12 @@ const MARKER_SHORT: Record<keyof BloodMarkers, string> = {
   vitaminB12: 'B12',
   ferritin: 'Ferritin',
   iron: 'Iron',
+  alt: 'ALT',
+  ast: 'AST',
+  albumin: 'Albumin',
+  creatinine: 'Creat',
+  uricAcid: 'Uric Acid',
+  fastingInsulin: 'Insulin',
 };
 
 const STATUS_COLORS: Record<string, string> = {

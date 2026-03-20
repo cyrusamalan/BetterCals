@@ -124,15 +124,79 @@ const FIELDS: {
     optimalRange: '30–300 ng/mL',
     category: 'Nutritional' 
   },
-  { 
-    key: 'iron', 
-    label: 'Serum Iron', 
-    unit: 'mcg/dL', 
-    placeholder: '80', 
-    hint: '60–170', 
+  {
+    key: 'iron',
+    label: 'Serum Iron',
+    unit: 'mcg/dL',
+    placeholder: '80',
+    hint: '60–170',
     description: 'Circulating iron. Essential for oxygen transport in blood.',
     optimalRange: '60–170 mcg/dL',
-    category: 'Nutritional' 
+    category: 'Nutritional'
+  },
+  {
+    key: 'alt',
+    label: 'ALT',
+    unit: 'U/L',
+    placeholder: '25',
+    hint: '0–41',
+    description: 'Alanine aminotransferase. Liver enzyme indicating hepatic health.',
+    optimalRange: '0–41 U/L (male), 0–33 U/L (female)',
+    category: 'Hepatic',
+  },
+  {
+    key: 'ast',
+    label: 'AST',
+    unit: 'U/L',
+    placeholder: '22',
+    hint: '0–40',
+    description: 'Aspartate aminotransferase. Liver and muscle health indicator.',
+    optimalRange: '0–40 U/L (male), 0–32 U/L (female)',
+    category: 'Hepatic',
+  },
+  {
+    key: 'albumin',
+    label: 'Albumin',
+    unit: 'g/dL',
+    placeholder: '4.2',
+    hint: '3.5–5.5',
+    description: 'Protein made by the liver. Reflects nutrition and liver function.',
+    optimalRange: '3.5–5.5 g/dL',
+    category: 'Hepatic',
+    step: '0.1',
+  },
+  {
+    key: 'creatinine',
+    label: 'Creatinine',
+    unit: 'mg/dL',
+    placeholder: '0.9',
+    hint: '0.7–1.3',
+    description: 'Waste product filtered by kidneys. Indicates kidney function.',
+    optimalRange: '0.7–1.3 mg/dL (male), 0.6–1.1 mg/dL (female)',
+    category: 'Renal',
+    step: '0.01',
+  },
+  {
+    key: 'uricAcid',
+    label: 'Uric Acid',
+    unit: 'mg/dL',
+    placeholder: '5.5',
+    hint: '3.5–7.2',
+    description: 'Byproduct of purine metabolism. Elevated levels linked to gout and kidney issues.',
+    optimalRange: '3.5–7.2 mg/dL (male), 2.6–6.0 mg/dL (female)',
+    category: 'Renal',
+    step: '0.1',
+  },
+  {
+    key: 'fastingInsulin',
+    label: 'Fasting Insulin',
+    unit: 'mIU/L',
+    placeholder: '5',
+    hint: '2–25',
+    description: 'Insulin level after fasting. Used to assess insulin resistance (HOMA-IR).',
+    optimalRange: '2–6 mIU/L (optimal)',
+    category: 'Metabolic',
+    step: '0.1',
   },
 ];
 
@@ -143,11 +207,17 @@ const HEALTHY_PRESET: BloodMarkers = {
   ldl: 90,
   hdl: 65,
   triglycerides: 110,
-  tsh: 2.0,
+  tsh: 2,
   vitaminD: 45,
   vitaminB12: 550,
   ferritin: 80,
   iron: 100,
+  alt: 20,
+  ast: 18,
+  albumin: 4.5,
+  creatinine: 0.9,
+  uricAcid: 5,
+  fastingInsulin: 4.5,
 };
 
 const DEFICIENT_PRESET: BloodMarkers = {
@@ -162,6 +232,12 @@ const DEFICIENT_PRESET: BloodMarkers = {
   vitaminB12: 210,
   ferritin: 15,
   iron: 45,
+  alt: 65,
+  ast: 55,
+  albumin: 3.1,
+  creatinine: 1.6,
+  uricAcid: 8.5,
+  fastingInsulin: 28,
 };
 
 const SUFFICIENT_PRESET: BloodMarkers = {
@@ -176,6 +252,12 @@ const SUFFICIENT_PRESET: BloodMarkers = {
   vitaminB12: 380,
   ferritin: 45,
   iron: 75,
+  alt: 35,
+  ast: 30,
+  albumin: 3.8,
+  creatinine: 1.1,
+  uricAcid: 6.5,
+  fastingInsulin: 12,
 };
 
 export default function BloodValuesForm({ onSubmit, initialValues }: BloodValuesFormProps) {
@@ -208,7 +290,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
   };
 
   // Group fields by category
-  const categories = ['Metabolic', 'Cardiovascular', 'Hormonal', 'Nutritional'];
+  const categories = ['Metabolic', 'Cardiovascular', 'Hormonal', 'Nutritional', 'Hepatic', 'Renal'];
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

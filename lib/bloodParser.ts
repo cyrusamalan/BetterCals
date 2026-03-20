@@ -64,8 +64,8 @@ export const MARKER_RULES: Record<keyof BloodMarkers, MarkerDefinition> = {
     universal: [
       { min: 0, max: 0.09, status: 'critical', label: 'Very low', score: 15 },
       { min: 0.1, max: 0.39, status: 'low', label: 'Low', score: 45 },
-      { min: 0.4, max: 4.0, status: 'normal', label: 'Normal', score: 92 },
-      { min: 4.01, max: 10.0, status: 'high', label: 'High', score: 45 },
+      { min: 0.4, max: 4, status: 'normal', label: 'Normal', score: 92 },
+      { min: 4.01, max: 10, status: 'high', label: 'High', score: 45 },
       { min: 10.01, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
     ],
   },
@@ -141,9 +141,90 @@ export const MARKER_RULES: Record<keyof BloodMarkers, MarkerDefinition> = {
     unit: 'mg/L',
     universal: [
       { min: 0, max: 0.99, status: 'optimal', label: 'Low risk', score: 100 },
-      { min: 1.0, max: 2.99, status: 'borderline', label: 'Average risk', score: 70 },
-      { min: 3.0, max: 9.99, status: 'high', label: 'High risk', score: 40 },
-      { min: 10.0, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+      { min: 1, max: 2.99, status: 'borderline', label: 'Average risk', score: 70 },
+      { min: 3, max: 9.99, status: 'high', label: 'High risk', score: 40 },
+      { min: 10, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
+  alt: {
+    unit: 'U/L',
+    male: [
+      { min: 0, max: 41, status: 'normal', label: 'Normal', score: 92 },
+      { min: 42, max: 63, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 64, max: 200, status: 'high', label: 'Elevated', score: 35 },
+      { min: 201, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+    female: [
+      { min: 0, max: 33, status: 'normal', label: 'Normal', score: 92 },
+      { min: 34, max: 55, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 56, max: 200, status: 'high', label: 'Elevated', score: 35 },
+      { min: 201, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
+  ast: {
+    unit: 'U/L',
+    male: [
+      { min: 0, max: 40, status: 'normal', label: 'Normal', score: 92 },
+      { min: 41, max: 60, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 61, max: 200, status: 'high', label: 'Elevated', score: 35 },
+      { min: 201, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+    female: [
+      { min: 0, max: 32, status: 'normal', label: 'Normal', score: 92 },
+      { min: 33, max: 50, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 51, max: 200, status: 'high', label: 'Elevated', score: 35 },
+      { min: 201, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
+  albumin: {
+    unit: 'g/dL',
+    universal: [
+      { min: 0, max: 2.9, status: 'critical', label: 'Very low', score: 15 },
+      { min: 3.0, max: 3.4, status: 'low', label: 'Low', score: 45 },
+      { min: 3.5, max: 5.5, status: 'normal', label: 'Normal', score: 92 },
+      { min: 5.6, max: VERY_HIGH, status: 'high', label: 'High', score: 70 },
+    ],
+  },
+  creatinine: {
+    unit: 'mg/dL',
+    male: [
+      { min: 0, max: 0.69, status: 'low', label: 'Low', score: 55 },
+      { min: 0.7, max: 1.3, status: 'normal', label: 'Normal', score: 92 },
+      { min: 1.31, max: 1.8, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 1.81, max: 3, status: 'high', label: 'Elevated', score: 35 },
+      { min: 3.01, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+    female: [
+      { min: 0, max: 0.59, status: 'low', label: 'Low', score: 55 },
+      { min: 0.6, max: 1.1, status: 'normal', label: 'Normal', score: 92 },
+      { min: 1.11, max: 1.5, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 1.51, max: 3, status: 'high', label: 'Elevated', score: 35 },
+      { min: 3.01, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
+    ],
+  },
+  uricAcid: {
+    unit: 'mg/dL',
+    male: [
+      { min: 0, max: 3.49, status: 'low', label: 'Low', score: 55 },
+      { min: 3.5, max: 7.2, status: 'normal', label: 'Normal', score: 92 },
+      { min: 7.21, max: 9, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 9.01, max: VERY_HIGH, status: 'high', label: 'High', score: 35 },
+    ],
+    female: [
+      { min: 0, max: 2.59, status: 'low', label: 'Low', score: 55 },
+      { min: 2.6, max: 6, status: 'normal', label: 'Normal', score: 92 },
+      { min: 6.01, max: 8, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 8.01, max: VERY_HIGH, status: 'high', label: 'High', score: 35 },
+    ],
+  },
+  fastingInsulin: {
+    unit: 'mIU/L',
+    universal: [
+      { min: 0, max: 1.99, status: 'low', label: 'Low', score: 55 },
+      { min: 2, max: 6, status: 'optimal', label: 'Optimal', score: 100 },
+      { min: 6.01, max: 25, status: 'normal', label: 'Normal', score: 85 },
+      { min: 25.01, max: 50, status: 'high', label: 'High', score: 40 },
+      { min: 50.01, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
     ],
   },
 };
@@ -152,76 +233,105 @@ export function parseBloodReport(text: string): BloodMarkers {
   const markers: BloodMarkers = {};
 
   // Glucose patterns
-  const glucoseMatch = text.match(/glucose.*?[:\s]+(\d+\.?\d*)/i) || 
-                      text.match(/fasting.*?glucose.*?[:\s]+(\d+\.?\d*)/i);
-  if (glucoseMatch) markers.glucose = parseFloat(glucoseMatch[1]);
+  const glucoseMatch = /glucose.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                      /fasting.*?glucose.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (glucoseMatch) markers.glucose = Number.parseFloat(glucoseMatch[1]);
 
   // HbA1c patterns
-  const hba1cMatch = text.match(/hba1c.*?[:\s]+(\d+\.?\d*)/i) || 
-                     text.match(/hemoglobin a1c.*?[:\s]+(\d+\.?\d*)/i) ||
-                     text.match(/a1c.*?[:\s]+(\d+\.?\d*)/i);
-  if (hba1cMatch) markers.hba1c = parseFloat(hba1cMatch[1]);
+  const hba1cMatch = /hba1c.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                     /hemoglobin a1c.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                     /a1c.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (hba1cMatch) markers.hba1c = Number.parseFloat(hba1cMatch[1]);
 
   // Cholesterol patterns
-  const totalCholMatch = text.match(/total cholesterol.*?[:\s]+(\d+\.?\d*)/i) ||
-                         text.match(/cholesterol, total.*?[:\s]+(\d+\.?\d*)/i);
-  if (totalCholMatch) markers.totalCholesterol = parseFloat(totalCholMatch[1]);
+  const totalCholMatch = /total cholesterol.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                         /cholesterol, total.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (totalCholMatch) markers.totalCholesterol = Number.parseFloat(totalCholMatch[1]);
 
   // LDL patterns
-  const ldlMatch = text.match(/ldl.*?[:\s]+(\d+\.?\d*)/i) ||
-                 text.match(/ldl cholesterol.*?[:\s]+(\d+\.?\d*)/i) ||
-                 text.match(/low density lipoprotein.*?[:\s]+(\d+\.?\d*)/i);
-  if (ldlMatch) markers.ldl = parseFloat(ldlMatch[1]);
+  const ldlMatch = /ldl.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                 /ldl cholesterol.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                 /low density lipoprotein.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (ldlMatch) markers.ldl = Number.parseFloat(ldlMatch[1]);
 
   // HDL patterns
-  const hdlMatch = text.match(/hdl.*?[:\s]+(\d+\.?\d*)/i) ||
-                 text.match(/hdl cholesterol.*?[:\s]+(\d+\.?\d*)/i) ||
-                 text.match(/high density lipoprotein.*?[:\s]+(\d+\.?\d*)/i);
-  if (hdlMatch) markers.hdl = parseFloat(hdlMatch[1]);
+  const hdlMatch = /hdl.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                 /hdl cholesterol.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                 /high density lipoprotein.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (hdlMatch) markers.hdl = Number.parseFloat(hdlMatch[1]);
 
   // ApoB patterns
   const apoBMatch =
-    text.match(/apo\s*[-]?\s*b\b.*?[:\s]+(\d+\.?\d*)/i) ||
-    text.match(/apolipoprotein\s*b\b.*?[:\s]+(\d+\.?\d*)/i) ||
-    text.match(/\bapob\b.*?[:\s]+(\d+\.?\d*)/i);
-  if (apoBMatch) markers.apoB = parseFloat(apoBMatch[1]);
+    /apo\s*[-]?\s*b\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+    /apolipoprotein\s*b\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+    /\bapob\b.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (apoBMatch) markers.apoB = Number.parseFloat(apoBMatch[1]);
 
   // hs-CRP patterns
   const hsCrpMatch =
-    text.match(/\bhs[\s-]*crp\b.*?[:\s]+(\d+\.?\d*)/i) ||
-    text.match(/\bhigh[\s-]*sensitivity[\s-]*c[\s-]*reactive\s*protein\b.*?[:\s]+(\d+\.?\d*)/i) ||
-    text.match(/\bc[\s-]*reactive\s*protein\b.*?\bhigh[\s-]*sensitivity\b.*?[:\s]+(\d+\.?\d*)/i);
-  if (hsCrpMatch) markers.hsCRP = parseFloat(hsCrpMatch[1]);
+    /\bhs[\s-]*crp\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+    /\bhigh[\s-]*sensitivity[\s-]*c[\s-]*reactive\s*protein\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+    /\bc[\s-]*reactive\s*protein\b.*?\bhigh[\s-]*sensitivity\b.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (hsCrpMatch) markers.hsCRP = Number.parseFloat(hsCrpMatch[1]);
 
   // Triglycerides patterns
-  const trigMatch = text.match(/triglycerides.*?[:\s]+(\d+\.?\d*)/i);
-  if (trigMatch) markers.triglycerides = parseFloat(trigMatch[1]);
+  const trigMatch = /triglycerides.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (trigMatch) markers.triglycerides = Number.parseFloat(trigMatch[1]);
 
   // TSH patterns
-  const tshMatch = text.match(/tsh.*?[:\s]+(\d+\.?\d*)/i) ||
-                 text.match(/thyroid stimulating hormone.*?[:\s]+(\d+\.?\d*)/i);
-  if (tshMatch) markers.tsh = parseFloat(tshMatch[1]);
+  const tshMatch = /tsh.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                 /thyroid stimulating hormone.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (tshMatch) markers.tsh = Number.parseFloat(tshMatch[1]);
 
   // Vitamin D patterns
-  const vitDMatch = text.match(/vitamin d.*?[:\s]+(\d+\.?\d*)/i) ||
-                    text.match(/25[\-\s]?hydroxy.*?vitamin d.*?[:\s]+(\d+\.?\d*)/i) ||
-                    text.match(/25\(oh\)d.*?[:\s]+(\d+\.?\d*)/i);
-  if (vitDMatch) markers.vitaminD = parseFloat(vitDMatch[1]);
+  const vitDMatch = /vitamin d.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                    /25[\-\s]?hydroxy.*?vitamin d.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                    /25\(oh\)d.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (vitDMatch) markers.vitaminD = Number.parseFloat(vitDMatch[1]);
 
   // Vitamin B12 patterns
-  const b12Match = text.match(/vitamin b12.*?[:\s]+(\d+\.?\d*)/i) ||
-                   text.match(/b12.*?[:\s]+(\d+\.?\d*)/i) ||
-                   text.match(/cobalamin.*?[:\s]+(\d+\.?\d*)/i);
-  if (b12Match) markers.vitaminB12 = parseFloat(b12Match[1]);
+  const b12Match = /vitamin b12.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                   /b12.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                   /cobalamin.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (b12Match) markers.vitaminB12 = Number.parseFloat(b12Match[1]);
 
   // Ferritin patterns
-  const ferritinMatch = text.match(/ferritin.*?[:\s]+(\d+\.?\d*)/i);
-  if (ferritinMatch) markers.ferritin = parseFloat(ferritinMatch[1]);
+  const ferritinMatch = /ferritin.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (ferritinMatch) markers.ferritin = Number.parseFloat(ferritinMatch[1]);
 
   // Iron patterns
-  const ironMatch = text.match(/iron[^a-z]*?[:\s]+(\d+\.?\d*)/i) ||
-                  text.match(/serum iron.*?[:\s]+(\d+\.?\d*)/i);
-  if (ironMatch) markers.iron = parseFloat(ironMatch[1]);
+  const ironMatch = /iron[^a-z]*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                  /serum iron.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (ironMatch) markers.iron = Number.parseFloat(ironMatch[1]);
+
+  // ALT patterns
+  const altMatch = /\balt\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                   /alanine\s*(?:amino)?transferase.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                   /sgpt.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (altMatch) markers.alt = Number.parseFloat(altMatch[1]);
+
+  // AST patterns
+  const astMatch = /\bast\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                   /aspartate\s*(?:amino)?transferase.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                   /sgot.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (astMatch) markers.ast = Number.parseFloat(astMatch[1]);
+
+  // Albumin patterns
+  const albuminMatch = /\balbumin\b.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (albuminMatch) markers.albumin = Number.parseFloat(albuminMatch[1]);
+
+  // Creatinine patterns
+  const creatinineMatch = /creatinine.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (creatinineMatch) markers.creatinine = Number.parseFloat(creatinineMatch[1]);
+
+  // Uric Acid patterns
+  const uricAcidMatch = /uric\s*acid.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
+                         /urate.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (uricAcidMatch) markers.uricAcid = Number.parseFloat(uricAcidMatch[1]);
+
+  // Fasting Insulin patterns
+  const insulinMatch = /(?:fasting\s+)?insulin.*?[:\s]+(\d+\.?\d*)/i.exec(text);
+  if (insulinMatch) markers.fastingInsulin = Number.parseFloat(insulinMatch[1]);
 
   // Derived markers
   if (markers.totalCholesterol !== undefined && markers.hdl !== undefined) {

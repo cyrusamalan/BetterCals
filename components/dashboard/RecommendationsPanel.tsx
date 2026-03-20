@@ -23,13 +23,11 @@ function getBmiPosition(bmi: number): number {
 }
 
 function getRatioColor(interpretation: string): string {
-  switch (interpretation) {
-    case 'Optimal': return 'var(--status-normal)';
-    case 'Normal': return 'var(--accent-warm)';
-    case 'Borderline': return 'var(--status-warning)';
-    case 'High Risk': return 'var(--status-danger)';
-    default: return 'var(--text-secondary)';
-  }
+  if (interpretation === 'Optimal') return 'var(--status-normal)';
+  if (interpretation === 'Normal') return 'var(--accent-warm)';
+  if (interpretation === 'Borderline' || interpretation === 'Elevated') return 'var(--status-warning)';
+  if (interpretation.startsWith('High Risk')) return 'var(--status-danger)';
+  return 'var(--text-secondary)';
 }
 
 export default function RecommendationsPanel({ recs }: RecommendationsPanelProps) {
@@ -167,6 +165,32 @@ export default function RecommendationsPanel({ recs }: RecommendationsPanelProps
             )}
           </div>
         ) : null}
+
+        {/* Waist-to-Hip Ratio */}
+        {recs.waistToHipRatio !== null && recs.waistToHipInterpretation !== null && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Scale className="w-4 h-4" style={{ color: 'var(--accent-warm)' }} />
+              <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: 'var(--text-tertiary)' }}>
+                Waist-to-Hip Ratio
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="font-display text-2xl" style={{ color: getRatioColor(recs.waistToHipInterpretation) }}>
+                {recs.waistToHipRatio}
+              </span>
+              <span
+                className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                style={{
+                  backgroundColor: `${getRatioColor(recs.waistToHipInterpretation)}18`,
+                  color: getRatioColor(recs.waistToHipInterpretation),
+                }}
+              >
+                {recs.waistToHipInterpretation}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Supplements */}
         {recs.supplements.length > 0 && (

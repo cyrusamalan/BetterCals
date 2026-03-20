@@ -8,12 +8,15 @@ interface HealthRadarChartProps {
 }
 
 export default function HealthRadarChart({ healthScore }: HealthRadarChartProps) {
-  const data = [
+  const allData = [
     { axis: 'Metabolic', value: healthScore.metabolic },
     { axis: 'Cardiovascular', value: healthScore.cardiovascular },
     { axis: 'Hormonal', value: healthScore.hormonal },
     { axis: 'Nutritional', value: healthScore.nutritional },
+    { axis: 'Hepatic', value: healthScore.hepatic },
+    { axis: 'Renal', value: healthScore.renal },
   ];
+  const data = allData.filter((d) => d.value > 0);
 
   return (
     <div

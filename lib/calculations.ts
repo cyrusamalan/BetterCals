@@ -78,12 +78,14 @@ export function calculateHealthScore(markers: BloodMarkers, profile?: Pick<UserP
     return { score: Math.round(avg), hasData: true };
   };
 
-  const metabolic = scoreCategory(['glucose', 'hba1c']);
+  const metabolic = scoreCategory(['glucose', 'hba1c', 'fastingInsulin']);
   const cardiovascular = scoreCategory(['totalCholesterol', 'ldl', 'hdl', 'triglycerides']);
   const hormonal = scoreCategory(['tsh']);
   const nutritional = scoreCategory(['vitaminD', 'vitaminB12', 'ferritin', 'iron']);
+  const hepatic = scoreCategory(['alt', 'ast', 'albumin']);
+  const renal = scoreCategory(['creatinine', 'uricAcid']);
 
-  const validCategoryScores = [metabolic, cardiovascular, hormonal, nutritional]
+  const validCategoryScores = [metabolic, cardiovascular, hormonal, nutritional, hepatic, renal]
     .filter((c) => c.hasData)
     .map((c) => c.score);
 
@@ -98,6 +100,8 @@ export function calculateHealthScore(markers: BloodMarkers, profile?: Pick<UserP
     cardiovascular: cardiovascular.score,
     hormonal: hormonal.score,
     nutritional: nutritional.score,
+    hepatic: hepatic.score,
+    renal: renal.score,
   };
 }
 
@@ -131,6 +135,12 @@ export function generateInsights(profile: UserProfile, tdee: TDEEResult, markers
     vitaminB12: 'Vitamin B12',
     ferritin: 'Ferritin',
     iron: 'Serum Iron',
+    alt: 'ALT (Liver)',
+    ast: 'AST (Liver)',
+    albumin: 'Albumin',
+    creatinine: 'Creatinine',
+    uricAcid: 'Uric Acid',
+    fastingInsulin: 'Fasting Insulin',
   };
 
   const typeFromStatus = (status: ReturnType<typeof getMarkerInterpretation>['status']): Insight['type'] => {
@@ -172,6 +182,7 @@ export function identifyDeficiencies(markers: BloodMarkers, profile: Pick<UserPr
     vitaminB12: 'Vitamin B12',
     ferritin: 'Iron (Ferritin)',
     iron: 'Serum Iron',
+    albumin: 'Albumin',
   };
 
   for (const marker of Object.keys(markers) as (keyof BloodMarkers)[]) {
@@ -204,15 +215,23 @@ export function identifyRisks(markers: BloodMarkers, profile: Pick<UserProfile, 
     vitaminB12: 'Vitamin B12',
     ferritin: 'Ferritin',
     iron: 'Serum Iron',
+    alt: 'ALT (Liver)',
+    ast: 'AST (Liver)',
+    albumin: 'Albumin',
+    creatinine: 'Creatinine',
+    uricAcid: 'Uric Acid',
+    fastingInsulin: 'Fasting Insulin',
   };
 
   const isRiskStatus = (status: ReturnType<typeof getMarkerInterpretation>['status']) =>
     status === 'borderline' || status === 'high' || status === 'critical';
 
-  const metabolicMarkers: (keyof BloodMarkers)[] = ['glucose', 'hba1c'];
+  const metabolicMarkers: (keyof BloodMarkers)[] = ['glucose', 'hba1c', 'fastingInsulin'];
   const cardiovascularMarkers: (keyof BloodMarkers)[] = ['totalCholesterol', 'ldl', 'hdl', 'triglycerides'];
+  const hepaticMarkers: (keyof BloodMarkers)[] = ['alt', 'ast'];
+  const renalMarkers: (keyof BloodMarkers)[] = ['creatinine', 'uricAcid'];
 
-  for (const marker of [...metabolicMarkers, ...cardiovascularMarkers]) {
+  for (const marker of [...metabolicMarkers, ...cardiovascularMarkers, ...hepaticMarkers, ...renalMarkers]) {
     const value = markers[marker];
     if (value === undefined) continue;
 
@@ -271,6 +290,27 @@ export function calculateBMI(weightLbs: number, heightFeet: number, heightInches
 
 const ACTIVITY_TIERS: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'active', 'very-active'];
 
+export function calculateWaistToHipRatio(
+  waistInches: number,
+  hipInches: number,
+  gender: UserProfile['gender'],
+): { ratio: number; interpretation: string } {
+  const ratio = Math.round((waistInches / hipInches) * 100) / 100;
+  let interpretation: string;
+  if (gender === 'male') {
+    if (ratio < 0.9) interpretation = 'Normal';
+    else if (ratio < 0.95) interpretation = 'Elevated';
+    else interpretation = 'High Risk';
+  } else if (ratio < 0.8) {
+    interpretation = 'Normal';
+  } else if (ratio < 0.85) {
+    interpretation = 'Elevated';
+  } else {
+    interpretation = 'High Risk';
+  }
+  return { ratio, interpretation };
+}
+
 export function calculateRecommendations(
   profile: UserProfile,
   markers: BloodMarkers,
@@ -309,6 +349,7 @@ export function calculateRecommendations(
     'Vitamin B12': { dosage: '1000 mcg daily', reason: 'B12 deficiency detected' },
     'Iron (Ferritin)': { dosage: '18-27 mg daily (with vitamin C)', reason: 'Low ferritin stores' },
     'Serum Iron': { dosage: '18-27 mg daily (with vitamin C)', reason: 'Low serum iron levels' },
+    'Albumin': { dosage: 'Increase dietary protein intake', reason: 'Low albumin — may indicate poor nutrition or liver issues' },
   };
   const supplements = deficiencies
     .filter((d) => supplementMap[d])
@@ -333,6 +374,15 @@ export function calculateRecommendations(
     exerciseSuggestions.push('Post-meal walks (15 min) can help regulate blood sugar');
   }
 
+  // Waist-to-hip ratio
+  let waistToHipRatio: number | null = null;
+  let waistToHipInterpretation: string | null = null;
+  if (profile.waistInches && profile.hipInches && profile.hipInches > 0) {
+    const whr = calculateWaistToHipRatio(profile.waistInches, profile.hipInches, profile.gender);
+    waistToHipRatio = whr.ratio;
+    waistToHipInterpretation = whr.interpretation;
+  }
+
   return {
     bmi,
     bmiCategory,
@@ -341,6 +391,8 @@ export function calculateRecommendations(
     ldlHdlInterpretation,
     tgHdlRatio,
     tgHdlInterpretation,
+    waistToHipRatio,
+    waistToHipInterpretation,
     supplements,
     exerciseSuggestions,
   };
