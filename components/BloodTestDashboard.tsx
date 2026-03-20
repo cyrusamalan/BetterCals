@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useState } from 'react';
 import { AnalysisResult, BloodMarkers, Insight, UserProfile } from '@/types';
 import { getMarkerDisplayRange, getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
 import BetterCalsMark from '@/components/BetterCalsMark';
@@ -390,22 +391,24 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
   const grade = getScoreGrade(healthScore.overall);
   const hasMarkers = Object.keys(markers).length > 0;
   const usedAverageMarkers = result.usedAverageMarkers === true;
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const handleDownloadPDF = async () => {
-    const pdfEl = document.getElementById('pdf-content') as HTMLElement | null;
-    const screenEl = document.getElementById('screen-content') as HTMLElement | null;
-    if (!pdfEl) return;
+    setDownloadError(null);
+    const pdfEl = document.getElementById('pdf-content');
+    const screenEl = document.getElementById('screen-content');
+    if (!(pdfEl instanceof HTMLElement)) return;
 
     const mod: any = await import('html2pdf.js');
     const html2pdf = mod?.default ?? mod;
 
     const prevPdfDisplay = pdfEl.style.display;
-    const prevScreenDisplay = screenEl?.style.display;
+    const prevScreenDisplay = screenEl instanceof HTMLElement ? screenEl.style.display : undefined;
 
     try {
       // Make sure the element we're capturing is actually rendered (not display:none).
       pdfEl.style.display = 'block';
-      if (screenEl) screenEl.style.display = 'none';
+      if (screenEl instanceof HTMLElement) screenEl.style.display = 'none';
 
       // Allow the browser to reflow/layout before snapshotting.
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -429,9 +432,12 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
           jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
         })
         .save();
+    } catch (err) {
+      console.error('PDF generation failed', err);
+      setDownloadError('PDF generation failed. Please try again.');
     } finally {
       pdfEl.style.display = prevPdfDisplay;
-      if (screenEl) screenEl.style.display = prevScreenDisplay ?? '';
+      if (screenEl instanceof HTMLElement) screenEl.style.display = prevScreenDisplay ?? '';
     }
   };
 
@@ -460,8 +466,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
     });
   }
 
-  const ascvdDisplay =
-    result.ascvdRiskScore !== undefined ? `${result.ascvdRiskScore.toFixed(1)}%` : 'N/A';
+  const ascvdDisplay = result.ascvdRiskScore != null ? `${result.ascvdRiskScore.toFixed(1)}%` : 'N/A';
 
   return (
     <div
@@ -478,43 +483,51 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
           WebkitBackdropFilter: 'blur(16px)',
         }}
       >
-        <div className="max-w-5xl mx-auto px-5 py-4 flex items-center justify-between">
-          <button
-            onClick={onReset}
-            className="flex items-center gap-1.5 text-sm font-medium group btn-press"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" style={{ color: 'var(--text-tertiary)' }} />
-            New Analysis
-          </button>
-          <div className="flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-5 py-4">
+          <div className="flex items-center justify-between">
             <button
-              onClick={handleDownloadPDF}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
-              style={{
-                backgroundColor: 'var(--border-light)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border)',
-              }}
+              onClick={onReset}
+              className="flex items-center gap-1.5 text-sm font-medium group btn-press"
+              style={{ color: 'var(--text-secondary)' }}
             >
-              <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-              Download Report
+              <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" style={{ color: 'var(--text-tertiary)' }} />
+              New Analysis
             </button>
-
-            <div className="flex items-center gap-2">
-              <div
-                className="w-9 h-9 rounded-[14px] flex items-center justify-center"
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleDownloadPDF}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
                 style={{
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #d2d2cc',
-                  boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
+                  backgroundColor: 'var(--border-light)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
                 }}
               >
-                <BetterCalsMark className="w-6.5 h-6.5" />
+                <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                Download Report
+              </button>
+
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-9 h-9 rounded-[14px] flex items-center justify-center"
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #d2d2cc',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
+                  }}
+                >
+                  <BetterCalsMark className="w-6.5 h-6.5" />
+                </div>
+                <span className="text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
               </div>
-              <span className="text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
             </div>
           </div>
+
+          {downloadError ? (
+            <div className="mt-2 text-xs font-semibold" style={{ color: 'var(--status-danger)' }}>
+              {downloadError}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -563,7 +576,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
               Sex: <b>{profile.gender}</b><br />
               Race: <b>{profile.race ?? 'white'}</b><br />
               Weight: <b>{profile.weightLbs} lb</b><br />
-              Height: <b>{profile.heightFeet}'{profile.heightInches}"</b><br />
+              Height: <b>{`${profile.heightFeet}'${profile.heightInches}"`}</b><br />
               Goal: <b>{profile.goal}</b>
             </div>
           </div>
@@ -676,13 +689,16 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
           <div className="pdf-avoid-break" style={{ marginTop: 14, border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>Insights</div>
             <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
-              {insights.slice(0, 10).map((i, idx) => (
-                <div key={idx} className="pdf-avoid-break" style={{ border: '1px solid #f0f0f0', borderRadius: 10, padding: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 800 }}>{i.title}</div>
-                  <div style={{ fontSize: 11, color: '#333', marginTop: 4 }}>{i.description}</div>
-                  {i.recommendation && <div style={{ fontSize: 10, color: '#666', marginTop: 6 }}>{i.recommendation}</div>}
-                </div>
-              ))}
+              {insights.slice(0, 10).map((i) => {
+                const insightKey = `${i.type}:${i.title}:${i.description}:${i.recommendation ?? ''}`;
+                return (
+                  <div key={insightKey} className="pdf-avoid-break" style={{ border: '1px solid #f0f0f0', borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800 }}>{i.title}</div>
+                    <div style={{ fontSize: 11, color: '#333', marginTop: 4 }}>{i.description}</div>
+                    {i.recommendation && <div style={{ fontSize: 10, color: '#666', marginTop: 6 }}>{i.recommendation}</div>}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
