@@ -22,7 +22,8 @@ function getBmiPosition(bmi: number): number {
   return Math.max(0, Math.min(100, ((bmi - 15) / 25) * 100));
 }
 
-function getRatioColor(interpretation: string): string {
+function getRatioColor(interpretation: string | undefined | null): string {
+  if (!interpretation) return 'var(--text-secondary)';
   if (interpretation === 'Optimal') return 'var(--status-normal)';
   if (interpretation === 'Normal') return 'var(--accent-warm)';
   if (interpretation === 'Borderline' || interpretation === 'Elevated') return 'var(--status-warning)';

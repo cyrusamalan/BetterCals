@@ -199,26 +199,27 @@ export default function Home() {
       <header
         className="anim-fade-up sticky top-0 z-30"
         style={{
-          backgroundColor: 'rgba(246, 245, 241, 0.8)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          borderBottom: '1px solid var(--border-light)',
+          backgroundColor: 'rgba(246, 245, 241, 0.72)',
+          backdropFilter: 'blur(20px) saturate(1.3)',
+          WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+          borderBottom: '1px solid rgba(228, 226, 220, 0.5)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
         }}
       >
-        <div className="max-w-3xl mx-auto px-5 py-4 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-5 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
-              className="w-12 h-12 rounded-[18px] flex items-center justify-center"
+              className="w-11 h-11 rounded-[16px] flex items-center justify-center"
               style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #d2d2cc',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
+                background: 'linear-gradient(145deg, #ffffff 0%, #f8f7f4 100%)',
+                border: '1px solid rgba(210, 210, 204, 0.6)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.8)',
               }}
             >
-              <BetterCalsMark className="w-8.5 h-8.5" />
+              <BetterCalsMark className="w-7 h-7" />
             </div>
             <div>
-              <h1 className="text-lg font-bold font-display" style={{ color: 'var(--text-primary)' }}>
+              <h1 className="text-[17px] font-bold font-display" style={{ color: 'var(--text-primary)' }}>
                 BetterCals
               </h1>
             </div>
@@ -226,25 +227,22 @@ export default function Home() {
 
           <div className="flex items-center gap-4">
             {/* Step pills */}
-            <div className="hidden sm:flex items-center gap-1.5">
+            <div className="hidden sm:flex items-center gap-1">
               {steps.map((s, i) => (
-                <div key={s.key} className="flex items-center gap-1.5">
+                <div key={s.key} className="flex items-center gap-1">
                   <div
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors duration-300"
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-300"
                     style={{
                       backgroundColor: i <= currentStepIdx ? 'var(--accent-subtle)' : 'transparent',
                       color: i <= currentStepIdx ? 'var(--accent)' : 'var(--text-tertiary)',
                     }}
                   >
                     <span
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors duration-300"
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-300"
                       style={{
-                        backgroundColor: i < currentStepIdx
-                          ? 'var(--accent)'
-                          : i === currentStepIdx
-                          ? 'var(--accent)'
-                          : 'var(--border)',
+                        backgroundColor: i <= currentStepIdx ? 'var(--accent)' : 'var(--border)',
                         color: i <= currentStepIdx ? 'var(--text-inverse)' : 'var(--text-tertiary)',
+                        boxShadow: i === currentStepIdx ? '0 0 0 3px rgba(107, 143, 113, 0.15)' : 'none',
                       }}
                     >
                       {i < currentStepIdx ? '\u2713' : s.num}
@@ -262,10 +260,11 @@ export default function Home() {
             <Show when="signed-out">
               <SignInButton mode="modal">
                 <button
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold btn-press"
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
                   style={{
-                    backgroundColor: 'var(--accent)',
+                    background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
                     color: 'var(--text-inverse)',
+                    boxShadow: '0 2px 6px rgba(107, 143, 113, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)',
                   }}
                 >
                   Sign in
@@ -300,11 +299,13 @@ export default function Home() {
             <div className="grid grid-cols-1 gap-8 items-start">
               {/* Form card */}
               <div
-                className="relative overflow-hidden rounded-2xl noise anim-fade-up delay-3"
+                className="relative overflow-hidden rounded-3xl noise anim-fade-up delay-3"
                 style={{
-                  backgroundColor: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.04)',
+                  background: 'rgba(255, 255, 255, 0.72)',
+                  backdropFilter: 'blur(20px) saturate(1.3)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+                  border: '1px solid rgba(255, 255, 255, 0.5)',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.04), 0 12px 48px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.6)',
                 }}
               >
                 <div className="p-6 sm:p-8">
@@ -344,11 +345,13 @@ export default function Home() {
 
             {/* Upload card */}
             <div
-              className="relative overflow-hidden rounded-2xl noise anim-fade-up delay-3"
+              className="relative overflow-hidden rounded-3xl noise anim-fade-up delay-3"
               style={{
-                backgroundColor: 'var(--surface)',
-                border: '1px solid var(--border)',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.04)',
+                background: 'rgba(255, 255, 255, 0.72)',
+                backdropFilter: 'blur(20px) saturate(1.3)',
+                WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+                border: '1px solid rgba(255, 255, 255, 0.5)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.04), 0 12px 48px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.6)',
               }}
             >
               <div className="p-6 sm:p-8">
@@ -358,23 +361,25 @@ export default function Home() {
 
             {/* Divider */}
             <div className="flex items-center gap-4 my-8 anim-fade-in delay-4">
-              <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border)' }} />
+              <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, var(--border), transparent)' }} />
               <span
-                className="text-xs font-semibold uppercase tracking-[0.2em]"
+                className="text-[11px] font-semibold uppercase tracking-[0.2em]"
                 style={{ color: 'var(--text-tertiary)' }}
               >
                 or enter manually
               </span>
-              <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border)' }} />
+              <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, var(--border), transparent)' }} />
             </div>
 
             {/* Manual entry card */}
             <div
-              className="relative overflow-hidden rounded-2xl noise anim-fade-up delay-5"
+              className="relative overflow-hidden rounded-3xl noise anim-fade-up delay-5"
               style={{
-                backgroundColor: 'var(--surface)',
-                border: '1px solid var(--border)',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.04)',
+                background: 'rgba(255, 255, 255, 0.72)',
+                backdropFilter: 'blur(20px) saturate(1.3)',
+                WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+                border: '1px solid rgba(255, 255, 255, 0.5)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.04), 0 12px 48px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.6)',
               }}
             >
               <div className="p-6 sm:p-8">

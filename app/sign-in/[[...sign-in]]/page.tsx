@@ -6,6 +6,30 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import BetterCalsMark from '@/components/BetterCalsMark';
 
+function LeafSVG({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="48" height="48" viewBox="0 0 48 48" fill="none">
+      <path
+        d="M8 40C8 40 12 8 40 8C40 8 36 20 28 28C20 36 8 40 8 40Z"
+        fill="currentColor"
+        opacity="0.5"
+      />
+      <path
+        d="M8 40C18 30 28 20 40 8"
+        stroke="currentColor"
+        strokeWidth="1"
+        opacity="0.3"
+      />
+      <path
+        d="M16 34C20 26 24 22 32 14"
+        stroke="currentColor"
+        strokeWidth="0.5"
+        opacity="0.2"
+      />
+    </svg>
+  );
+}
+
 export default function SignInPage() {
   const { signIn, isLoaded, setActive } = useSignIn();
   const router = useRouter();
@@ -14,6 +38,7 @@ export default function SignInPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,52 +79,51 @@ export default function SignInPage() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ background: 'linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%)' }}
-    >
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
+    <div className="auth-bg min-h-screen flex items-center justify-center px-4">
+      {/* Decorative elements */}
+      <div className="auth-orb-3" />
+      <div className="auth-ring auth-ring-1" />
+      <div className="auth-ring auth-ring-2" />
+      <LeafSVG className="auth-leaf auth-leaf-1 text-[var(--accent)]" />
+      <LeafSVG className="auth-leaf auth-leaf-2 text-[var(--accent-warm)]" />
+      <LeafSVG className="auth-leaf auth-leaf-3 text-[var(--accent)]" />
+
+      <div className="w-full max-w-[400px] relative z-10">
+        {/* Logo + header */}
+        <div className="flex flex-col items-center mb-7">
           <div
-            className="w-14 h-14 rounded-[20px] flex items-center justify-center mb-3"
+            className="auth-logo-enter w-16 h-16 rounded-[22px] flex items-center justify-center mb-4"
             style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #d2d2cc',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              background: 'linear-gradient(145deg, #ffffff 0%, #f8f7f4 100%)',
+              border: '1px solid rgba(210, 210, 204, 0.6)',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8)',
             }}
           >
-            <BetterCalsMark className="w-9 h-9" />
+            <BetterCalsMark className="w-10 h-10" />
           </div>
-          <h1 className="font-display text-2xl" style={{ color: 'var(--text-primary)' }}>
+          <h1
+            className="auth-text-enter font-display text-[1.75rem] leading-tight"
+            style={{ color: 'var(--text-primary)', animationDelay: '0.2s' }}
+          >
             Welcome back
           </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
+          <p
+            className="auth-text-enter text-sm mt-1.5"
+            style={{ color: 'var(--text-tertiary)', animationDelay: '0.3s' }}
+          >
             Sign in to your BetterCals account
           </p>
         </div>
 
         {/* Card */}
-        <div
-          className="rounded-2xl p-6 space-y-5"
-          style={{
-            backgroundColor: 'var(--surface)',
-            border: '1px solid var(--border)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.04)',
-          }}
-        >
+        <div className="auth-card p-7 space-y-5">
           {/* Google sign in */}
           <button
             type="button"
             onClick={handleGoogleSignIn}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium btn-press"
-            style={{
-              backgroundColor: 'var(--bg-warm)',
-              border: '1px solid var(--border)',
-              color: 'var(--text-primary)',
-            }}
+            className="auth-btn-social"
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
@@ -110,15 +134,23 @@ export default function SignInPage() {
 
           {/* Divider */}
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border)' }} />
-            <span className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>or</span>
-            <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border)' }} />
+            <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, var(--border), transparent)' }} />
+            <span
+              className="text-[11px] font-semibold uppercase tracking-[0.15em]"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              or
+            </span>
+            <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, var(--border), transparent)' }} />
           </div>
 
           {/* Email/password form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <label
+                className="block text-xs font-semibold mb-1.5 transition-colors duration-200"
+                style={{ color: focusedField === 'email' ? 'var(--accent)' : 'var(--text-secondary)' }}
+              >
                 Email
               </label>
               <input
@@ -126,19 +158,18 @@ export default function SignInPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl text-sm"
-                style={{
-                  backgroundColor: 'var(--bg-warm)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-primary)',
-                  outline: 'none',
-                }}
+                onFocus={() => setFocusedField('email')}
+                onBlur={() => setFocusedField(null)}
+                className="auth-input"
                 placeholder="you@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              <label
+                className="block text-xs font-semibold mb-1.5 transition-colors duration-200"
+                style={{ color: focusedField === 'password' ? 'var(--accent)' : 'var(--text-secondary)' }}
+              >
                 Password
               </label>
               <input
@@ -146,42 +177,60 @@ export default function SignInPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl text-sm"
-                style={{
-                  backgroundColor: 'var(--bg-warm)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-primary)',
-                  outline: 'none',
-                }}
+                onFocus={() => setFocusedField('password')}
+                onBlur={() => setFocusedField(null)}
+                className="auth-input"
                 placeholder="Enter your password"
               />
             </div>
 
             {error && (
-              <p className="text-xs font-medium px-3 py-2 rounded-lg" style={{ color: 'var(--status-danger)', backgroundColor: 'var(--status-danger-bg)' }}>
+              <div
+                className="text-xs font-medium px-3.5 py-2.5 rounded-xl anim-scale-in flex items-center gap-2"
+                style={{
+                  color: 'var(--status-danger)',
+                  backgroundColor: 'var(--status-danger-bg)',
+                  border: '1px solid var(--status-danger-border)',
+                }}
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 10.5a.75.75 0 110-1.5.75.75 0 010 1.5zM8.75 4.75a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0v-3.5z" />
+                </svg>
                 {error}
-              </p>
+              </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold btn-press disabled:opacity-50"
-              style={{
-                backgroundColor: 'var(--accent)',
-                color: 'var(--text-inverse)',
-                boxShadow: '0 2px 6px rgba(107, 143, 113, 0.25)',
-              }}
+              className="auth-btn-primary"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
+                    <path d="M12 2a10 10 0 019.95 9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                'Sign in'
+              )}
             </button>
           </form>
         </div>
 
         {/* Footer link */}
-        <p className="text-center text-sm mt-5" style={{ color: 'var(--text-tertiary)' }}>
+        <p
+          className="auth-text-enter text-center text-sm mt-6"
+          style={{ color: 'var(--text-tertiary)', animationDelay: '0.5s' }}
+        >
           Don&apos;t have an account?{' '}
-          <Link href="/sign-up" className="font-semibold" style={{ color: 'var(--accent)' }}>
+          <Link
+            href="/sign-up"
+            className="font-semibold transition-colors duration-200 hover:underline"
+            style={{ color: 'var(--accent)' }}
+          >
             Sign up
           </Link>
         </p>
