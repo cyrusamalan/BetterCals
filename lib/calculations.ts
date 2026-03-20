@@ -301,10 +301,12 @@ export function calculateWaistToHipRatio(
     if (ratio < 0.9) interpretation = 'Normal';
     else if (ratio < 0.95) interpretation = 'Elevated';
     else interpretation = 'High Risk';
+  } else if (ratio < 0.8) {
+    interpretation = 'Normal';
+  } else if (ratio < 0.85) {
+    interpretation = 'Elevated';
   } else {
-    if (ratio < 0.8) interpretation = 'Normal';
-    else if (ratio < 0.85) interpretation = 'Elevated';
-    else interpretation = 'High Risk';
+    interpretation = 'High Risk';
   }
   return { ratio, interpretation };
 }

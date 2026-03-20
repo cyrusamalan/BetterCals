@@ -127,6 +127,13 @@ const CATEGORIES: {
   },
 ];
 
+function getBmiScore(bmi: number): number {
+  if (bmi < 18.5) return 50;
+  if (bmi < 25) return 90;
+  if (bmi < 30) return 60;
+  return 30;
+}
+
 function getScoreGrade(score: number): { label: string; color: string } {
   if (score >= 85) return { label: 'Excellent', color: 'var(--status-normal)' };
   if (score >= 70) return { label: 'Good', color: 'var(--accent-warm)' };
@@ -846,7 +853,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
                   <div
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
                     style={{
-                      backgroundColor: `${getScoreGrade(recommendations.bmi < 18.5 ? 50 : recommendations.bmi < 25 ? 90 : recommendations.bmi < 30 ? 60 : 30).color}12`,
+                      backgroundColor: `${getScoreGrade(getBmiScore(recommendations.bmi)).color}12`,
                       border: '1px solid var(--border-light)',
                     }}
                   >

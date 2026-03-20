@@ -16,6 +16,20 @@ async function extractTextWithOCR(file: File): Promise<string> {
   return result.data.text;
 }
 
+function getDropzoneBorderColor(isDragActive: boolean, done: boolean, error: string | null): string {
+  if (isDragActive) return 'var(--accent)';
+  if (done) return 'var(--status-normal-border)';
+  if (error) return 'var(--status-danger)';
+  return 'var(--border)';
+}
+
+function getDropzoneBackgroundColor(isDragActive: boolean, done: boolean, error: string | null): string {
+  if (isDragActive) return 'var(--accent-subtle)';
+  if (done) return 'var(--status-normal-bg)';
+  if (error) return 'var(--status-danger-bg)';
+  return 'var(--bg-warm)';
+}
+
 export default function BloodReportUploader({ onTextExtracted }: BloodReportUploaderProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -71,20 +85,8 @@ export default function BloodReportUploader({ onTextExtracted }: BloodReportUplo
           ${isDragActive ? '' : !fileName ? 'dropzone-idle' : ''}
         `}
         style={{
-          borderColor: isDragActive
-            ? 'var(--accent)'
-            : done
-            ? 'var(--status-normal-border)'
-            : error
-            ? 'var(--status-danger)'
-            : 'var(--border)',
-          backgroundColor: isDragActive
-            ? 'var(--accent-subtle)'
-            : done
-            ? 'var(--status-normal-bg)'
-            : error
-            ? 'var(--status-danger-bg)'
-            : 'var(--bg-warm)',
+          borderColor: getDropzoneBorderColor(isDragActive, done, error),
+          backgroundColor: getDropzoneBackgroundColor(isDragActive, done, error),
         }}
       >
         <input {...getInputProps()} />

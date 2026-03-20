@@ -207,7 +207,7 @@ const HEALTHY_PRESET: BloodMarkers = {
   ldl: 90,
   hdl: 65,
   triglycerides: 110,
-  tsh: 2.0,
+  tsh: 2,
   vitaminD: 45,
   vitaminB12: 550,
   ferritin: 80,
@@ -216,7 +216,7 @@ const HEALTHY_PRESET: BloodMarkers = {
   ast: 18,
   albumin: 4.5,
   creatinine: 0.9,
-  uricAcid: 5.0,
+  uricAcid: 5,
   fastingInsulin: 4.5,
 };
 
