@@ -236,46 +236,20 @@ export function parseBloodReport(text: string): BloodMarkers {
   const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   /**
-   * Labcorp-style tables often look like:
-   *   Glucose 01 93 93 06/26/2024 mg/dL 70-99
-   * where the first numeric token after the marker label is a "flag/index" (often `01`),
-   * and the "current result" is the next numeric value.
+   * Generic lab-agnostic value extractor.
    *
-   * OCR/PDF extraction can also split these tokens across lines/pages, so we intentionally
-   * avoid "same-line" extraction and instead capture `flag` then `current` across whitespace.
+   * This is a FALLBACK parser — the primary extraction is done by the LLM.
+   * It handles common lab report formats from any provider:
+   *   - "Glucose: 93 mg/dL"
+   *   - "Glucose  93  mg/dL  (70-100)"
+   *   - "Glucose .............. 93 mg/dL"
+   *   - "93 mg/dL" near the marker name
+   *   - "93 High" or "15.3 Low" flag patterns
+   *
+   * It does NOT try to handle provider-specific concatenated column formats
+   * (e.g. Labcorp "131706/26/2024") — that complexity is left to the LLM.
    */
-  const extractFlagThenCurrent = (re: RegExp): number | undefined => {
-    const match = re.exec(normalizedText);
-    if (!match) return undefined;
-    // Expected capture groups: (1)=flag, (2)=current result.
-    const raw = match[2] ?? match[1];
-    const value = Number.parseFloat(raw);
-    return Number.isFinite(value) ? value : undefined;
-  };
-
-  /**
-   * Generic fallback for report formats where each marker row has a single result value, e.g.:
-   *   ALT 22 U/L 0-41 Healthy
-   */
-  const extractFirstValueAfterLabel = (lineRegex: RegExp, markerLabelRegex: RegExp): number | undefined => {
-    const match = lineRegex.exec(normalizedText);
-    if (!match) return undefined;
-    const line = match[0];
-    const afterLabel = line.replace(markerLabelRegex, ' ');
-    const valueMatch = afterLabel.match(/-?\d+(?:\.\d+)?/);
-    if (!valueMatch) return undefined;
-    const value = Number.parseFloat(valueMatch[0]);
-    return Number.isFinite(value) ? value : undefined;
-  };
-
-  /**
-   * Format-agnostic extraction:
-   * 1) Locate marker alias
-   * 2) Prefer number closest to expected unit (e.g. `93 mg/dL`)
-   * 3) Fallback to Labcorp flag/current shape (`01 93`)
-   * 4) Final fallback: first plausible number after label
-   */
-  const extractMarkerValue = (
+  const extractValue = (
     aliases: string[],
     units: string[],
   ): number | undefined => {
@@ -284,143 +258,118 @@ export function parseBloodReport(text: string): BloodMarkers {
       let m: RegExpExecArray | null;
       while ((m = aliasRe.exec(normalizedText)) !== null) {
         const from = m.index;
-        const snippet = normalizedText.slice(from, from + 220);
-        const afterAlias = snippet.slice(m[0].length);
 
-        // 1) Prefer value right before expected unit.
+        // ── Context guards: skip non-result matches ──
+        // Look at surrounding context to reject matches in headers, footnotes, disclaimers
+        const lineStart = normalizedText.lastIndexOf('\n', from) + 1;
+        const contextBefore = normalizedText.slice(Math.max(0, lineStart), from);
+        const contextAfter = normalizedText.slice(from, Math.min(normalizedText.length, from + 300));
+
+        // Skip matches in order lists, footnotes, disclaimers, educational text
+        if (/ordered items|test\s+name|previous\s+reference/i.test(contextBefore)) continue;
+        if (/deficien|insufficien|guideline|institute|society|recommend|less\s+than|greater\s+than|between/i.test(
+          contextAfter.slice(0, 100)
+        )) continue;
+
+        const afterAlias = contextAfter.slice(m[0].length);
+
+        // Strategy 1: "value flag" pattern — number followed by High/Low/Normal/Critical/Abnormal
+        // e.g. "15.3 Low", "22 High", "93 Normal"
+        const flagMatch = afterAlias.match(/^[\s.:]*(\d+(?:\.\d+)?)\s*(?:High|Low|Normal|Critical|Abnormal|H|L|A)\b/i);
+        if (flagMatch) {
+          const value = Number.parseFloat(flagMatch[1]);
+          if (Number.isFinite(value) && value > 0) return value;
+        }
+
+        // Strategy 2: "value unit" pattern — number followed by a known unit
+        // e.g. "93 mg/dL", "5.2 %", "1.18 mg/dL"
         const unitPattern = units.map((u) => escapeRegex(u)).join('|');
-        const byUnit = new RegExp(`(-?\\d+(?:\\.\\d+)?)\\s*(?:${unitPattern})\\b`, 'i').exec(afterAlias);
-        if (byUnit) {
-          const value = Number.parseFloat(byUnit[1]);
-          if (Number.isFinite(value)) return value;
+        const unitMatch = new RegExp(
+          `[\\s.:]+?(\\d+(?:\\.\\d+)?)\\s*(?:${unitPattern})\\b`,
+          'i',
+        ).exec(afterAlias);
+        if (unitMatch) {
+          const value = Number.parseFloat(unitMatch[1]);
+          if (Number.isFinite(value) && value > 0) return value;
         }
 
-        // 2) Labcorp flag/current style: "01 93"
-        const flagCurrent = /(?:^|\D)(\d{1,3})\s+(\d+(?:\.\d+)?)/.exec(afterAlias);
-        if (flagCurrent) {
-          const current = Number.parseFloat(flagCurrent[2]);
-          if (Number.isFinite(current)) return current;
-        }
-
-        // 3) First plausible number after marker.
-        const nums = afterAlias.match(/-?\d+(?:\.\d+)?/g);
-        if (nums && nums.length > 0) {
-          const first = Number.parseFloat(nums[0]);
-          const second = nums.length > 1 ? Number.parseFloat(nums[1]) : undefined;
-          // If the first number is likely a flag/index (e.g. 01), use the next one.
-          const candidate = Number.isFinite(second) && first <= 2 ? second : first;
-          if (Number.isFinite(candidate)) return candidate;
+        // Strategy 3: colon/space then number pattern (generic)
+        // e.g. "Glucose: 93", "Glucose   93", "Glucose......93"
+        // Only grab standalone numbers (followed by space, unit, end-of-line, or flag)
+        const simpleMatch = afterAlias.match(
+          /^[\s.:·…]+(\d+(?:\.\d+)?)\s*(?:$|\s|[a-zA-Z/%])/,
+        );
+        if (simpleMatch) {
+          const value = Number.parseFloat(simpleMatch[1]);
+          if (Number.isFinite(value) && value > 0) return value;
         }
       }
     }
     return undefined;
   };
 
-  // Glucose patterns
-  const glucose =
-    extractMarkerValue(['fasting glucose', 'glucose'], ['mg/dL']) ??
-    extractFlagThenCurrent(/\bglucose\b[^\d]{0,20}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  // ── Marker extraction ──
+  // Each uses extractValue — a generic, lab-agnostic extractor.
+  // This is the fallback parser; the LLM handles complex/unusual layouts.
+
+  const glucose = extractValue(['fasting glucose', 'glucose'], ['mg/dL', 'mg/dl']);
   if (glucose !== undefined) markers.glucose = glucose;
 
-  // HbA1c patterns
-  const hba1c =
-    extractMarkerValue(['hemoglobin a1c', 'hba1c', 'a1c'], ['%']) ??
-    extractFlagThenCurrent(/\b(?:hba1c|hemoglobin\s*a\s*1c)\b[^\d]{0,30}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  const hba1c = extractValue(['hemoglobin a1c', 'hba1c', 'a1c'], ['%']);
   if (hba1c !== undefined) markers.hba1c = hba1c;
 
-  // Cholesterol patterns
-  const totalCholMatch = /total cholesterol.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                         /cholesterol, total.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (totalCholMatch) markers.totalCholesterol = Number.parseFloat(totalCholMatch[1]);
+  const totalCholesterol = extractValue(['total cholesterol', 'cholesterol, total'], ['mg/dL', 'mg/dl']);
+  if (totalCholesterol !== undefined) markers.totalCholesterol = totalCholesterol;
 
-  // LDL patterns
-  const ldlMatch = /ldl.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                 /ldl cholesterol.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                 /low density lipoprotein.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (ldlMatch) markers.ldl = Number.parseFloat(ldlMatch[1]);
+  const ldl = extractValue(['ldl cholesterol', 'ldl-c', 'ldl', 'low density lipoprotein'], ['mg/dL', 'mg/dl']);
+  if (ldl !== undefined) markers.ldl = ldl;
 
-  // HDL patterns
-  const hdlMatch = /hdl.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                 /hdl cholesterol.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                 /high density lipoprotein.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (hdlMatch) markers.hdl = Number.parseFloat(hdlMatch[1]);
+  const hdl = extractValue(['hdl cholesterol', 'hdl-c', 'hdl', 'high density lipoprotein'], ['mg/dL', 'mg/dl']);
+  if (hdl !== undefined) markers.hdl = hdl;
 
-  // ApoB patterns
-  const apoBMatch =
-    /apo\s*[-]?\s*b\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-    /apolipoprotein\s*b\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-    /\bapob\b.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (apoBMatch) markers.apoB = Number.parseFloat(apoBMatch[1]);
+  const triglycerides = extractValue(['triglycerides', 'triglyceride'], ['mg/dL', 'mg/dl']);
+  if (triglycerides !== undefined) markers.triglycerides = triglycerides;
 
-  // hs-CRP patterns
-  const hsCrpMatch =
-    /\bhs[\s-]*crp\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-    /\bhigh[\s-]*sensitivity[\s-]*c[\s-]*reactive\s*protein\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-    /\bc[\s-]*reactive\s*protein\b.*?\bhigh[\s-]*sensitivity\b.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (hsCrpMatch) markers.hsCRP = Number.parseFloat(hsCrpMatch[1]);
+  const apoB = extractValue(['apo b', 'apolipoprotein b', 'apob'], ['mg/dL', 'mg/dl']);
+  if (apoB !== undefined) markers.apoB = apoB;
 
-  // Triglycerides patterns
-  const trigMatch = /triglycerides.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (trigMatch) markers.triglycerides = Number.parseFloat(trigMatch[1]);
+  const hsCRP = extractValue(['hs-crp', 'high sensitivity c-reactive protein', 'c-reactive protein', 'hscrp'], ['mg/L', 'mg/l']);
+  if (hsCRP !== undefined) markers.hsCRP = hsCRP;
 
-  // TSH patterns
-  const tshMatch = /tsh.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                 /thyroid stimulating hormone.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (tshMatch) markers.tsh = Number.parseFloat(tshMatch[1]);
+  const tsh = extractValue(['tsh', 'thyroid stimulating hormone'], ['mIU/L', 'uIU/mL', 'miu/l']);
+  if (tsh !== undefined) markers.tsh = tsh;
 
-  // Vitamin D patterns
-  const vitD =
-    extractMarkerValue(['vitamin d, 25-hydroxy', 'vitamin d 25-hydroxy', 'vitamin d'], ['ng/mL']) ??
-    extractFlagThenCurrent(/vitamin\s*d[\s\S]{0,50}?25[\-\s]?hydroxy\b[^\d]{0,30}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  const vitD = extractValue(['vitamin d, 25-hydroxy', 'vitamin d 25-hydroxy', '25-hydroxy vitamin d', 'vitamin d'], ['ng/mL', 'ng/ml']);
   if (vitD !== undefined) markers.vitaminD = vitD;
 
-  // Vitamin B12 patterns
-  const b12Match = /vitamin b12.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                   /b12.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                   /cobalamin.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (b12Match) markers.vitaminB12 = Number.parseFloat(b12Match[1]);
+  const b12 = extractValue(['vitamin b12', 'vitamin b-12', 'cobalamin'], ['pg/mL', 'pg/ml', 'pmol/L']);
+  if (b12 !== undefined) markers.vitaminB12 = b12;
 
-  // Ferritin patterns
-  const ferritinMatch = /ferritin.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (ferritinMatch) markers.ferritin = Number.parseFloat(ferritinMatch[1]);
+  const ferritin = extractValue(['ferritin'], ['ng/mL', 'ng/ml', 'ug/L']);
+  if (ferritin !== undefined) markers.ferritin = ferritin;
 
-  // Iron patterns
-  const ironMatch = /iron[^a-z]*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                  /serum iron.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (ironMatch) markers.iron = Number.parseFloat(ironMatch[1]);
+  const iron = extractValue(['serum iron', 'iron, total', 'iron'], ['mcg/dL', 'ug/dL', 'umol/L']);
+  if (iron !== undefined) markers.iron = iron;
 
-  // ALT patterns
-  const alt =
-    extractMarkerValue(['alt', 'alt (sgpt)', 'sgpt', 'alanine transferase'], ['U/L', 'IU/L']) ??
-    extractFlagThenCurrent(/\balt\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  // ALT — search for the specific "ALT (SGPT)" first to avoid matching "Alternate"
+  const alt = extractValue(['alt (sgpt)', 'sgpt', 'alanine aminotransferase', 'alanine transferase', 'alt'], ['U/L', 'IU/L', 'u/l']);
   if (alt !== undefined) markers.alt = alt;
 
-  // AST patterns
-  const ast =
-    extractMarkerValue(['ast', 'ast (sgot)', 'sgot', 'aspartate transferase'], ['U/L', 'IU/L']) ??
-    extractFlagThenCurrent(/\bast\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  // AST — search for the specific "AST (SGOT)" first
+  const ast = extractValue(['ast (sgot)', 'sgot', 'aspartate aminotransferase', 'aspartate transferase', 'ast'], ['U/L', 'IU/L', 'u/l']);
   if (ast !== undefined) markers.ast = ast;
 
-  // Albumin patterns
-  const albumin =
-    extractMarkerValue(['albumin'], ['g/dL']) ??
-    extractFlagThenCurrent(/\balbumin\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  const albumin = extractValue(['albumin'], ['g/dL', 'g/dl']);
   if (albumin !== undefined) markers.albumin = albumin;
 
-  // Creatinine patterns
-  const creatinine =
-    extractMarkerValue(['creatinine'], ['mg/dL']) ??
-    extractFlagThenCurrent(/\bcreatinine\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  const creatinine = extractValue(['creatinine'], ['mg/dL', 'mg/dl']);
   if (creatinine !== undefined) markers.creatinine = creatinine;
 
-  // Uric Acid patterns
-  const uricAcidMatch = /uric\s*acid.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                         /urate.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (uricAcidMatch) markers.uricAcid = Number.parseFloat(uricAcidMatch[1]);
+  const uricAcid = extractValue(['uric acid', 'urate'], ['mg/dL', 'mg/dl']);
+  if (uricAcid !== undefined) markers.uricAcid = uricAcid;
 
-  // Fasting Insulin patterns
-  const insulinMatch = /(?:fasting\s+)?insulin.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (insulinMatch) markers.fastingInsulin = Number.parseFloat(insulinMatch[1]);
+  const fastingInsulin = extractValue(['fasting insulin', 'insulin'], ['mIU/L', 'uIU/mL', 'miu/l']);
+  if (fastingInsulin !== undefined) markers.fastingInsulin = fastingInsulin;
 
   // Derived markers
   if (markers.totalCholesterol !== undefined && markers.hdl !== undefined) {

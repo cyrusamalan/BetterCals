@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Heart, Activity, FileText, Droplets, ChevronRight } from 'lucide-react';
+import { Heart, Activity, FileText, Droplets, ChevronRight, UserCog } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import TDEEForm from '@/components/TDEEForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
@@ -149,6 +149,11 @@ export default function Home() {
     }
   };
 
+  const handleEditProfile = () => {
+    // Navigate back to step 1 with existing profile data preserved
+    setStep('profile');
+  };
+
   const handleSignOut = async () => {
     setSigningOut(true);
     try {
@@ -195,6 +200,7 @@ export default function Home() {
         markers={markers}
         profile={profile!}
         onReset={handleReset}
+        onEditProfile={handleEditProfile}
       />
     );
   }
@@ -290,19 +296,36 @@ export default function Home() {
                 Sign in
               </Link>
             ) : (
-              <button
-                type="button"
-                onClick={handleSignOut}
-                disabled={signingOut}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press disabled:opacity-50"
-                style={{
-                  background: 'var(--border-light)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border)',
-                }}
-              >
-                {signingOut ? 'Signing out...' : 'Sign out'}
-              </button>
+              <div className="flex items-center gap-2">
+                {profile && step !== 'profile' && (
+                  <button
+                    type="button"
+                    onClick={handleEditProfile}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                    style={{
+                      background: 'var(--accent-subtle)',
+                      color: 'var(--accent)',
+                      border: '1px solid rgba(107, 143, 113, 0.2)',
+                    }}
+                  >
+                    <UserCog className="w-3.5 h-3.5" />
+                    Edit Profile
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  disabled={signingOut}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press disabled:opacity-50"
+                  style={{
+                    background: 'var(--border-light)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  {signingOut ? 'Signing out...' : 'Sign out'}
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -339,7 +362,7 @@ export default function Home() {
                 }}
               >
                 <div className="p-6 sm:p-8">
-                  <TDEEForm onSubmit={handleProfileSubmit} />
+                  <TDEEForm onSubmit={handleProfileSubmit} initialValues={profile ?? undefined} />
                 </div>
               </div>
             </div>

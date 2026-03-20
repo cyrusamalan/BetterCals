@@ -36,34 +36,33 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       heightInches: initialValues.heightInches,
       activityLevel: initialValues.activityLevel,
       goal: initialValues.goal,
-      race: initialValues.race ?? 'white',
+      race: initialValues.race,
       smoker: initialValues.smoker ?? false,
       diabetic: initialValues.diabetic ?? false,
-      bloodPressureSystolic: initialValues.bloodPressureSystolic ?? 120,
+      bloodPressureSystolic: initialValues.bloodPressureSystolic,
       treatedForHypertension: initialValues.treatedForHypertension ?? false,
       waistInches: initialValues.waistInches,
       hipInches: initialValues.hipInches,
     } : {
-      age: 30,
       gender: 'male',
-      weightLbs: 154,
-      heightFeet: 5,
-      heightInches: 7,
       activityLevel: 'moderate',
       goal: 'maintain',
-      race: 'white',
       smoker: false,
       diabetic: false,
-      bloodPressureSystolic: 120,
       treatedForHypertension: false,
     },
   });
 
   const handleFormSubmit = (data: FormData) => {
+    // Only include optional numeric fields if the user actually entered a value.
+    // react-hook-form with valueAsNumber returns NaN for empty inputs.
+    const optNum = (v: number | undefined): number | undefined =>
+      typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+
     onSubmit({
       age: data.age,
       gender: data.gender,
-      race: data.race,
+      race: data.race || undefined,
       weightLbs: data.weightLbs,
       heightFeet: data.heightFeet,
       heightInches: data.heightInches,
@@ -71,10 +70,10 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       goal: data.goal,
       smoker: data.smoker,
       diabetic: data.diabetic,
-      bloodPressureSystolic: data.bloodPressureSystolic,
+      bloodPressureSystolic: optNum(data.bloodPressureSystolic),
       treatedForHypertension: data.treatedForHypertension,
-      waistInches: data.waistInches,
-      hipInches: data.hipInches,
+      waistInches: optNum(data.waistInches),
+      hipInches: optNum(data.hipInches),
     });
   };
 
@@ -244,6 +243,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-5">
           <FieldGroup icon={User} label="Race">
             <select {...register('race')} className="select-field">
+              <option value="">— Select (optional) —</option>
               <option value="white">White</option>
               <option value="black">Black / African American</option>
               <option value="other">Other</option>

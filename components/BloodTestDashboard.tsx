@@ -23,6 +23,7 @@ import {
   Bean,
   Save,
   Check,
+  UserCog,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
@@ -39,6 +40,7 @@ interface BloodTestDashboardProps {
   markers: BloodMarkers;
   profile: UserProfile;
   onReset: () => void;
+  onEditProfile?: () => void;
 }
 
 const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
@@ -423,7 +425,7 @@ function FlagSection({ title, items, variant }: { title: string; items: string[]
 
 // ── Main Dashboard ──
 
-export default function BloodTestDashboard({ result, markers, profile, onReset }: BloodTestDashboardProps) {
+export default function BloodTestDashboard({ result, markers, profile, onReset, onEditProfile }: BloodTestDashboardProps) {
   const { isSignedIn } = useAuth();
   const { tdee, healthScore, insights, deficiencies, risks, calorieTiers, macros, recommendations } = result;
   const grade = getScoreGrade(healthScore.overall);
@@ -566,6 +568,21 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
                 <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
                 Download Report
               </button>
+
+              {onEditProfile && (
+                <button
+                  onClick={onEditProfile}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
+                  style={{
+                    backgroundColor: 'var(--accent-subtle)',
+                    color: 'var(--accent)',
+                    border: '1px solid rgba(107, 143, 113, 0.2)',
+                  }}
+                >
+                  <UserCog className="w-4 h-4" />
+                  Edit Profile
+                </button>
+              )}
 
               {isSignedIn ? (
                 <button
