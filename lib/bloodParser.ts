@@ -232,16 +232,35 @@ export const MARKER_RULES: Record<keyof BloodMarkers, MarkerDefinition> = {
 export function parseBloodReport(text: string): BloodMarkers {
   const markers: BloodMarkers = {};
 
+  /**
+   * Labcorp-style tables often look like:
+   *   Glucose 01 93 93 06/26/2024 mg/dL 70-99
+   * where the first numeric token after the marker label is a "flag/index" (often `01`),
+   * and the "current result" is the next numeric value.
+   *
+   * OCR/PDF extraction can also split these tokens across lines/pages, so we intentionally
+   * avoid "same-line" extraction and instead capture `flag` then `current` across whitespace.
+   */
+  const extractFlagThenCurrent = (re: RegExp): number | undefined => {
+    const match = re.exec(text);
+    if (!match) return undefined;
+    // Expected capture groups: (1)=flag, (2)=current result.
+    const raw = match[2] ?? match[1];
+    const value = Number.parseFloat(raw);
+    return Number.isFinite(value) ? value : undefined;
+  };
+
   // Glucose patterns
-  const glucoseMatch = /glucose.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                      /fasting.*?glucose.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (glucoseMatch) markers.glucose = Number.parseFloat(glucoseMatch[1]);
+  const glucose = extractFlagThenCurrent(
+    /\bglucose\b[^\d]{0,20}(\d{1,3})\s+(\d+(?:\.\d+)?)/i,
+  );
+  if (glucose !== undefined) markers.glucose = glucose;
 
   // HbA1c patterns
-  const hba1cMatch = /hba1c.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                     /hemoglobin a1c.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                     /a1c.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (hba1cMatch) markers.hba1c = Number.parseFloat(hba1cMatch[1]);
+  const hba1c = extractFlagThenCurrent(
+    /\b(?:hba1c|hemoglobin\s*a\s*1c)\b[^\d]{0,30}(\d{1,3})\s+(\d+(?:\.\d+)?)/i,
+  );
+  if (hba1c !== undefined) markers.hba1c = hba1c;
 
   // Cholesterol patterns
   const totalCholMatch = /total cholesterol.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
@@ -284,10 +303,10 @@ export function parseBloodReport(text: string): BloodMarkers {
   if (tshMatch) markers.tsh = Number.parseFloat(tshMatch[1]);
 
   // Vitamin D patterns
-  const vitDMatch = /vitamin d.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                    /25[\-\s]?hydroxy.*?vitamin d.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                    /25\(oh\)d.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (vitDMatch) markers.vitaminD = Number.parseFloat(vitDMatch[1]);
+  const vitD = extractFlagThenCurrent(
+    /vitamin\s*d[\s\S]{0,50}?25[\-\s]?hydroxy\b[^\d]{0,30}(\d{1,3})\s+(\d+(?:\.\d+)?)/i,
+  );
+  if (vitD !== undefined) markers.vitaminD = vitD;
 
   // Vitamin B12 patterns
   const b12Match = /vitamin b12.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
@@ -305,24 +324,22 @@ export function parseBloodReport(text: string): BloodMarkers {
   if (ironMatch) markers.iron = Number.parseFloat(ironMatch[1]);
 
   // ALT patterns
-  const altMatch = /\balt\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                   /alanine\s*(?:amino)?transferase.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                   /sgpt.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (altMatch) markers.alt = Number.parseFloat(altMatch[1]);
+  const alt = extractFlagThenCurrent(/\balt\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  if (alt !== undefined) markers.alt = alt;
 
   // AST patterns
-  const astMatch = /\bast\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                   /aspartate\s*(?:amino)?transferase.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                   /sgot.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (astMatch) markers.ast = Number.parseFloat(astMatch[1]);
+  const ast = extractFlagThenCurrent(/\bast\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  if (ast !== undefined) markers.ast = ast;
 
   // Albumin patterns
-  const albuminMatch = /\balbumin\b.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (albuminMatch) markers.albumin = Number.parseFloat(albuminMatch[1]);
+  const albumin = extractFlagThenCurrent(/\balbumin\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  if (albumin !== undefined) markers.albumin = albumin;
 
   // Creatinine patterns
-  const creatinineMatch = /creatinine.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (creatinineMatch) markers.creatinine = Number.parseFloat(creatinineMatch[1]);
+  const creatinine = extractFlagThenCurrent(
+    /\bcreatinine\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i,
+  );
+  if (creatinine !== undefined) markers.creatinine = creatinine;
 
   // Uric Acid patterns
   const uricAcidMatch = /uric\s*acid.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
