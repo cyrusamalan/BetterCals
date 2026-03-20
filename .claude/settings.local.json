@@ -4,7 +4,8 @@
       "Bash(npm run:*)",
       "Bash(grep -r \"tesseract\\\\|Tesseract\" C:/Users/cyrus/camalan/Projects/BloodWise --include=*.ts --include=*.tsx --include=*.js --include=*.json)",
       "Bash(find C:/Users/cyrus/camalan/Projects/BloodWise -name .env* -o -name *config* -type f)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm ls:*)"
     ]
   },
   "enabledPlugins": {
