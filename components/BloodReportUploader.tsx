@@ -4,12 +4,55 @@ import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import Tesseract from 'tesseract.js';
-
 interface BloodReportUploaderProps {
   onTextExtracted: (text: string) => void;
 }
 
-async function extractTextWithOCR(file: File): Promise<string> {
+async function extractTextFromPDF(file: File): Promise<string> {
+  const pdfjsLib = await import('pdfjs-dist');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const allText: string[] = [];
+
+  // First try native text extraction (works for digital/searchable PDFs)
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items
+      .map((item) => ('str' in item ? item.str : ''))
+      .join(' ');
+    allText.push(pageText);
+  }
+
+  const nativeText = allText.join('\n').trim();
+  if (nativeText.length > 50) {
+    return nativeText;
+  }
+
+  // Fallback: render pages to canvas and OCR them (for scanned PDFs)
+  const ocrResults: string[] = [];
+  const scale = 2;
+  for (let i = 1; i <= Math.min(pdf.numPages, 5); i++) {
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d')!;
+    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+
+    const result = await Tesseract.recognize(canvas, 'eng', {
+      logger: () => {},
+    });
+    ocrResults.push(result.data.text);
+  }
+
+  return ocrResults.join('\n');
+}
+
+async function extractTextFromImage(file: File): Promise<string> {
   const result = await Tesseract.recognize(file, 'eng', {
     logger: () => {},
   });
@@ -46,10 +89,10 @@ export default function BloodReportUploader({ onTextExtracted }: BloodReportUplo
     setFileName(file.name);
 
     try {
-      let text = '';
-
-      // OCR works for both images and PDFs (tesseract.js handles both)
-      text = await extractTextWithOCR(file);
+      const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      const text = isPDF
+        ? await extractTextFromPDF(file)
+        : await extractTextFromImage(file);
 
       if (!text.trim()) {
         setError('Could not extract text from this file. Try entering values manually.');
