@@ -4,15 +4,15 @@ import { useState } from 'react';
 import { useSignIn } from '@clerk/nextjs/legacy';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import BetterCalsMark from '@/components/BetterCalsMark';
 
 /* ── Animated donut hero for the branding panel ── */
-function DonutHero() {
-  const thicknessPx = 42;
+function DonutHero({ sizePx = 34 }: { sizePx?: number }) {
+  const baseSize = 280;
+  const scale = sizePx / baseSize;
+  // Keep the donut hole usable at small sizes, while still scaling nicely.
+  const thicknessPx = Math.max(6, Math.round(42 * scale));
 
-  // Conic-gradient ring with a right-side gap to form a "C".
   const gradient = `conic-gradient(from 90deg,
-    /* Right-facing "C" gap wedge is split into quarter red/yellow. */
     #a05a5a 0deg 45deg,
     #22c55e 45deg 315deg,
     #b8960b 315deg 360deg
@@ -20,54 +20,61 @@ function DonutHero() {
 
   const ringMask = `radial-gradient(farthest-side, transparent calc(100% - ${thicknessPx}px), #000 calc(100% - ${thicknessPx - 1}px))`;
 
-  return (
-    <div className="auth-donut-hero">
-      <div
-        className="auth-donut-ring-animate auth-donut-spin w-[280px] h-[280px] md:w-[320px] md:h-[320px] relative rounded-full"
-      >
-        <div
-          className="absolute inset-0 rounded-full"
-          style={{
-            background: gradient,
-            WebkitMaskImage: ringMask,
-            maskImage: ringMask,
-          }}
-        />
+  // Don't clamp too high; otherwise the ECG line becomes fat at small sizes.
+  const strokeWidth = Math.max(0.9, 4.2 * scale);
 
-        {/* Center content: subtle logo watermark + professional ECG waveform (no text). */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="relative w-[180px] h-[120px]">
-            <svg viewBox="0 0 140 80" className="absolute inset-0 w-full h-full" aria-hidden="true">
-              <path
-                d="M8 44
-                   L30 44
-                   L36 44
-                   L42 38
-                   L48 44
-                   L54 44
-                   L60 44
-                   L62 36
-                   L66 44
-                   L70 44
-                   L74 18
-                   L78 44
-                   L86 68
-                   L90 44
-                   L106 44
-                   L110 36
-                   L116 44
-                   L122 44
-                   L130 44"
-                fill="none"
-                stroke="#ff2d2d"
-                strokeWidth="4.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-        </div>
-      </div>
+  return (
+    <div style={{ width: sizePx, height: sizePx, position: 'relative', borderRadius: 9999 }}>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 9999,
+          background: gradient,
+          WebkitMaskImage: ringMask,
+          maskImage: ringMask,
+        }}
+      />
+
+      <svg
+        viewBox="0 0 140 80"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '74%',
+          height: '56%',
+          margin: 'auto',
+        }}
+        aria-hidden="true"
+      >
+        <path
+          d="M8 44
+             L30 44
+             L36 44
+             L42 38
+             L48 44
+             L54 44
+             L60 44
+             L62 36
+             L66 44
+             L70 44
+             L74 18
+             L78 44
+             L86 68
+             L90 44
+             L106 44
+             L110 36
+             L116 44
+             L122 44
+             L130 44"
+          fill="none"
+                stroke="#ff0000"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+                style={{ filter: 'drop-shadow(0 0 4px rgba(255,0,0,0.6))' }}
+        />
+      </svg>
     </div>
   );
 }
@@ -121,40 +128,14 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="auth-split-wrapper">
-      {/* ── LEFT PANEL — Branding ── */}
-      <div className="auth-split-brand">
-        <div className="auth-split-brand-inner">
-          {/* Top logo */}
-          <div className="flex items-center gap-2.5 mb-auto">
-            <BetterCalsMark className="w-11 h-11" />
-            <span className="text-white/90 text-lg font-bold tracking-tight">BetterCals</span>
-          </div>
-
-          {/* Donut hero */}
-          <DonutHero />
-
-          {/* Tagline */}
-          <div className="mt-auto">
-            <h2 className="text-white text-[1.4rem] md:text-2xl font-bold leading-snug">
-              Track smarter.<br />
-              <span className="text-white/60">Live healthier.</span>
-            </h2>
-            <p className="text-white/40 text-sm mt-2 max-w-[260px]">
-              Upload blood reports, get personalized calorie targets and deep health insights.
-            </p>
-          </div>
-        </div>
+    <div className="auth-single-page">
+      <div className="auth-single-top-left">
+        <DonutHero sizePx={44} />
+        <span className="text-white/90 text-[20px] font-bold tracking-tight">BetterCals</span>
       </div>
 
-      {/* ── RIGHT PANEL — Form ── */}
-      <div className="auth-split-form">
+      <div className="auth-single-main">
         <div className="w-full max-w-[400px] mx-auto">
-          {/* Mobile logo (hidden on desktop) */}
-          <div className="flex flex-col items-center mb-7 md:hidden">
-            <BetterCalsMark className="auth-logo-enter w-16 h-16 mb-3" />
-          </div>
-
           {/* Header */}
           <div className="mb-7">
             <h1
@@ -276,9 +257,20 @@ export default function SignInPage() {
             </form>
           </div>
 
+          {/* Bottom text (moved from left panel) */}
+          <div className="auth-single-tagline">
+            <h2 className="text-white text-[1.4rem] md:text-2xl font-bold leading-snug">
+              Track smarter.<br />
+              <span className="text-white/60">Live healthier.</span>
+            </h2>
+            <p className="text-white/40 text-sm mt-2">
+              Upload blood reports, get personalized calorie targets and deep health insights.
+            </p>
+          </div>
+
           {/* Footer link */}
           <p
-            className="auth-text-enter text-center text-sm mt-6"
+            className="auth-single-footer auth-text-enter text-center text-sm"
             style={{ color: 'var(--text-tertiary)', animationDelay: '0.4s' }}
           >
             Don&apos;t have an account?{' '}

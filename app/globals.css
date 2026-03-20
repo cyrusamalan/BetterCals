@@ -750,3 +750,60 @@ body {
   animation: orbFloat3 20s ease-in-out infinite;
   pointer-events: none;
 }
+
+/* ── Single-column Auth Layout (custom) ── */
+.auth-single-page {
+  min-height: 100vh;
+  background: linear-gradient(160deg, #1a1c1e 0%, #252729 40%, #1e2022 100%);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-single-top-left {
+  position: absolute;
+  top: 22px;
+  left: 26px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.auth-single-top-left span {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+.auth-single-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 110px 1.25rem 2.5rem;
+  text-align: center;
+}
+
+.auth-single-tagline {
+  margin-top: 28px;
+  max-width: 520px;
+}
+
+.auth-single-footer {
+  margin-top: 16px;
+}
+
+@media (max-width: 480px) {
+  .auth-single-top-left {
+    top: 16px;
+    left: 16px;
+    gap: 10px;
+  }
+
+  .auth-single-main {
+    padding-top: 98px;
+  }
+}
