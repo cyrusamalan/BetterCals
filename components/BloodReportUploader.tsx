@@ -3,60 +3,27 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
-import Tesseract from 'tesseract.js';
+import type { BloodMarkers } from '@/types';
 interface BloodReportUploaderProps {
-  onTextExtracted: (text: string) => void;
+  onMarkersExtracted: (markers: BloodMarkers) => void;
 }
 
-async function extractTextFromPDF(file: File): Promise<string> {
-  const pdfjsLib = await import('pdfjs-dist');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+async function extractMarkersServerSide(file: File): Promise<BloodMarkers> {
+  const body = new FormData();
+  body.append('file', file);
 
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  const allText: string[] = [];
-
-  // First try native text extraction (works for digital/searchable PDFs)
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const pageText = content.items
-      .map((item) => ('str' in item ? item.str : ''))
-      .join(' ');
-    allText.push(pageText);
-  }
-
-  const nativeText = allText.join('\n').trim();
-  if (nativeText.length > 50) {
-    return nativeText;
-  }
-
-  // Fallback: render pages to canvas and OCR them (for scanned PDFs)
-  const ocrResults: string[] = [];
-  const scale = 2;
-  for (let i = 1; i <= Math.min(pdf.numPages, 5); i++) {
-    const page = await pdf.getPage(i);
-    const viewport = page.getViewport({ scale });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    const ctx = canvas.getContext('2d')!;
-    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-
-    const result = await Tesseract.recognize(canvas, 'eng', {
-      logger: () => {},
-    });
-    ocrResults.push(result.data.text);
-  }
-
-  return ocrResults.join('\n');
-}
-
-async function extractTextFromImage(file: File): Promise<string> {
-  const result = await Tesseract.recognize(file, 'eng', {
-    logger: () => {},
+  const res = await fetch('/api/extract-blood-report', {
+    method: 'POST',
+    body,
   });
-  return result.data.text;
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error || 'Extraction failed');
+  }
+
+  const data = await res.json() as { markers?: BloodMarkers };
+  return data.markers ?? {};
 }
 
 function getDropzoneBorderColor(isDragActive: boolean, done: boolean, error: string | null): string {
@@ -73,7 +40,7 @@ function getDropzoneBackgroundColor(isDragActive: boolean, done: boolean, error:
   return 'var(--bg-warm)';
 }
 
-export default function BloodReportUploader({ onTextExtracted }: BloodReportUploaderProps) {
+export default function BloodReportUploader({ onMarkersExtracted }: BloodReportUploaderProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -89,17 +56,13 @@ export default function BloodReportUploader({ onTextExtracted }: BloodReportUplo
     setFileName(file.name);
 
     try {
-      const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-      const text = isPDF
-        ? await extractTextFromPDF(file)
-        : await extractTextFromImage(file);
-
-      if (!text.trim()) {
-        setError('Could not extract text from this file. Try entering values manually.');
+      const markers = await extractMarkersServerSide(file);
+      if (Object.keys(markers).length === 0) {
+        setError('No marker values found in this report. Try another report or enter values manually.');
         return;
       }
 
-      onTextExtracted(text);
+      onMarkersExtracted(markers);
       setDone(true);
     } catch (err) {
       console.error('Error processing file:', err);
@@ -107,7 +70,7 @@ export default function BloodReportUploader({ onTextExtracted }: BloodReportUplo
     } finally {
       setIsProcessing(false);
     }
-  }, [onTextExtracted]);
+  }, [onMarkersExtracted]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -150,7 +113,7 @@ export default function BloodReportUploader({ onTextExtracted }: BloodReportUplo
                 Processing {fileName}
               </p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-                Running OCR to extract blood marker values...
+                Using AI to extract blood marker values...
               </p>
             </div>
           </div>
@@ -213,7 +176,7 @@ export default function BloodReportUploader({ onTextExtracted }: BloodReportUplo
                 {isDragActive ? 'Drop your blood report here' : 'Drag & drop your blood report'}
               </p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-                PDF, PNG, or JPG — text is extracted using OCR
+                PDF - extracted with AI
               </p>
             </div>
             <button

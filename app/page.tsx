@@ -25,7 +25,6 @@ import {
   calculateRecommendations,
   calculateASCVDRiskScore,
 } from '@/lib/calculations';
-import { parseBloodReport } from '@/lib/bloodParser';
 import { estimateAverageMarkers } from '@/lib/averageMarkers';
 
 type Step = 'profile' | 'blood' | 'results';
@@ -94,9 +93,8 @@ export default function Home() {
     setStep('blood');
   };
 
-  const handleBloodTextExtracted = (text: string) => {
-    const parsed = sanitizeBloodMarkers(parseBloodReport(text));
-    setMarkers(parsed);
+  const handleMarkersExtracted = (extracted: BloodMarkers) => {
+    setMarkers(sanitizeBloodMarkers(extracted));
   };
 
   const handleBloodSubmit = (data: BloodMarkers) => {
@@ -387,7 +385,7 @@ export default function Home() {
               }}
             >
               <div className="p-6 sm:p-8">
-                <BloodReportUploader onTextExtracted={handleBloodTextExtracted} />
+                <BloodReportUploader onMarkersExtracted={handleMarkersExtracted} />
               </div>
             </div>
 

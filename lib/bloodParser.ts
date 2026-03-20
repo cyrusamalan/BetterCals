@@ -231,6 +231,9 @@ export const MARKER_RULES: Record<keyof BloodMarkers, MarkerDefinition> = {
 
 export function parseBloodReport(text: string): BloodMarkers {
   const markers: BloodMarkers = {};
+  const normalizedText = text.replace(/\u2013|\u2014/g, '-');
+
+  const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   /**
    * Labcorp-style tables often look like:
@@ -242,7 +245,7 @@ export function parseBloodReport(text: string): BloodMarkers {
    * avoid "same-line" extraction and instead capture `flag` then `current` across whitespace.
    */
   const extractFlagThenCurrent = (re: RegExp): number | undefined => {
-    const match = re.exec(text);
+    const match = re.exec(normalizedText);
     if (!match) return undefined;
     // Expected capture groups: (1)=flag, (2)=current result.
     const raw = match[2] ?? match[1];
@@ -250,16 +253,79 @@ export function parseBloodReport(text: string): BloodMarkers {
     return Number.isFinite(value) ? value : undefined;
   };
 
+  /**
+   * Generic fallback for report formats where each marker row has a single result value, e.g.:
+   *   ALT 22 U/L 0-41 Healthy
+   */
+  const extractFirstValueAfterLabel = (lineRegex: RegExp, markerLabelRegex: RegExp): number | undefined => {
+    const match = lineRegex.exec(normalizedText);
+    if (!match) return undefined;
+    const line = match[0];
+    const afterLabel = line.replace(markerLabelRegex, ' ');
+    const valueMatch = afterLabel.match(/-?\d+(?:\.\d+)?/);
+    if (!valueMatch) return undefined;
+    const value = Number.parseFloat(valueMatch[0]);
+    return Number.isFinite(value) ? value : undefined;
+  };
+
+  /**
+   * Format-agnostic extraction:
+   * 1) Locate marker alias
+   * 2) Prefer number closest to expected unit (e.g. `93 mg/dL`)
+   * 3) Fallback to Labcorp flag/current shape (`01 93`)
+   * 4) Final fallback: first plausible number after label
+   */
+  const extractMarkerValue = (
+    aliases: string[],
+    units: string[],
+  ): number | undefined => {
+    for (const alias of aliases) {
+      const aliasRe = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'ig');
+      let m: RegExpExecArray | null;
+      while ((m = aliasRe.exec(normalizedText)) !== null) {
+        const from = m.index;
+        const snippet = normalizedText.slice(from, from + 220);
+        const afterAlias = snippet.slice(m[0].length);
+
+        // 1) Prefer value right before expected unit.
+        const unitPattern = units.map((u) => escapeRegex(u)).join('|');
+        const byUnit = new RegExp(`(-?\\d+(?:\\.\\d+)?)\\s*(?:${unitPattern})\\b`, 'i').exec(afterAlias);
+        if (byUnit) {
+          const value = Number.parseFloat(byUnit[1]);
+          if (Number.isFinite(value)) return value;
+        }
+
+        // 2) Labcorp flag/current style: "01 93"
+        const flagCurrent = /(?:^|\D)(\d{1,3})\s+(\d+(?:\.\d+)?)/.exec(afterAlias);
+        if (flagCurrent) {
+          const current = Number.parseFloat(flagCurrent[2]);
+          if (Number.isFinite(current)) return current;
+        }
+
+        // 3) First plausible number after marker.
+        const nums = afterAlias.match(/-?\d+(?:\.\d+)?/g);
+        if (nums && nums.length > 0) {
+          const first = Number.parseFloat(nums[0]);
+          const second = nums.length > 1 ? Number.parseFloat(nums[1]) : undefined;
+          // If the first number is likely a flag/index (e.g. 01), use the next one.
+          const candidate = Number.isFinite(second) && first <= 2 ? second : first;
+          if (Number.isFinite(candidate)) return candidate;
+        }
+      }
+    }
+    return undefined;
+  };
+
   // Glucose patterns
-  const glucose = extractFlagThenCurrent(
-    /\bglucose\b[^\d]{0,20}(\d{1,3})\s+(\d+(?:\.\d+)?)/i,
-  );
+  const glucose =
+    extractMarkerValue(['fasting glucose', 'glucose'], ['mg/dL']) ??
+    extractFlagThenCurrent(/\bglucose\b[^\d]{0,20}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
   if (glucose !== undefined) markers.glucose = glucose;
 
   // HbA1c patterns
-  const hba1c = extractFlagThenCurrent(
-    /\b(?:hba1c|hemoglobin\s*a\s*1c)\b[^\d]{0,30}(\d{1,3})\s+(\d+(?:\.\d+)?)/i,
-  );
+  const hba1c =
+    extractMarkerValue(['hemoglobin a1c', 'hba1c', 'a1c'], ['%']) ??
+    extractFlagThenCurrent(/\b(?:hba1c|hemoglobin\s*a\s*1c)\b[^\d]{0,30}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
   if (hba1c !== undefined) markers.hba1c = hba1c;
 
   // Cholesterol patterns
@@ -303,9 +369,9 @@ export function parseBloodReport(text: string): BloodMarkers {
   if (tshMatch) markers.tsh = Number.parseFloat(tshMatch[1]);
 
   // Vitamin D patterns
-  const vitD = extractFlagThenCurrent(
-    /vitamin\s*d[\s\S]{0,50}?25[\-\s]?hydroxy\b[^\d]{0,30}(\d{1,3})\s+(\d+(?:\.\d+)?)/i,
-  );
+  const vitD =
+    extractMarkerValue(['vitamin d, 25-hydroxy', 'vitamin d 25-hydroxy', 'vitamin d'], ['ng/mL']) ??
+    extractFlagThenCurrent(/vitamin\s*d[\s\S]{0,50}?25[\-\s]?hydroxy\b[^\d]{0,30}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
   if (vitD !== undefined) markers.vitaminD = vitD;
 
   // Vitamin B12 patterns
@@ -324,21 +390,27 @@ export function parseBloodReport(text: string): BloodMarkers {
   if (ironMatch) markers.iron = Number.parseFloat(ironMatch[1]);
 
   // ALT patterns
-  const alt = extractFlagThenCurrent(/\balt\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  const alt =
+    extractMarkerValue(['alt', 'alt (sgpt)', 'sgpt', 'alanine transferase'], ['U/L', 'IU/L']) ??
+    extractFlagThenCurrent(/\balt\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
   if (alt !== undefined) markers.alt = alt;
 
   // AST patterns
-  const ast = extractFlagThenCurrent(/\bast\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  const ast =
+    extractMarkerValue(['ast', 'ast (sgot)', 'sgot', 'aspartate transferase'], ['U/L', 'IU/L']) ??
+    extractFlagThenCurrent(/\bast\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
   if (ast !== undefined) markers.ast = ast;
 
   // Albumin patterns
-  const albumin = extractFlagThenCurrent(/\balbumin\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
+  const albumin =
+    extractMarkerValue(['albumin'], ['g/dL']) ??
+    extractFlagThenCurrent(/\balbumin\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
   if (albumin !== undefined) markers.albumin = albumin;
 
   // Creatinine patterns
-  const creatinine = extractFlagThenCurrent(
-    /\bcreatinine\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i,
-  );
+  const creatinine =
+    extractMarkerValue(['creatinine'], ['mg/dL']) ??
+    extractFlagThenCurrent(/\bcreatinine\b[^\d]{0,25}(\d{1,3})\s+(\d+(?:\.\d+)?)/i);
   if (creatinine !== undefined) markers.creatinine = creatinine;
 
   // Uric Acid patterns
