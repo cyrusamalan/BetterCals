@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Heart, Activity, FileText, Droplets, ChevronRight } from 'lucide-react';
+import { SignInButton, UserButton, useAuth } from '@clerk/nextjs';
 import TDEEForm from '@/components/TDEEForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
 import BloodValuesForm from '@/components/BloodValuesForm';
@@ -39,6 +40,7 @@ function sanitizeBloodMarkers(input: BloodMarkers): BloodMarkers {
 }
 
 export default function Home() {
+  const { isSignedIn } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const [step, setStep] = useState<Step>('profile');
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -223,37 +225,56 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Step pills */}
-          <div className="hidden sm:flex items-center gap-1.5">
-            {steps.map((s, i) => (
-              <div key={s.key} className="flex items-center gap-1.5">
-                <div
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors duration-300"
-                  style={{
-                    backgroundColor: i <= currentStepIdx ? 'var(--accent-subtle)' : 'transparent',
-                    color: i <= currentStepIdx ? 'var(--accent)' : 'var(--text-tertiary)',
-                  }}
-                >
-                  <span
-                    className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors duration-300"
+          <div className="flex items-center gap-4">
+            {/* Step pills */}
+            <div className="hidden sm:flex items-center gap-1.5">
+              {steps.map((s, i) => (
+                <div key={s.key} className="flex items-center gap-1.5">
+                  <div
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors duration-300"
                     style={{
-                      backgroundColor: i < currentStepIdx
-                        ? 'var(--accent)'
-                        : i === currentStepIdx
-                        ? 'var(--accent)'
-                        : 'var(--border)',
-                      color: i <= currentStepIdx ? 'var(--text-inverse)' : 'var(--text-tertiary)',
+                      backgroundColor: i <= currentStepIdx ? 'var(--accent-subtle)' : 'transparent',
+                      color: i <= currentStepIdx ? 'var(--accent)' : 'var(--text-tertiary)',
                     }}
                   >
-                    {i < currentStepIdx ? '\u2713' : s.num}
-                  </span>
-                  {s.label}
+                    <span
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors duration-300"
+                      style={{
+                        backgroundColor: i < currentStepIdx
+                          ? 'var(--accent)'
+                          : i === currentStepIdx
+                          ? 'var(--accent)'
+                          : 'var(--border)',
+                        color: i <= currentStepIdx ? 'var(--text-inverse)' : 'var(--text-tertiary)',
+                      }}
+                    >
+                      {i < currentStepIdx ? '\u2713' : s.num}
+                    </span>
+                    {s.label}
+                  </div>
+                  {i < steps.length - 1 && (
+                    <ChevronRight className="w-3 h-3" style={{ color: 'var(--border)' }} />
+                  )}
                 </div>
-                {i < steps.length - 1 && (
-                  <ChevronRight className="w-3 h-3" style={{ color: 'var(--border)' }} />
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
+
+            {/* Auth */}
+            {!isSignedIn ? (
+              <SignInButton mode="modal">
+                <button
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold btn-press"
+                  style={{
+                    backgroundColor: 'var(--accent)',
+                    color: 'var(--text-inverse)',
+                  }}
+                >
+                  Sign in
+                </button>
+              </SignInButton>
+            ) : (
+              <UserButton />
+            )}
           </div>
         </div>
       </header>

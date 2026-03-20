@@ -24,6 +24,7 @@ import {
   Save,
   Check,
 } from 'lucide-react';
+import { useAuth, SignInButton } from '@clerk/nextjs';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
 import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
@@ -422,6 +423,7 @@ function FlagSection({ title, items, variant }: { title: string; items: string[]
 // ── Main Dashboard ──
 
 export default function BloodTestDashboard({ result, markers, profile, onReset }: BloodTestDashboardProps) {
+  const { isSignedIn } = useAuth();
   const { tdee, healthScore, insights, deficiencies, risks, calorieTiers, macros, recommendations } = result;
   const grade = getScoreGrade(healthScore.overall);
   const hasMarkers = Object.keys(markers).length > 0;
@@ -564,23 +566,39 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
                 Download Report
               </button>
 
-              <button
-                onClick={handleSaveToHistory}
-                disabled={saving || saved}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press disabled:opacity-50"
-                style={{
-                  backgroundColor: saved ? 'var(--status-normal-bg)' : 'var(--border-light)',
-                  color: saved ? 'var(--status-normal)' : 'var(--text-primary)',
-                  border: `1px solid ${saved ? 'var(--status-normal-border)' : 'var(--border)'}`,
-                }}
-              >
-                {saved ? (
-                  <Check className="w-4 h-4" />
-                ) : (
-                  <Save className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                )}
-                {saving ? 'Saving...' : saved ? 'Saved' : 'Save to History'}
-              </button>
+              {isSignedIn ? (
+                <button
+                  onClick={handleSaveToHistory}
+                  disabled={saving || saved}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press disabled:opacity-50"
+                  style={{
+                    backgroundColor: saved ? 'var(--status-normal-bg)' : 'var(--border-light)',
+                    color: saved ? 'var(--status-normal)' : 'var(--text-primary)',
+                    border: `1px solid ${saved ? 'var(--status-normal-border)' : 'var(--border)'}`,
+                  }}
+                >
+                  {saved ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <Save className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                  )}
+                  {saving ? 'Saving...' : saved ? 'Saved' : 'Save to History'}
+                </button>
+              ) : (
+                <SignInButton mode="modal">
+                  <button
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
+                    style={{
+                      backgroundColor: 'var(--accent)',
+                      color: 'var(--text-inverse)',
+                      border: '1px solid var(--accent)',
+                    }}
+                  >
+                    <Save className="w-4 h-4" />
+                    Sign in to Save
+                  </button>
+                </SignInButton>
+              )}
 
               <div className="flex items-center gap-2">
                 <div
