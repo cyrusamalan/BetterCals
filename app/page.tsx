@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { Heart, Activity, FileText, Droplets, ChevronRight } from 'lucide-react';
-import { Show, SignInButton, UserButton } from '@clerk/nextjs';
+import { useAuth } from '@clerk/nextjs';
 import TDEEForm from '@/components/TDEEForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
 import BloodValuesForm from '@/components/BloodValuesForm';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
 import BetterCalsMark from '@/components/BetterCalsMark';
+import Link from 'next/link';
 import {
   UserProfile,
   BloodMarkers,
@@ -45,6 +46,8 @@ export default function Home() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [markers, setMarkers] = useState<BloodMarkers>({});
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const { isSignedIn, signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     try {
@@ -148,15 +151,32 @@ export default function Home() {
     }
   };
 
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      await signOut();
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
   if (!isMounted) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div
-          className="w-10 h-10 rounded-full border-2"
+          className="w-12 h-12 rounded-full"
           style={{
-            borderColor: 'var(--border-light)',
-            borderTopColor: 'var(--accent)',
-            animation: 'spin 1s linear infinite',
+            /* Vibrant multi-color ring with a "C"-shaped green arc (conic-gradient + mask). */
+            background:
+              'conic-gradient(from 90deg,' +
+              ' rgba(0,0,0,0) 0deg 80deg,' + // open side of the "C" (right side)
+              ' #22c55e 80deg 220deg,' + // green "C" stroke
+              ' #b8860b 220deg 300deg,' + // warm accent for the rest of the ring
+              ' #a05a5a 300deg 360deg)', // rose accent for the remaining arc
+            WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px))',
+            mask: 'radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px))',
+            animation: 'spin 0.9s linear both',
+            filter: 'saturate(1.2) brightness(1.08)',
           }}
         />
         <style jsx global>{`
@@ -209,17 +229,13 @@ export default function Home() {
         <div className="max-w-3xl mx-auto px-5 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
-              className="w-11 h-11 rounded-[16px] flex items-center justify-center"
-              style={{
-                background: 'linear-gradient(145deg, #ffffff 0%, #f8f7f4 100%)',
-                border: '1px solid rgba(210, 210, 204, 0.6)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.8)',
-              }}
+              className="w-11 h-11 flex items-center justify-center"
+              style={{ background: 'transparent' }}
             >
-              <BetterCalsMark className="w-7 h-7" />
+              <BetterCalsMark className="w-9 h-9" />
             </div>
             <div>
-              <h1 className="text-[17px] font-bold font-display" style={{ color: 'var(--text-primary)' }}>
+              <h1 className="text-[22px] font-bold font-display" style={{ color: 'var(--text-primary)' }}>
                 BetterCals
               </h1>
             </div>
@@ -257,23 +273,33 @@ export default function Home() {
             </div>
 
             {/* Auth */}
-            <Show when="signed-out">
-              <SignInButton mode="modal">
-                <button
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
-                  style={{
-                    background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
-                    color: 'var(--text-inverse)',
-                    boxShadow: '0 2px 6px rgba(107, 143, 113, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)',
-                  }}
-                >
-                  Sign in
-                </button>
-              </SignInButton>
-            </Show>
-            <Show when="signed-in">
-              <UserButton />
-            </Show>
+            {!isSignedIn ? (
+              <Link
+                href="/sign-in"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                style={{
+                  background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+                  color: 'var(--text-inverse)',
+                  boxShadow: '0 2px 6px rgba(107, 143, 113, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)',
+                }}
+              >
+                Sign in
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press disabled:opacity-50"
+                style={{
+                  background: 'var(--border-light)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                {signingOut ? 'Signing out...' : 'Sign out'}
+              </button>
+            )}
           </div>
         </div>
       </header>

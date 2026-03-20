@@ -602,3 +602,151 @@ body {
 .anatomy-digest-flow {
   animation: digestFlow 3s linear infinite;
 }
+
+/* ═══════════════════════════════════════
+   Split-screen Auth Layout
+   ═══════════════════════════════════════ */
+
+@keyframes donutDraw {
+  from { stroke-dashoffset: var(--seg-len); opacity: 0.3; }
+  to   { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes donutTextReveal {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes brandSlideIn {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.auth-split-wrapper {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 100vh;
+}
+
+@media (min-width: 768px) {
+  .auth-split-wrapper {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 1100px) {
+  .auth-split-wrapper {
+    grid-template-columns: 1.1fr 0.9fr;
+  }
+}
+
+/* ── Branding panel (left) ── */
+.auth-split-brand {
+  display: none;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(160deg, #1a1c1e 0%, #252729 40%, #1e2022 100%);
+}
+
+@media (min-width: 768px) {
+  .auth-split-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.auth-split-brand::before {
+  content: '';
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  top: -20%;
+  right: -15%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(107, 143, 113, 0.12) 0%, transparent 60%);
+  animation: orbFloat1 22s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.auth-split-brand::after {
+  content: '';
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  bottom: -10%;
+  left: -10%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(184, 134, 11, 0.08) 0%, transparent 60%);
+  animation: orbFloat2 28s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.auth-split-brand-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 2.5rem;
+  height: 100%;
+  max-height: 100vh;
+  animation: brandSlideIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+/* ── Donut hero ── */
+.auth-donut-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: auto 0;
+  padding: 1.5rem 0;
+}
+
+.auth-donut-segment {
+  animation: donutDraw 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* Should be >= any dash length so segments properly animate from hidden. */
+  --seg-len: 900;
+}
+
+.auth-donut-text {
+  animation: donutTextReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.auth-donut-spin {
+  filter: drop-shadow(0 4px 24px rgba(0,0,0,0.3));
+}
+
+@keyframes donutHeroRingDraw {
+  from { opacity: 0.35; transform: rotate(-26deg) scale(0.96); }
+  to   { opacity: 1; transform: rotate(0deg) scale(1); }
+}
+
+.auth-donut-ring-animate {
+  animation: donutHeroRingDraw 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: center;
+}
+
+/* ── Form panel (right) ── */
+.auth-split-form {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  background: linear-gradient(170deg, #f6f5f1 0%, #eceae4 40%, #f0eeea 70%, #f5f3ef 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-split-form::before {
+  content: '';
+  position: absolute;
+  width: 350px;
+  height: 350px;
+  top: -10%;
+  right: -8%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(107, 143, 113, 0.08) 0%, transparent 60%);
+  animation: orbFloat3 20s ease-in-out infinite;
+  pointer-events: none;
+}

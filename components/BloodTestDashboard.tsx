@@ -24,7 +24,8 @@ import {
   Save,
   Check,
 } from 'lucide-react';
-import { Show, SignInButton } from '@clerk/nextjs';
+import { useAuth } from '@clerk/nextjs';
+import Link from 'next/link';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
 import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
@@ -423,6 +424,7 @@ function FlagSection({ title, items, variant }: { title: string; items: string[]
 // ── Main Dashboard ──
 
 export default function BloodTestDashboard({ result, markers, profile, onReset }: BloodTestDashboardProps) {
+  const { isSignedIn } = useAuth();
   const { tdee, healthScore, insights, deficiencies, risks, calorieTiers, macros, recommendations } = result;
   const grade = getScoreGrade(healthScore.overall);
   const hasMarkers = Object.keys(markers).length > 0;
@@ -565,7 +567,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
                 Download Report
               </button>
 
-              <Show when="signed-in">
+              {isSignedIn ? (
                 <button
                   onClick={handleSaveToHistory}
                   disabled={saving || saved}
@@ -583,22 +585,20 @@ export default function BloodTestDashboard({ result, markers, profile, onReset }
                   )}
                   {saving ? 'Saving...' : saved ? 'Saved' : 'Save to History'}
                 </button>
-              </Show>
-              <Show when="signed-out">
-                <SignInButton mode="modal">
-                  <button
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
-                    style={{
-                      backgroundColor: 'var(--accent)',
-                      color: 'var(--text-inverse)',
-                      border: '1px solid var(--accent)',
-                    }}
-                  >
-                    <Save className="w-4 h-4" />
-                    Sign in to Save
-                  </button>
-                </SignInButton>
-              </Show>
+              ) : (
+                <Link
+                  href="/sign-in"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
+                  style={{
+                    backgroundColor: 'var(--accent)',
+                    color: 'var(--text-inverse)',
+                    border: '1px solid var(--accent)',
+                  }}
+                >
+                  <Save className="w-4 h-4" />
+                  Sign in to Save
+                </Link>
+              )}
 
               <div className="flex items-center gap-2">
                 <div
