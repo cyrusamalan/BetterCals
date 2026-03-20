@@ -33,7 +33,7 @@ export default function ASCVDRiskCard({
     ? (tier.label === 'High Risk' ? 'danger' : tier.label === 'Intermediate Risk' ? 'warning' : 'info')
     : 'info';
 
-  const icon = infoType === 'danger' ? '!' : infoType === 'warning' ? 'i' : 'i';
+  const icon = infoType === 'danger' ? '!' : infoType === 'warning' ? '⚠' : 'i';
 
   return (
     <div
