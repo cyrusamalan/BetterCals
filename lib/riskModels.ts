@@ -16,11 +16,11 @@ function clamp01(x: number) {
  * Inputs:
  * - Official model is validated for ages 40–79; we return null if out of bounds.
  * - Uses: age, sex, total cholesterol, HDL, systolic BP, smoker, diabetes, and BP treatment.
- * - If optional clinical fields are missing, we fall back to safe defaults:
- *   - smoker = false
- *   - diabetic = false
- *   - bloodPressureSystolic = 120
- *   - treatedForHypertension = false
+ * - If optional clinical fields are missing:
+ *   - smoker defaults to false (conservative)
+ *   - diabetic defaults to false (conservative)
+ *   - treatedForHypertension defaults to false
+ *   - bloodPressureSystolic: if missing, ASCVD cannot be computed → returns null
  *
  * Notes:
  * - The full published model is race-specific (White/Black) and includes SBP treatment status.
@@ -39,11 +39,12 @@ export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers):
   if (!(tc > 0) || !(hdl > 0)) return null;
 
   const sex: Sex = profile.gender;
+  // Default to white coefficients when race is not specified
   const race = profile.race === 'black' ? 'black' : 'white';
 
-  // Clinical inputs with safe fallbacks
-  const sbp = profile.bloodPressureSystolic ?? 120;
-  if (!(sbp > 0)) return null;
+  // Blood pressure is required for ASCVD — do not assume a default
+  const sbp = profile.bloodPressureSystolic;
+  if (sbp === undefined || sbp === null || !(sbp > 0)) return null;
   const smoker = profile.smoker ? 1 : 0;
   const diabetes = profile.diabetic ? 1 : 0;
   const treatedSbp = profile.treatedForHypertension ? 1 : 0;

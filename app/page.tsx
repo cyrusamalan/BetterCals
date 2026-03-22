@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Heart, Activity, FileText, Droplets, ChevronRight } from 'lucide-react';
+import { Heart, Activity, FileText, Droplets, ChevronRight, UserCog } from 'lucide-react';
+import { useAuth } from '@clerk/nextjs';
 import TDEEForm from '@/components/TDEEForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
 import BloodValuesForm from '@/components/BloodValuesForm';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
-import BetterCalsMark from '@/components/BetterCalsMark';
+import VitalsMark from '@/components/VitalsMark';
+import Link from 'next/link';
 import {
   UserProfile,
   BloodMarkers,
@@ -23,7 +25,6 @@ import {
   calculateRecommendations,
   calculateASCVDRiskScore,
 } from '@/lib/calculations';
-import { parseBloodReport } from '@/lib/bloodParser';
 import { estimateAverageMarkers } from '@/lib/averageMarkers';
 
 type Step = 'profile' | 'blood' | 'results';
@@ -44,6 +45,8 @@ export default function Home() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [markers, setMarkers] = useState<BloodMarkers>({});
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const { isSignedIn, signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     try {
@@ -90,9 +93,8 @@ export default function Home() {
     setStep('blood');
   };
 
-  const handleBloodTextExtracted = (text: string) => {
-    const parsed = sanitizeBloodMarkers(parseBloodReport(text));
-    setMarkers(parsed);
+  const handleMarkersExtracted = (extracted: BloodMarkers) => {
+    setMarkers(sanitizeBloodMarkers(extracted));
   };
 
   const handleBloodSubmit = (data: BloodMarkers) => {
@@ -147,15 +149,37 @@ export default function Home() {
     }
   };
 
+  const handleEditProfile = () => {
+    // Navigate back to step 1 with existing profile data preserved
+    setStep('profile');
+  };
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      await signOut();
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
   if (!isMounted) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div
-          className="w-10 h-10 rounded-full border-2"
+          className="w-12 h-12 rounded-full"
           style={{
-            borderColor: 'var(--border-light)',
-            borderTopColor: 'var(--accent)',
-            animation: 'spin 1s linear infinite',
+            /* Vibrant multi-color ring with a "C"-shaped green arc (conic-gradient + mask). */
+            background:
+              'conic-gradient(from 90deg,' +
+              ' rgba(0,0,0,0) 0deg 80deg,' + // open side of the "C" (right side)
+              ' #22c55e 80deg 220deg,' + // green "C" stroke
+              ' #b8860b 220deg 300deg,' + // warm accent for the rest of the ring
+              ' #a05a5a 300deg 360deg)', // rose accent for the remaining arc
+            WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px))',
+            mask: 'radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px))',
+            animation: 'spin 0.9s linear both',
+            filter: 'saturate(1.2) brightness(1.08)',
           }}
         />
         <style jsx global>{`
@@ -176,6 +200,7 @@ export default function Home() {
         markers={markers}
         profile={profile!}
         onReset={handleReset}
+        onEditProfile={handleEditProfile}
       />
     );
   }
@@ -198,51 +223,50 @@ export default function Home() {
       <header
         className="anim-fade-up sticky top-0 z-30"
         style={{
-          backgroundColor: 'rgba(246, 245, 241, 0.8)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          borderBottom: '1px solid var(--border-light)',
+          backgroundColor: 'rgba(246, 245, 241, 0.72)',
+          backdropFilter: 'blur(20px) saturate(1.3)',
+          WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+          borderBottom: '1px solid rgba(228, 226, 220, 0.5)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
         }}
       >
-        <div className="max-w-3xl mx-auto px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="w-full px-5 py-3.5 grid grid-cols-[auto_1fr_auto] items-center">
+          {/* Left: logo */}
+          <div className="flex items-center gap-3 justify-start">
             <div
-              className="w-12 h-12 rounded-[18px] flex items-center justify-center"
-              style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #d2d2cc',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
-              }}
+              className="w-10 h-10 flex items-center justify-center"
+              style={{ background: 'transparent' }}
             >
-              <BetterCalsMark className="w-8.5 h-8.5" />
+              <VitalsMark sizePx={34} />
             </div>
             <div>
-              <h1 className="text-lg font-bold font-display" style={{ color: 'var(--text-primary)' }}>
+              <h1
+                className="text-[22px] font-bold font-display"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 BetterCals
               </h1>
             </div>
           </div>
 
-          {/* Step pills */}
-          <div className="hidden sm:flex items-center gap-1.5">
+          {/* Center: step pills */}
+          <div className="hidden sm:flex items-center gap-1 justify-center">
             {steps.map((s, i) => (
-              <div key={s.key} className="flex items-center gap-1.5">
+              <div key={s.key} className="flex items-center gap-1">
                 <div
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors duration-300"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-300"
                   style={{
                     backgroundColor: i <= currentStepIdx ? 'var(--accent-subtle)' : 'transparent',
                     color: i <= currentStepIdx ? 'var(--accent)' : 'var(--text-tertiary)',
                   }}
                 >
                   <span
-                    className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors duration-300"
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-300"
                     style={{
-                      backgroundColor: i < currentStepIdx
-                        ? 'var(--accent)'
-                        : i === currentStepIdx
-                        ? 'var(--accent)'
-                        : 'var(--border)',
+                      backgroundColor: i <= currentStepIdx ? 'var(--accent)' : 'var(--border)',
                       color: i <= currentStepIdx ? 'var(--text-inverse)' : 'var(--text-tertiary)',
+                      boxShadow:
+                        i === currentStepIdx ? '0 0 0 3px rgba(107, 143, 113, 0.15)' : 'none',
                     }}
                   >
                     {i < currentStepIdx ? '\u2713' : s.num}
@@ -254,6 +278,55 @@ export default function Home() {
                 )}
               </div>
             ))}
+          </div>
+
+          {/* Right: Auth */}
+          <div className="flex items-center justify-end">
+            {!isSignedIn ? (
+              <Link
+                href="/sign-in"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                style={{
+                  background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+                  color: 'var(--text-inverse)',
+                  boxShadow:
+                    '0 2px 6px rgba(107, 143, 113, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)',
+                }}
+              >
+                Sign in
+              </Link>
+            ) : (
+              <div className="flex items-center gap-2">
+                {profile && step !== 'profile' && (
+                  <button
+                    type="button"
+                    onClick={handleEditProfile}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                    style={{
+                      background: 'var(--accent-subtle)',
+                      color: 'var(--accent)',
+                      border: '1px solid rgba(107, 143, 113, 0.2)',
+                    }}
+                  >
+                    <UserCog className="w-3.5 h-3.5" />
+                    Edit Profile
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  disabled={signingOut}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press disabled:opacity-50"
+                  style={{
+                    background: 'var(--border-light)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  {signingOut ? 'Signing out...' : 'Sign out'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -279,15 +352,17 @@ export default function Home() {
             <div className="grid grid-cols-1 gap-8 items-start">
               {/* Form card */}
               <div
-                className="relative overflow-hidden rounded-2xl noise anim-fade-up delay-3"
+                className="relative overflow-hidden rounded-3xl noise anim-fade-up delay-3"
                 style={{
-                  backgroundColor: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.04)',
+                  background: 'rgba(255, 255, 255, 0.72)',
+                  backdropFilter: 'blur(20px) saturate(1.3)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+                  border: '1px solid rgba(255, 255, 255, 0.5)',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.04), 0 12px 48px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.6)',
                 }}
               >
                 <div className="p-6 sm:p-8">
-                  <TDEEForm onSubmit={handleProfileSubmit} />
+                  <TDEEForm onSubmit={handleProfileSubmit} initialValues={profile ?? undefined} />
                 </div>
               </div>
             </div>
@@ -323,37 +398,41 @@ export default function Home() {
 
             {/* Upload card */}
             <div
-              className="relative overflow-hidden rounded-2xl noise anim-fade-up delay-3"
+              className="relative overflow-hidden rounded-3xl noise anim-fade-up delay-3"
               style={{
-                backgroundColor: 'var(--surface)',
-                border: '1px solid var(--border)',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.04)',
+                background: 'rgba(255, 255, 255, 0.72)',
+                backdropFilter: 'blur(20px) saturate(1.3)',
+                WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+                border: '1px solid rgba(255, 255, 255, 0.5)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.04), 0 12px 48px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.6)',
               }}
             >
               <div className="p-6 sm:p-8">
-                <BloodReportUploader onTextExtracted={handleBloodTextExtracted} />
+                <BloodReportUploader onMarkersExtracted={handleMarkersExtracted} />
               </div>
             </div>
 
             {/* Divider */}
             <div className="flex items-center gap-4 my-8 anim-fade-in delay-4">
-              <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border)' }} />
+              <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, var(--border), transparent)' }} />
               <span
-                className="text-xs font-semibold uppercase tracking-[0.2em]"
+                className="text-[11px] font-semibold uppercase tracking-[0.2em]"
                 style={{ color: 'var(--text-tertiary)' }}
               >
                 or enter manually
               </span>
-              <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border)' }} />
+              <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, var(--border), transparent)' }} />
             </div>
 
             {/* Manual entry card */}
             <div
-              className="relative overflow-hidden rounded-2xl noise anim-fade-up delay-5"
+              className="relative overflow-hidden rounded-3xl noise anim-fade-up delay-5"
               style={{
-                backgroundColor: 'var(--surface)',
-                border: '1px solid var(--border)',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.04)',
+                background: 'rgba(255, 255, 255, 0.72)',
+                backdropFilter: 'blur(20px) saturate(1.3)',
+                WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+                border: '1px solid rgba(255, 255, 255, 0.5)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.04), 0 12px 48px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.6)',
               }}
             >
               <div className="p-6 sm:p-8">

@@ -2,6 +2,10 @@
 
 import clsx from 'clsx';
 
+/**
+ * BetterCals logo — donut-chart ring with the green segment forming a "C",
+ * plus smaller carbs (amber) and fats (rose) segments.
+ */
 export default function BetterCalsMark({
   className,
   title = 'BetterCals',
@@ -9,6 +13,22 @@ export default function BetterCalsMark({
   className?: string;
   title?: string;
 }) {
+  const cx = 128;
+  const cy = 128;
+  const r = 90;
+  const stroke = 26;
+  const circumference = 2 * Math.PI * r;
+
+  // Green (protein) takes ~70% to form a "C" shape, carbs 18%, fats 12%
+  const segments = [
+    { pct: 0.70, color: '#6b8f71' },   // protein — sage green → forms the "C"
+    { pct: 0.18, color: '#b8960b' },   // carbs — warm amber / gold
+    { pct: 0.12, color: '#a05a5a' },   // fats — muted rose
+  ];
+
+  // Start at 12 o'clock (top)
+  let offset = -circumference * 0.25;
+
   return (
     <svg
       viewBox="0 0 256 256"
@@ -19,47 +39,28 @@ export default function BetterCalsMark({
     >
       <title>{title}</title>
 
-      <defs>
-        <linearGradient id="bcHeart" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#F36A5B" />
-          <stop offset="60%" stopColor="#E24B4B" />
-          <stop offset="100%" stopColor="#C93A45" />
-        </linearGradient>
-        <linearGradient id="bcHeartHighlight" x1="0.2" y1="0" x2="0.9" y2="1">
-          <stop offset="0%" stopColor="#FFD3C7" stopOpacity="0.75" />
-          <stop offset="70%" stopColor="#FFFFFF" stopOpacity="0" />
-        </linearGradient>
-      </defs>
+      {/* Donut segments */}
+      {segments.map((seg, i) => {
+        const dash = seg.pct * circumference;
+        const gap = circumference - dash;
+        const currentOffset = offset;
+        offset += dash;
 
-      {/* Heart mark */}
-      <path
-        d="
-          M 128 220
-          C 96 194 56 160 56 116
-          C 56 88 74 68 100 68
-          C 114 68 124 74 128 82
-          C 132 74 142 68 156 68
-          C 182 68 200 88 200 116
-          C 200 160 160 194 128 220
-          Z
-        "
-        fill="url(#bcHeart)"
-      />
-
-      {/* Inner highlight */}
-      <path
-        d="
-          M 98 84
-          C 86 90 78 102 78 116
-          C 78 140 100 162 128 186
-          C 112 168 100 148 100 126
-          C 100 110 108 98 118 90
-          C 110 84 104 82 98 84
-          Z
-        "
-        fill="url(#bcHeartHighlight)"
-      />
+        return (
+          <circle
+            key={i}
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={stroke}
+            strokeDasharray={`${dash} ${gap}`}
+            strokeDashoffset={-currentOffset}
+            strokeLinecap="round"
+          />
+        );
+      })}
     </svg>
   );
 }
-

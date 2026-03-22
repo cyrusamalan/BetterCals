@@ -231,107 +231,145 @@ export const MARKER_RULES: Record<keyof BloodMarkers, MarkerDefinition> = {
 
 export function parseBloodReport(text: string): BloodMarkers {
   const markers: BloodMarkers = {};
+  const normalizedText = text.replace(/\u2013|\u2014/g, '-');
 
-  // Glucose patterns
-  const glucoseMatch = /glucose.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                      /fasting.*?glucose.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (glucoseMatch) markers.glucose = Number.parseFloat(glucoseMatch[1]);
+  const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  // HbA1c patterns
-  const hba1cMatch = /hba1c.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                     /hemoglobin a1c.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                     /a1c.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (hba1cMatch) markers.hba1c = Number.parseFloat(hba1cMatch[1]);
+  /**
+   * Generic lab-agnostic value extractor.
+   *
+   * This is a FALLBACK parser — the primary extraction is done by the LLM.
+   * It handles common lab report formats from any provider:
+   *   - "Glucose: 93 mg/dL"
+   *   - "Glucose  93  mg/dL  (70-100)"
+   *   - "Glucose .............. 93 mg/dL"
+   *   - "93 mg/dL" near the marker name
+   *   - "93 High" or "15.3 Low" flag patterns
+   *
+   * It does NOT try to handle provider-specific concatenated column formats
+   * (e.g. Labcorp "131706/26/2024") — that complexity is left to the LLM.
+   */
+  const extractValue = (
+    aliases: string[],
+    units: string[],
+  ): number | undefined => {
+    for (const alias of aliases) {
+      const aliasRe = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'ig');
+      let m: RegExpExecArray | null;
+      while ((m = aliasRe.exec(normalizedText)) !== null) {
+        const from = m.index;
 
-  // Cholesterol patterns
-  const totalCholMatch = /total cholesterol.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                         /cholesterol, total.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (totalCholMatch) markers.totalCholesterol = Number.parseFloat(totalCholMatch[1]);
+        // ── Context guards: skip non-result matches ──
+        // Look at surrounding context to reject matches in headers, footnotes, disclaimers
+        const lineStart = normalizedText.lastIndexOf('\n', from) + 1;
+        const contextBefore = normalizedText.slice(Math.max(0, lineStart), from);
+        const contextAfter = normalizedText.slice(from, Math.min(normalizedText.length, from + 300));
 
-  // LDL patterns
-  const ldlMatch = /ldl.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                 /ldl cholesterol.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                 /low density lipoprotein.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (ldlMatch) markers.ldl = Number.parseFloat(ldlMatch[1]);
+        // Skip matches in order lists, footnotes, disclaimers, educational text
+        if (/ordered items|test\s+name|previous\s+reference/i.test(contextBefore)) continue;
+        if (/deficien|insufficien|guideline|institute|society|recommend|less\s+than|greater\s+than|between/i.test(
+          contextAfter.slice(0, 100)
+        )) continue;
 
-  // HDL patterns
-  const hdlMatch = /hdl.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                 /hdl cholesterol.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                 /high density lipoprotein.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (hdlMatch) markers.hdl = Number.parseFloat(hdlMatch[1]);
+        const afterAlias = contextAfter.slice(m[0].length);
 
-  // ApoB patterns
-  const apoBMatch =
-    /apo\s*[-]?\s*b\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-    /apolipoprotein\s*b\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-    /\bapob\b.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (apoBMatch) markers.apoB = Number.parseFloat(apoBMatch[1]);
+        // Strategy 1: "value flag" pattern — number followed by High/Low/Normal/Critical/Abnormal
+        // e.g. "15.3 Low", "22 High", "93 Normal"
+        const flagMatch = afterAlias.match(/^[\s.:]*(\d+(?:\.\d+)?)\s*(?:High|Low|Normal|Critical|Abnormal|H|L|A)\b/i);
+        if (flagMatch) {
+          const value = Number.parseFloat(flagMatch[1]);
+          if (Number.isFinite(value) && value > 0) return value;
+        }
 
-  // hs-CRP patterns
-  const hsCrpMatch =
-    /\bhs[\s-]*crp\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-    /\bhigh[\s-]*sensitivity[\s-]*c[\s-]*reactive\s*protein\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-    /\bc[\s-]*reactive\s*protein\b.*?\bhigh[\s-]*sensitivity\b.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (hsCrpMatch) markers.hsCRP = Number.parseFloat(hsCrpMatch[1]);
+        // Strategy 2: "value unit" pattern — number followed by a known unit
+        // e.g. "93 mg/dL", "5.2 %", "1.18 mg/dL"
+        const unitPattern = units.map((u) => escapeRegex(u)).join('|');
+        const unitMatch = new RegExp(
+          `[\\s.:]+?(\\d+(?:\\.\\d+)?)\\s*(?:${unitPattern})\\b`,
+          'i',
+        ).exec(afterAlias);
+        if (unitMatch) {
+          const value = Number.parseFloat(unitMatch[1]);
+          if (Number.isFinite(value) && value > 0) return value;
+        }
 
-  // Triglycerides patterns
-  const trigMatch = /triglycerides.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (trigMatch) markers.triglycerides = Number.parseFloat(trigMatch[1]);
+        // Strategy 3: colon/space then number pattern (generic)
+        // e.g. "Glucose: 93", "Glucose   93", "Glucose......93"
+        // Only grab standalone numbers (followed by space, unit, end-of-line, or flag)
+        const simpleMatch = afterAlias.match(
+          /^[\s.:·…]+(\d+(?:\.\d+)?)\s*(?:$|\s|[a-zA-Z/%])/,
+        );
+        if (simpleMatch) {
+          const value = Number.parseFloat(simpleMatch[1]);
+          if (Number.isFinite(value) && value > 0) return value;
+        }
+      }
+    }
+    return undefined;
+  };
 
-  // TSH patterns
-  const tshMatch = /tsh.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                 /thyroid stimulating hormone.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (tshMatch) markers.tsh = Number.parseFloat(tshMatch[1]);
+  // ── Marker extraction ──
+  // Each uses extractValue — a generic, lab-agnostic extractor.
+  // This is the fallback parser; the LLM handles complex/unusual layouts.
 
-  // Vitamin D patterns
-  const vitDMatch = /vitamin d.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                    /25[\-\s]?hydroxy.*?vitamin d.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                    /25\(oh\)d.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (vitDMatch) markers.vitaminD = Number.parseFloat(vitDMatch[1]);
+  const glucose = extractValue(['fasting glucose', 'glucose'], ['mg/dL', 'mg/dl']);
+  if (glucose !== undefined) markers.glucose = glucose;
 
-  // Vitamin B12 patterns
-  const b12Match = /vitamin b12.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                   /b12.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                   /cobalamin.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (b12Match) markers.vitaminB12 = Number.parseFloat(b12Match[1]);
+  const hba1c = extractValue(['hemoglobin a1c', 'hba1c', 'a1c'], ['%']);
+  if (hba1c !== undefined) markers.hba1c = hba1c;
 
-  // Ferritin patterns
-  const ferritinMatch = /ferritin.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (ferritinMatch) markers.ferritin = Number.parseFloat(ferritinMatch[1]);
+  const totalCholesterol = extractValue(['total cholesterol', 'cholesterol, total'], ['mg/dL', 'mg/dl']);
+  if (totalCholesterol !== undefined) markers.totalCholesterol = totalCholesterol;
 
-  // Iron patterns
-  const ironMatch = /iron[^a-z]*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                  /serum iron.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (ironMatch) markers.iron = Number.parseFloat(ironMatch[1]);
+  const ldl = extractValue(['ldl cholesterol', 'ldl-c', 'ldl', 'low density lipoprotein'], ['mg/dL', 'mg/dl']);
+  if (ldl !== undefined) markers.ldl = ldl;
 
-  // ALT patterns
-  const altMatch = /\balt\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                   /alanine\s*(?:amino)?transferase.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                   /sgpt.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (altMatch) markers.alt = Number.parseFloat(altMatch[1]);
+  const hdl = extractValue(['hdl cholesterol', 'hdl-c', 'hdl', 'high density lipoprotein'], ['mg/dL', 'mg/dl']);
+  if (hdl !== undefined) markers.hdl = hdl;
 
-  // AST patterns
-  const astMatch = /\bast\b.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                   /aspartate\s*(?:amino)?transferase.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                   /sgot.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (astMatch) markers.ast = Number.parseFloat(astMatch[1]);
+  const triglycerides = extractValue(['triglycerides', 'triglyceride'], ['mg/dL', 'mg/dl']);
+  if (triglycerides !== undefined) markers.triglycerides = triglycerides;
 
-  // Albumin patterns
-  const albuminMatch = /\balbumin\b.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (albuminMatch) markers.albumin = Number.parseFloat(albuminMatch[1]);
+  const apoB = extractValue(['apo b', 'apolipoprotein b', 'apob'], ['mg/dL', 'mg/dl']);
+  if (apoB !== undefined) markers.apoB = apoB;
 
-  // Creatinine patterns
-  const creatinineMatch = /creatinine.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (creatinineMatch) markers.creatinine = Number.parseFloat(creatinineMatch[1]);
+  const hsCRP = extractValue(['hs-crp', 'high sensitivity c-reactive protein', 'c-reactive protein', 'hscrp'], ['mg/L', 'mg/l']);
+  if (hsCRP !== undefined) markers.hsCRP = hsCRP;
 
-  // Uric Acid patterns
-  const uricAcidMatch = /uric\s*acid.*?[:\s]+(\d+\.?\d*)/i.exec(text) ||
-                         /urate.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (uricAcidMatch) markers.uricAcid = Number.parseFloat(uricAcidMatch[1]);
+  const tsh = extractValue(['tsh', 'thyroid stimulating hormone'], ['mIU/L', 'uIU/mL', 'miu/l']);
+  if (tsh !== undefined) markers.tsh = tsh;
 
-  // Fasting Insulin patterns
-  const insulinMatch = /(?:fasting\s+)?insulin.*?[:\s]+(\d+\.?\d*)/i.exec(text);
-  if (insulinMatch) markers.fastingInsulin = Number.parseFloat(insulinMatch[1]);
+  const vitD = extractValue(['vitamin d, 25-hydroxy', 'vitamin d 25-hydroxy', '25-hydroxy vitamin d', 'vitamin d'], ['ng/mL', 'ng/ml']);
+  if (vitD !== undefined) markers.vitaminD = vitD;
+
+  const b12 = extractValue(['vitamin b12', 'vitamin b-12', 'cobalamin'], ['pg/mL', 'pg/ml', 'pmol/L']);
+  if (b12 !== undefined) markers.vitaminB12 = b12;
+
+  const ferritin = extractValue(['ferritin'], ['ng/mL', 'ng/ml', 'ug/L']);
+  if (ferritin !== undefined) markers.ferritin = ferritin;
+
+  const iron = extractValue(['serum iron', 'iron, total', 'iron'], ['mcg/dL', 'ug/dL', 'umol/L']);
+  if (iron !== undefined) markers.iron = iron;
+
+  // ALT — search for the specific "ALT (SGPT)" first to avoid matching "Alternate"
+  const alt = extractValue(['alt (sgpt)', 'sgpt', 'alanine aminotransferase', 'alanine transferase', 'alt'], ['U/L', 'IU/L', 'u/l']);
+  if (alt !== undefined) markers.alt = alt;
+
+  // AST — search for the specific "AST (SGOT)" first
+  const ast = extractValue(['ast (sgot)', 'sgot', 'aspartate aminotransferase', 'aspartate transferase', 'ast'], ['U/L', 'IU/L', 'u/l']);
+  if (ast !== undefined) markers.ast = ast;
+
+  const albumin = extractValue(['albumin'], ['g/dL', 'g/dl']);
+  if (albumin !== undefined) markers.albumin = albumin;
+
+  const creatinine = extractValue(['creatinine'], ['mg/dL', 'mg/dl']);
+  if (creatinine !== undefined) markers.creatinine = creatinine;
+
+  const uricAcid = extractValue(['uric acid', 'urate'], ['mg/dL', 'mg/dl']);
+  if (uricAcid !== undefined) markers.uricAcid = uricAcid;
+
+  const fastingInsulin = extractValue(['fasting insulin', 'insulin'], ['mIU/L', 'uIU/mL', 'miu/l']);
+  if (fastingInsulin !== undefined) markers.fastingInsulin = fastingInsulin;
 
   // Derived markers
   if (markers.totalCholesterol !== undefined && markers.hdl !== undefined) {

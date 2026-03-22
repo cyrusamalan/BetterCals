@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { DM_Serif_Display, DM_Sans } from 'next/font/google';
+import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 
 const dmSerif = DM_Serif_Display({
@@ -26,10 +27,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${dmSerif.variable} ${dmSans.variable}`}>
-      <body className="min-h-screen bg-gray-50 font-body">
-        {children}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" className={`${dmSerif.variable} ${dmSans.variable}`}>
+        <body className="min-h-screen bg-gray-50 font-body">
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

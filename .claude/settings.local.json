@@ -5,7 +5,17 @@
       "Bash(grep -r \"tesseract\\\\|Tesseract\" C:/Users/cyrus/camalan/Projects/BloodWise --include=*.ts --include=*.tsx --include=*.js --include=*.json)",
       "Bash(find C:/Users/cyrus/camalan/Projects/BloodWise -name .env* -o -name *config* -type f)",
       "Bash(npm install:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(find C:/Users/cyrus/camalan/Projects/BloodWise -maxdepth 2 -type f \\\\\\(-name *.config.* -o -name .*config.* -o -name middleware.* \\\\\\))",
+      "Bash(grep -r \"auth\\\\|login\\\\|session\\\\|account\\\\|user.*id\\\\|userId\" C:/Users/cyrus/camalan/Projects/BloodWise --include=*.ts --include=*.tsx --include=*.js --include=*.json --exclude-dir=node_modules)",
+      "Bash(grep -r \"user\\\\|auth\\\\|login\\\\|session\" C:/Users/cyrus/camalan/Projects/BloodWise/lib/db C:/Users/cyrus/camalan/Projects/BloodWise/drizzle*)",
+      "Bash(grep -E \"^d|\\\\.ts$|\\\\.js$|\\\\.json$\")",
+      "Bash(mkdir -p C:/Users/cyrus/camalan/Projects/BloodWise/app/sign-in/[[...sign-in]])",
+      "Bash(mkdir -p C:/Users/cyrus/camalan/Projects/BloodWise/app/sign-up/[[...sign-up]])",
+      "Bash(node -e \"const c = require\\(''@clerk/nextjs''\\); console.log\\(Object.keys\\(c\\).filter\\(k => k.startsWith\\(''Sign''\\)\\).join\\('', ''\\)\\)\")",
+      "Bash(node -e \"const c = require\\(''@clerk/nextjs''\\); console.log\\(Object.keys\\(c\\).filter\\(k => /sign/i.test\\(k\\)\\).join\\(''\\\\n''\\)\\)\")",
+      "Bash(node -e \":*)",
+      "Bash(node -e \"const c = require\\(''@clerk/nextjs''\\); console.log\\(Object.keys\\(c\\).filter\\(k => /Show|Sign|User|Auth/i.test\\(k\\)\\).sort\\(\\).join\\(''\\\\n''\\)\\)\")"
     ]
   },
   "enabledPlugins": {
