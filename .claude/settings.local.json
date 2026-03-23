@@ -20,7 +20,8 @@
       "Bash(npx tsc:*)",
       "WebFetch(domain:sonarcloud.io)",
       "Bash(gh pr:*)",
-      "Bash(where gh:*)"
+      "Bash(where gh:*)",
+      "Bash(powershell -Command \"Select-String -Path ''C:\\\\Users\\\\cyrus\\\\.claude\\\\projects\\\\C--Users-cyrus-camalan-Projects-BloodWise\\\\de7639d9-7501-40f0-8408-5c2211c01269.jsonl'' -Pattern ''7\\\\.'' -SimpleMatch | Select-Object -Last 30 | ForEach-Object { $_Line.Substring\\(0, [Math]::Min\\(500, $_Line.Length\\)\\) }\")"
     ]
   },
   "enabledPlugins": {

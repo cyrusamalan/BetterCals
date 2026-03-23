@@ -119,6 +119,17 @@ export default function Home() {
       mergedMarkers = profile ? estimateAverageMarkers(profile) : {};
     }
 
+    // Derive markers that can be computed from others
+    // Non-HDL: TC - HDL (only if HDL <= TC)
+    if (mergedMarkers.nonHdl === undefined && mergedMarkers.totalCholesterol !== undefined && mergedMarkers.hdl !== undefined && mergedMarkers.hdl <= mergedMarkers.totalCholesterol) {
+      mergedMarkers.nonHdl = Math.round(mergedMarkers.totalCholesterol - mergedMarkers.hdl);
+    }
+    // Friedewald LDL: TC - HDL - (TG / 5), valid when TG < 400
+    if (mergedMarkers.ldl === undefined && mergedMarkers.totalCholesterol !== undefined && mergedMarkers.hdl !== undefined && mergedMarkers.triglycerides !== undefined && mergedMarkers.triglycerides < 400) {
+      const derived = Math.round(mergedMarkers.totalCholesterol - mergedMarkers.hdl - mergedMarkers.triglycerides / 5);
+      if (derived > 0) mergedMarkers.ldl = derived;
+    }
+
     setMarkers(mergedMarkers);
 
     if (profile) {

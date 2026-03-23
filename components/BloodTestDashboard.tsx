@@ -24,6 +24,7 @@ import {
   Save,
   Check,
   UserCog,
+  History,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
@@ -585,23 +586,37 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
               )}
 
               {isSignedIn ? (
-                <button
-                  onClick={handleSaveToHistory}
-                  disabled={saving || saved}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press disabled:opacity-50"
-                  style={{
-                    backgroundColor: saved ? 'var(--status-normal-bg)' : 'var(--border-light)',
-                    color: saved ? 'var(--status-normal)' : 'var(--text-primary)',
-                    border: `1px solid ${saved ? 'var(--status-normal-border)' : 'var(--border)'}`,
-                  }}
-                >
-                  {saved ? (
-                    <Check className="w-4 h-4" />
-                  ) : (
-                    <Save className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                  )}
-                  {saving ? 'Saving...' : saved ? 'Saved' : 'Save to History'}
-                </button>
+                <>
+                  <Link
+                    href="/history"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
+                    style={{
+                      backgroundColor: 'var(--border-light)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <History className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                    History
+                  </Link>
+                  <button
+                    onClick={handleSaveToHistory}
+                    disabled={saving || saved}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press disabled:opacity-50"
+                    style={{
+                      backgroundColor: saved ? 'var(--status-normal-bg)' : 'var(--border-light)',
+                      color: saved ? 'var(--status-normal)' : 'var(--text-primary)',
+                      border: `1px solid ${saved ? 'var(--status-normal-border)' : 'var(--border)'}`,
+                    }}
+                  >
+                    {saved ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <Save className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                    )}
+                    {saving ? 'Saving...' : saved ? 'Saved' : 'Save to History'}
+                  </button>
+                </>
               ) : (
                 <Link
                   href="/sign-in"
