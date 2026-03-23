@@ -15,7 +15,12 @@
       "Bash(node -e \"const c = require\\(''@clerk/nextjs''\\); console.log\\(Object.keys\\(c\\).filter\\(k => k.startsWith\\(''Sign''\\)\\).join\\('', ''\\)\\)\")",
       "Bash(node -e \"const c = require\\(''@clerk/nextjs''\\); console.log\\(Object.keys\\(c\\).filter\\(k => /sign/i.test\\(k\\)\\).join\\(''\\\\n''\\)\\)\")",
       "Bash(node -e \":*)",
-      "Bash(node -e \"const c = require\\(''@clerk/nextjs''\\); console.log\\(Object.keys\\(c\\).filter\\(k => /Show|Sign|User|Auth/i.test\\(k\\)\\).sort\\(\\).join\\(''\\\\n''\\)\\)\")"
+      "Bash(node -e \"const c = require\\(''@clerk/nextjs''\\); console.log\\(Object.keys\\(c\\).filter\\(k => /Show|Sign|User|Auth/i.test\\(k\\)\\).sort\\(\\).join\\(''\\\\n''\\)\\)\")",
+      "Bash(npm audit:*)",
+      "Bash(npx tsc:*)",
+      "WebFetch(domain:sonarcloud.io)",
+      "Bash(gh pr:*)",
+      "Bash(where gh:*)"
     ]
   },
   "enabledPlugins": {

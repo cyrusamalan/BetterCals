@@ -2,17 +2,17 @@ import type { Insight } from '@/types';
 
 export default function ASCVDRiskCard({
   ascvdRiskScore,
+  ascvdRiskReason,
   age,
   hasLipids,
   race,
 }: {
   ascvdRiskScore: number | undefined;
+  ascvdRiskReason?: string;
   age: number;
   hasLipids: boolean;
   race?: 'white' | 'black' | 'other';
 }) {
-  const outOfRange = age < 40 || age > 79;
-
   const tier = (() => {
     if (ascvdRiskScore === undefined) return null;
     if (ascvdRiskScore < 5) return { label: 'Low Risk', color: 'var(--status-normal)', bg: 'var(--status-normal-bg)' };
@@ -24,9 +24,9 @@ export default function ASCVDRiskCard({
   const helperText =
     'ACC/AHA Pooled Cohort Equations estimate of 10-year risk for an ASCVD event.';
 
+  // Use the reason from the calculation engine if available, otherwise fall back to generic messages
   const message = (() => {
-    if (outOfRange) return 'ASCVD risk modeling is validated only for ages 40-79.';
-    if (!hasLipids) return 'Total Cholesterol and HDL are required to calculate your 10-year risk.';
+    if (ascvdRiskReason) return ascvdRiskReason;
     if (ascvdRiskScore === undefined) return 'We could not calculate your risk with the current data.';
     return null;
   })();

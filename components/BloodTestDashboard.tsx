@@ -956,6 +956,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
             <div className="md:col-span-1 h-full">
               <ASCVDRiskCard
                 ascvdRiskScore={result.ascvdRiskScore}
+                ascvdRiskReason={result.ascvdRiskReason}
                 age={profile.age}
                 hasLipids={markers.totalCholesterol !== undefined && markers.hdl !== undefined}
                 race={profile.race}

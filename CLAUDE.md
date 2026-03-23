@@ -10,7 +10,7 @@ BetterCals (repo name: BloodWise) is a Next.js 16 health analytics app (TypeScri
 - Generates personalized health scores, insights, macros, calorie tiers, and ASCVD risk
 - Persists analysis history with Clerk authentication and Neon PostgreSQL (optional)
 
-Deployed on Vercel with Next.js App Router.
+Deployed on Vercel as a server-rendered Next.js app (App Router with API routes).
 
 ## Commands
 
@@ -168,9 +168,9 @@ Each blood marker maps to a `MarkerStatus` → numeric score (0–100) via tiers
 
 | Category | Markers |
 |---|---|
-| metabolic | glucose, hba1c, insulin |
-| cardiovascular | totalCholesterol, ldl, hdl, triglycerides |
-| hormonal | tsh, testosterone, cortisol |
+| metabolic | glucose, hba1c, fastingInsulin |
+| cardiovascular | totalCholesterol, ldl, hdl, triglycerides, nonHdl, apoB, hsCRP |
+| hormonal | tsh |
 | nutritional | vitaminD, vitaminB12, ferritin, iron |
 | hepatic | alt, ast, albumin |
 | renal | creatinine, uricAcid |
@@ -231,7 +231,7 @@ All shared interfaces live here. Key types:
 
 - **OCR in production**: `BloodReportUploader` calls `/api/extract-blood-report` which uses LLM (DeepSeek default) for extraction; `lib/bloodParser.ts` provides a regex fallback. The old demo hardcoded data has been replaced.
 - **No test framework**: CI only runs `npm run build`. Validate changes manually with `npm run dev`.
-- **Static export note**: `vercel.json` points to `.next/` output directory; `next.config.js` does not set `output: 'export'` — the app uses App Router with API routes (not fully static).
+- **Deployment**: Server-rendered on Vercel (not static export). `vercel.json` points to `.next/` output. API routes, Clerk auth, and Neon DB require server-side rendering.
 - **Unit convention**: User inputs imperial (lbs, ft/in); calculations use metric internally; blood markers use standard lab units (mg/dL, ng/mL, mIU/L, etc.).
 - **Physiological validation**: `sanitizeBloodMarkers()` in the API route rejects implausible values; `NaN`/`Infinity` guards are applied to all optional numeric fields.
 - **CodeRabbit**: Assertive auto-review runs on all PRs. Ignores `dist/`, `node_modules/`, `package-lock.json`.

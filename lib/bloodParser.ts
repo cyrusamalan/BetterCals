@@ -229,6 +229,40 @@ export const MARKER_RULES: Record<keyof BloodMarkers, MarkerDefinition> = {
   },
 };
 
+/**
+ * Plausible physiological ranges per marker.
+ * Values outside these ranges are likely data-entry errors or unit mismatches
+ * (e.g. glucose in mmol/L instead of mg/dL) and should be rejected.
+ */
+const PLAUSIBLE_RANGES: Partial<Record<keyof BloodMarkers, { min: number; max: number }>> = {
+  glucose: { min: 20, max: 600 },         // mg/dL — 20 is severe hypoglycemia, 600+ is diabetic crisis
+  hba1c: { min: 2, max: 20 },             // % — below 2 is impossible, above 20 is extreme
+  totalCholesterol: { min: 50, max: 500 }, // mg/dL
+  ldl: { min: 10, max: 400 },             // mg/dL
+  hdl: { min: 5, max: 150 },              // mg/dL — above 150 is extremely rare
+  triglycerides: { min: 10, max: 2000 },   // mg/dL — above 2000 is pancreatitis territory
+  apoB: { min: 10, max: 300 },            // mg/dL
+  hsCRP: { min: 0.01, max: 100 },         // mg/L
+  tsh: { min: 0.01, max: 100 },           // mIU/L
+  vitaminD: { min: 1, max: 200 },         // ng/mL
+  vitaminB12: { min: 50, max: 5000 },     // pg/mL
+  ferritin: { min: 1, max: 2000 },        // ng/mL
+  iron: { min: 5, max: 500 },             // mcg/dL
+  alt: { min: 1, max: 1000 },             // U/L
+  ast: { min: 1, max: 1000 },             // U/L
+  albumin: { min: 1, max: 7 },            // g/dL
+  creatinine: { min: 0.1, max: 15 },      // mg/dL
+  uricAcid: { min: 0.5, max: 20 },        // mg/dL
+  fastingInsulin: { min: 0.1, max: 300 },  // mIU/L
+};
+
+/** Returns true if the value is within the plausible physiological range for the marker. */
+export function isPlausibleValue(marker: keyof BloodMarkers, value: number): boolean {
+  const range = PLAUSIBLE_RANGES[marker];
+  if (!range) return true; // No range defined — accept
+  return value >= range.min && value <= range.max;
+}
+
 export function parseBloodReport(text: string): BloodMarkers {
   const markers: BloodMarkers = {};
   const normalizedText = text.replace(/\u2013|\u2014/g, '-');
@@ -312,69 +346,39 @@ export function parseBloodReport(text: string): BloodMarkers {
   // Each uses extractValue — a generic, lab-agnostic extractor.
   // This is the fallback parser; the LLM handles complex/unusual layouts.
 
-  const glucose = extractValue(['fasting glucose', 'glucose'], ['mg/dL', 'mg/dl']);
-  if (glucose !== undefined) markers.glucose = glucose;
+  /** Accept extracted value only if it passes the plausible range check. */
+  const accept = (key: keyof BloodMarkers, value: number | undefined) => {
+    if (value !== undefined && isPlausibleValue(key, value)) {
+      markers[key] = value;
+    }
+  };
 
-  const hba1c = extractValue(['hemoglobin a1c', 'hba1c', 'a1c'], ['%']);
-  if (hba1c !== undefined) markers.hba1c = hba1c;
-
-  const totalCholesterol = extractValue(['total cholesterol', 'cholesterol, total'], ['mg/dL', 'mg/dl']);
-  if (totalCholesterol !== undefined) markers.totalCholesterol = totalCholesterol;
-
-  const ldl = extractValue(['ldl cholesterol', 'ldl-c', 'ldl', 'low density lipoprotein'], ['mg/dL', 'mg/dl']);
-  if (ldl !== undefined) markers.ldl = ldl;
-
-  const hdl = extractValue(['hdl cholesterol', 'hdl-c', 'hdl', 'high density lipoprotein'], ['mg/dL', 'mg/dl']);
-  if (hdl !== undefined) markers.hdl = hdl;
-
-  const triglycerides = extractValue(['triglycerides', 'triglyceride'], ['mg/dL', 'mg/dl']);
-  if (triglycerides !== undefined) markers.triglycerides = triglycerides;
-
-  const apoB = extractValue(['apo b', 'apolipoprotein b', 'apob'], ['mg/dL', 'mg/dl']);
-  if (apoB !== undefined) markers.apoB = apoB;
-
-  const hsCRP = extractValue(['hs-crp', 'high sensitivity c-reactive protein', 'c-reactive protein', 'hscrp'], ['mg/L', 'mg/l']);
-  if (hsCRP !== undefined) markers.hsCRP = hsCRP;
-
-  const tsh = extractValue(['tsh', 'thyroid stimulating hormone'], ['mIU/L', 'uIU/mL', 'miu/l']);
-  if (tsh !== undefined) markers.tsh = tsh;
-
-  const vitD = extractValue(['vitamin d, 25-hydroxy', 'vitamin d 25-hydroxy', '25-hydroxy vitamin d', 'vitamin d'], ['ng/mL', 'ng/ml']);
-  if (vitD !== undefined) markers.vitaminD = vitD;
-
-  const b12 = extractValue(['vitamin b12', 'vitamin b-12', 'cobalamin'], ['pg/mL', 'pg/ml', 'pmol/L']);
-  if (b12 !== undefined) markers.vitaminB12 = b12;
-
-  const ferritin = extractValue(['ferritin'], ['ng/mL', 'ng/ml', 'ug/L']);
-  if (ferritin !== undefined) markers.ferritin = ferritin;
-
-  const iron = extractValue(['serum iron', 'iron, total', 'iron'], ['mcg/dL', 'ug/dL', 'umol/L']);
-  if (iron !== undefined) markers.iron = iron;
-
+  accept('glucose', extractValue(['fasting glucose', 'glucose'], ['mg/dL', 'mg/dl']));
+  accept('hba1c', extractValue(['hemoglobin a1c', 'hba1c', 'a1c'], ['%']));
+  accept('totalCholesterol', extractValue(['total cholesterol', 'cholesterol, total'], ['mg/dL', 'mg/dl']));
+  accept('ldl', extractValue(['ldl cholesterol', 'ldl-c', 'ldl', 'low density lipoprotein'], ['mg/dL', 'mg/dl']));
+  accept('hdl', extractValue(['hdl cholesterol', 'hdl-c', 'hdl', 'high density lipoprotein'], ['mg/dL', 'mg/dl']));
+  accept('triglycerides', extractValue(['triglycerides', 'triglyceride'], ['mg/dL', 'mg/dl']));
+  accept('apoB', extractValue(['apo b', 'apolipoprotein b', 'apob'], ['mg/dL', 'mg/dl']));
+  accept('hsCRP', extractValue(['hs-crp', 'high sensitivity c-reactive protein', 'c-reactive protein', 'hscrp'], ['mg/L', 'mg/l']));
+  accept('tsh', extractValue(['tsh', 'thyroid stimulating hormone'], ['mIU/L', 'uIU/mL', 'miu/l']));
+  accept('vitaminD', extractValue(['vitamin d, 25-hydroxy', 'vitamin d 25-hydroxy', '25-hydroxy vitamin d', 'vitamin d'], ['ng/mL', 'ng/ml']));
+  accept('vitaminB12', extractValue(['vitamin b12', 'vitamin b-12', 'cobalamin'], ['pg/mL', 'pg/ml', 'pmol/L']));
+  accept('ferritin', extractValue(['ferritin'], ['ng/mL', 'ng/ml', 'ug/L']));
+  accept('iron', extractValue(['serum iron', 'iron, total', 'iron'], ['mcg/dL', 'ug/dL', 'umol/L']));
   // ALT — search for the specific "ALT (SGPT)" first to avoid matching "Alternate"
-  const alt = extractValue(['alt (sgpt)', 'sgpt', 'alanine aminotransferase', 'alanine transferase', 'alt'], ['U/L', 'IU/L', 'u/l']);
-  if (alt !== undefined) markers.alt = alt;
-
+  accept('alt', extractValue(['alt (sgpt)', 'sgpt', 'alanine aminotransferase', 'alanine transferase', 'alt'], ['U/L', 'IU/L', 'u/l']));
   // AST — search for the specific "AST (SGOT)" first
-  const ast = extractValue(['ast (sgot)', 'sgot', 'aspartate aminotransferase', 'aspartate transferase', 'ast'], ['U/L', 'IU/L', 'u/l']);
-  if (ast !== undefined) markers.ast = ast;
+  accept('ast', extractValue(['ast (sgot)', 'sgot', 'aspartate aminotransferase', 'aspartate transferase', 'ast'], ['U/L', 'IU/L', 'u/l']));
+  accept('albumin', extractValue(['albumin'], ['g/dL', 'g/dl']));
+  accept('creatinine', extractValue(['creatinine'], ['mg/dL', 'mg/dl']));
+  accept('uricAcid', extractValue(['uric acid', 'urate'], ['mg/dL', 'mg/dl']));
+  accept('fastingInsulin', extractValue(['fasting insulin', 'insulin'], ['mIU/L', 'uIU/mL', 'miu/l']));
 
-  const albumin = extractValue(['albumin'], ['g/dL', 'g/dl']);
-  if (albumin !== undefined) markers.albumin = albumin;
-
-  const creatinine = extractValue(['creatinine'], ['mg/dL', 'mg/dl']);
-  if (creatinine !== undefined) markers.creatinine = creatinine;
-
-  const uricAcid = extractValue(['uric acid', 'urate'], ['mg/dL', 'mg/dl']);
-  if (uricAcid !== undefined) markers.uricAcid = uricAcid;
-
-  const fastingInsulin = extractValue(['fasting insulin', 'insulin'], ['mIU/L', 'uIU/mL', 'miu/l']);
-  if (fastingInsulin !== undefined) markers.fastingInsulin = fastingInsulin;
-
-  // Derived markers
-  if (markers.totalCholesterol !== undefined && markers.hdl !== undefined) {
+  // Derived markers — only compute nonHdl if HDL <= Total Cholesterol (sanity check)
+  if (markers.totalCholesterol !== undefined && markers.hdl !== undefined && markers.hdl <= markers.totalCholesterol) {
     const nonHdl = markers.totalCholesterol - markers.hdl;
-    if (Number.isFinite(nonHdl)) {
+    if (Number.isFinite(nonHdl) && nonHdl >= 0) {
       markers.nonHdl = Math.round(nonHdl);
     }
   }
@@ -390,12 +394,19 @@ export function getMarkerInterpretation(
   const def = MARKER_RULES[marker];
   const tiers = getMarkerTiers(marker, gender);
 
-  // SAFE FALLBACK: missing rules/tiers or invalid value should not trigger "Critical"
+  // SAFE FALLBACK: missing rules/tiers or invalid value should not trigger "Critical".
+  // Score 25 matches the out-of-range fallback below for consistency.
   if (!def || !tiers || tiers.length === 0 || !Number.isFinite(value)) {
-    return { status: 'unknown', label: 'Unmapped', score: 50 };
+    return { status: 'unknown', label: 'Unmapped', score: 25 };
   }
 
-  const tier = tiers.find((t) => value >= t.min && value <= t.max);
+  // Match using >= min and < next tier's min (or <= max for the last tier).
+  // This closes gaps between tiers where decimals like 69.5 would otherwise be unmapped.
+  const sorted = [...tiers].sort((a, b) => a.min - b.min);
+  const tier = sorted.find((t, i) => {
+    const nextMin = sorted[i + 1]?.min;
+    return value >= t.min && (nextMin !== undefined ? value < nextMin : value <= t.max);
+  });
   if (tier) return { status: tier.status, label: tier.label, score: tier.score };
 
   // Out-of-bounds fallback — value fell between tier gaps (e.g. decimal like

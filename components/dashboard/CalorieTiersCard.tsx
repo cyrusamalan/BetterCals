@@ -15,9 +15,9 @@ export default function CalorieTiersCard({ tiers, userGoal, targetCalories }: Ca
   }
 
   function tierMatchesGoal(tier: CalorieTier): boolean {
-    if (userGoal === 'lose') return tier.dailyDeficit < 0;
-    if (userGoal === 'gain') return tier.dailyDeficit > 0;
-    return tier.dailyDeficit === 0;
+    if (userGoal === 'lose') return tier.dailyChange < 0;
+    if (userGoal === 'gain') return tier.dailyChange > 0;
+    return tier.dailyChange === 0;
   }
 
   return (
@@ -70,7 +70,7 @@ export default function CalorieTiersCard({ tiers, userGoal, targetCalories }: Ca
                   className="text-[11px] tabular-nums"
                   style={{ color: 'var(--text-tertiary)' }}
                 >
-                  {tier.dailyDeficit > 0 ? '+' : ''}{tier.dailyDeficit} cal/day
+                  {tier.dailyChange > 0 ? '+' : ''}{tier.dailyChange} cal/day
                 </span>
                 <span
                   className="font-display text-lg tabular-nums"

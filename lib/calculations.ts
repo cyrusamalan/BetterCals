@@ -1,6 +1,30 @@
 import { UserProfile, ActivityLevel, TDEEResult, BloodMarkers, HealthScore, Insight, CalorieTier, MacroBreakdown, PersonalizedRecs } from '@/types';
 import { getMarkerInterpretation } from '@/lib/bloodParser';
-import { calculateASCVDRisk } from '@/lib/riskModels';
+import { calculateASCVDRisk, type ASCVDResult } from '@/lib/riskModels';
+
+/** Human-readable names for blood markers — shared across insight generation and risk identification. */
+const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
+  glucose: 'Glucose',
+  hba1c: 'HbA1c',
+  totalCholesterol: 'Total Cholesterol',
+  nonHdl: 'Non-HDL Cholesterol',
+  ldl: 'LDL Cholesterol',
+  hdl: 'HDL Cholesterol',
+  triglycerides: 'Triglycerides',
+  apoB: 'Apolipoprotein B (ApoB)',
+  hsCRP: 'hs-CRP',
+  tsh: 'TSH',
+  vitaminD: 'Vitamin D',
+  vitaminB12: 'Vitamin B12',
+  ferritin: 'Ferritin',
+  iron: 'Serum Iron',
+  alt: 'ALT (Liver)',
+  ast: 'AST (Liver)',
+  albumin: 'Albumin',
+  creatinine: 'Creatinine',
+  uricAcid: 'Uric Acid',
+  fastingInsulin: 'Fasting Insulin',
+};
 
 const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   'sedentary': 1.2,
@@ -42,11 +66,14 @@ export function calculateTDEE(profile: UserProfile): TDEEResult {
   const tdee = Math.round(bmr * activityMultiplier);
 
   // Adjust for goal
+  // Deficit/surplus ratios per common sports nutrition guidelines (ISSN, NASM):
+  // - Weight loss: 20% deficit is moderate and preserves lean mass (Helms et al., 2014)
+  // - Weight gain: 10% surplus minimizes fat gain during a lean bulk (Iraki et al., 2019)
   let targetCalories = tdee;
   if (profile.goal === 'lose') {
-    targetCalories = Math.round(tdee * 0.8); // 20% deficit
+    targetCalories = Math.round(tdee * 0.8);
   } else if (profile.goal === 'gain') {
-    targetCalories = Math.round(tdee * 1.1); // 10% surplus
+    targetCalories = Math.round(tdee * 1.1);
   }
 
   return {
@@ -75,7 +102,7 @@ export function calculateHealthScore(markers: BloodMarkers, profile?: Pick<UserP
   };
 
   const metabolic = scoreCategory(['glucose', 'hba1c', 'fastingInsulin']);
-  const cardiovascular = scoreCategory(['totalCholesterol', 'ldl', 'hdl', 'triglycerides']);
+  const cardiovascular = scoreCategory(['totalCholesterol', 'ldl', 'hdl', 'triglycerides', 'nonHdl', 'apoB', 'hsCRP']);
   const hormonal = scoreCategory(['tsh']);
   const nutritional = scoreCategory(['vitaminD', 'vitaminB12', 'ferritin', 'iron']);
   const hepatic = scoreCategory(['alt', 'ast', 'albumin']);
@@ -115,29 +142,6 @@ export function generateInsights(profile: UserProfile, tdee: TDEEResult, markers
       ? `To gain lean mass, aim for ${tdee.targetCalories} calories daily.`
       : `Maintain your current intake of ${tdee.targetCalories} calories.`,
   });
-
-  const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
-    glucose: 'Glucose',
-    hba1c: 'HbA1c',
-    totalCholesterol: 'Total Cholesterol',
-    nonHdl: 'Non-HDL Cholesterol',
-    ldl: 'LDL Cholesterol',
-    hdl: 'HDL Cholesterol',
-    triglycerides: 'Triglycerides',
-    apoB: 'Apolipoprotein B (ApoB)',
-    hsCRP: 'hs-CRP',
-    tsh: 'TSH',
-    vitaminD: 'Vitamin D',
-    vitaminB12: 'Vitamin B12',
-    ferritin: 'Ferritin',
-    iron: 'Serum Iron',
-    alt: 'ALT (Liver)',
-    ast: 'AST (Liver)',
-    albumin: 'Albumin',
-    creatinine: 'Creatinine',
-    uricAcid: 'Uric Acid',
-    fastingInsulin: 'Fasting Insulin',
-  };
 
   const typeFromStatus = (status: ReturnType<typeof getMarkerInterpretation>['status']): Insight['type'] => {
     if (status === 'critical' || status === 'high') return 'danger';
@@ -196,29 +200,6 @@ export function identifyDeficiencies(markers: BloodMarkers, profile: Pick<UserPr
 export function identifyRisks(markers: BloodMarkers, profile: Pick<UserProfile, 'gender'>): string[] {
   const risks: string[] = [];
 
-  const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
-    glucose: 'Glucose',
-    hba1c: 'HbA1c',
-    totalCholesterol: 'Total Cholesterol',
-    nonHdl: 'Non-HDL Cholesterol',
-    ldl: 'LDL Cholesterol',
-    hdl: 'HDL Cholesterol',
-    triglycerides: 'Triglycerides',
-    apoB: 'Apolipoprotein B (ApoB)',
-    hsCRP: 'hs-CRP',
-    tsh: 'TSH',
-    vitaminD: 'Vitamin D',
-    vitaminB12: 'Vitamin B12',
-    ferritin: 'Ferritin',
-    iron: 'Serum Iron',
-    alt: 'ALT (Liver)',
-    ast: 'AST (Liver)',
-    albumin: 'Albumin',
-    creatinine: 'Creatinine',
-    uricAcid: 'Uric Acid',
-    fastingInsulin: 'Fasting Insulin',
-  };
-
   const isRiskStatus = (status: ReturnType<typeof getMarkerInterpretation>['status']) =>
     status === 'borderline' || status === 'high' || status === 'critical';
 
@@ -242,11 +223,11 @@ export function identifyRisks(markers: BloodMarkers, profile: Pick<UserProfile, 
 
 export function calculateCalorieTiers(tdee: number): CalorieTier[] {
   const floor = 1200;
-  const makeTier = (label: string, weeklyChange: string, targetDeficit: number): CalorieTier => {
-    const dailyCalories = Math.max(floor, Math.round(tdee + targetDeficit));
-    // Reflect the actual deficit after the floor is applied
-    const dailyDeficit = dailyCalories - Math.round(tdee);
-    return { label, weeklyChange, dailyCalories, dailyDeficit };
+  const makeTier = (label: string, weeklyChange: string, targetOffset: number): CalorieTier => {
+    const dailyCalories = Math.max(floor, Math.round(tdee + targetOffset));
+    // Actual daily change from TDEE (negative = deficit, positive = surplus)
+    const dailyChange = dailyCalories - Math.round(tdee);
+    return { label, weeklyChange, dailyCalories, dailyChange };
   };
 
   return [
@@ -268,7 +249,8 @@ export function calculateMacros(calories: number, goal: 'lose' | 'maintain' | 'g
 
   const proteinGrams = Math.round((calories * ratios.p / 100) / 4);
   const carbGrams = Math.round((calories * ratios.c / 100) / 4);
-  const fatGrams = Math.round((calories * ratios.f / 100) / 9);
+  // Compute fat as residual to prevent rounding drift (total always matches)
+  const fatGrams = Math.round((calories - proteinGrams * 4 - carbGrams * 4) / 9);
 
   return {
     protein: { grams: proteinGrams, pct: ratios.p },
@@ -301,10 +283,13 @@ export function calculateWaistToHipRatio(
 ): { ratio: number; interpretation: string } {
   const ratio = Math.round((waistInches / hipInches) * 100) / 100;
   let interpretation: string;
-  if (gender === 'male') {
-    if (ratio < 0.9) interpretation = 'Normal';
-    else if (ratio < 0.95) interpretation = 'Elevated';
-    else interpretation = 'High Risk';
+  // WHO waist-to-hip ratio thresholds (male vs female)
+  if (gender === 'male' && ratio < 0.9) {
+    interpretation = 'Normal';
+  } else if (gender === 'male' && ratio < 0.95) {
+    interpretation = 'Elevated';
+  } else if (gender === 'male') {
+    interpretation = 'High Risk';
   } else if (ratio < 0.8) {
     interpretation = 'Normal';
   } else if (ratio < 0.85) {
@@ -322,7 +307,9 @@ export function calculateRecommendations(
 ): PersonalizedRecs {
   const { bmi, category: bmiCategory } = calculateBMI(profile.weightLbs, profile.heightFeet, profile.heightInches);
 
-  // Water: 0.5 oz per lb + 16 oz per activity tier above sedentary
+  // Water: ~0.5 oz per lb bodyweight + 16 oz per activity tier above sedentary
+  // Base rate from National Academies of Sciences (2005) adequate intake guidelines;
+  // activity add-on approximates ACSM fluid replacement recommendations (~480 mL/session).
   const activityIdx = ACTIVITY_TIERS.indexOf(profile.activityLevel);
   const waterIntakeOz = Math.round(profile.weightLbs * 0.5 + activityIdx * 16);
 
@@ -402,6 +389,6 @@ export function calculateRecommendations(
   };
 }
 
-export function calculateASCVDRiskScore(profile: UserProfile, markers: BloodMarkers): number | null {
+export function calculateASCVDRiskScore(profile: UserProfile, markers: BloodMarkers): ASCVDResult {
   return calculateASCVDRisk(profile, markers);
 }
