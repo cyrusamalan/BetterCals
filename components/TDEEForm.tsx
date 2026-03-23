@@ -203,9 +203,9 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
           >
             <option value="sedentary">Sedentary (little/no exercise)</option>
             <option value="light">Lightly Active (1-3 days/wk)</option>
-            <option value="moderate">Moderate (3-5 days/wk)</option>
+            <option value="moderate">Moderately Active (3-5 days/wk)</option>
             <option value="active">Very Active (6-7 days/wk)</option>
-            <option value="very-active">Extremely Active (physical job)</option>
+            <option value="very-active">Extra Active (physical job + exercise)</option>
           </select>
         </FieldGroup>
 
