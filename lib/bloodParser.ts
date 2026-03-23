@@ -398,10 +398,10 @@ export function getMarkerInterpretation(
   const tier = tiers.find((t) => value >= t.min && value <= t.max);
   if (tier) return { status: tier.status, label: tier.label, score: tier.score };
 
-  // Out-of-bounds fallback — likely a data entry error (e.g. negative value),
-  // not a genuine critical reading. Use 'abnormal' instead of 'critical' to
-  // avoid tanking the health score for bad input.
-  return { status: 'high', label: 'Out of Range', score: 25 };
+  // Out-of-bounds fallback — value fell between tier gaps (e.g. decimal like
+  // 69.5 between 0-69 and 70-99) or is negative. Use neutral 'unknown' status
+  // since the direction (high vs low) can't be determined.
+  return { status: 'unknown', label: 'Out of Range', score: 25 };
 }
 
 export function formatMarkerValue(marker: keyof BloodMarkers, value: number): string {
