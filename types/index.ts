@@ -167,3 +167,10 @@ export interface AnalysisHistory {
   markers: BloodMarkers;
   result: AnalysisResult;
 }
+
+export interface FoodSensitivityFlag {
+  title: string;
+  markers: string;
+  suggestion: string;
+  severity: 'info' | 'warning';
+}

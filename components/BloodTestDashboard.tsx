@@ -1,8 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
-import { AnalysisResult, BloodMarkers, Insight, UserProfile } from '@/types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnalysisResult, BloodMarkers, FoodSensitivityFlag, Insight, UserProfile } from '@/types';
 import { getMarkerDisplayRange, getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
 import BetterCalsMark from '@/components/BetterCalsMark';
 import {
@@ -31,6 +31,43 @@ import Link from 'next/link';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
 import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
+import FoodSensitivityCard from '@/components/dashboard/FoodSensitivityCard';
+
+// #region debug log helper
+const DEBUG_ENDPOINT = 'http://127.0.0.1:7498/ingest/6f0bd25c-93a7-48e3-a88d-41621d1baedd';
+const DEBUG_SESSION_ID = 'dc8eb7';
+function debugLog({
+  hypothesisId,
+  location,
+  message,
+  data,
+}: {
+  hypothesisId: string;
+  location: string;
+  message: string;
+  data?: Record<string, unknown>;
+}) {
+  try {
+    fetch(DEBUG_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': DEBUG_SESSION_ID,
+      },
+      body: JSON.stringify({
+        sessionId: DEBUG_SESSION_ID,
+        location,
+        message,
+        hypothesisId,
+        data,
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  } catch {
+    // ignore
+  }
+}
+// #endregion
 
 const MacroDonutChart = dynamic(() => import('@/components/dashboard/MacroDonutChart'), { ssr: false });
 const HealthRadarChart = dynamic(() => import('@/components/dashboard/HealthRadarChart'), { ssr: false });
@@ -65,6 +102,38 @@ const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
   creatinine: 'Creatinine',
   uricAcid: 'Uric Acid',
   fastingInsulin: 'Fasting Insulin',
+};
+
+const MARKER_CONTEXT: Partial<
+  Record<
+    keyof BloodMarkers,
+    { description: string; affects: string; foods: string; retest: string }
+  >
+> = {
+  glucose: {
+    description: 'Fasting blood sugar reflects short-term glucose control and metabolic flexibility.',
+    affects: 'Refined carbs, sleep, stress, and physical activity.',
+    foods: 'Beans, oats, lentils, vegetables, and protein-forward meals.',
+    retest: '8-12 weeks after sustained diet/activity changes.',
+  },
+  hba1c: {
+    description: 'HbA1c estimates average glucose exposure over about 3 months.',
+    affects: 'Long-term eating patterns, insulin sensitivity, sleep, and stress.',
+    foods: 'High-fiber carbs, legumes, whole foods, and balanced meals.',
+    retest: 'Every ~3 months.',
+  },
+  ldl: {
+    description: 'LDL transports cholesterol and is associated with atherosclerotic risk when elevated.',
+    affects: 'Fat quality, body fat, activity, and genetics.',
+    foods: 'Oats, legumes, nuts, fish, and olive oil-focused patterns.',
+    retest: '8-12 weeks after targeted changes.',
+  },
+  hsCRP: {
+    description: 'hs-CRP is a sensitive marker of systemic inflammation.',
+    affects: 'Sleep debt, infection, stress load, body fat, and diet quality.',
+    foods: 'Fatty fish, berries, leafy greens, legumes, and olive oil.',
+    retest: '6-10 weeks once acute illness has resolved.',
+  },
 };
 
 const CATEGORIES: {
@@ -188,6 +257,78 @@ function getRangeNormalZone(key: keyof BloodMarkers, gender?: UserProfile['gende
   return { left, width: right - left };
 }
 
+function computeFoodSensitivityFlags(markers: BloodMarkers) {
+  const flags: FoodSensitivityFlag[] = [];
+
+  if (
+    markers.hsCRP !== undefined &&
+    markers.hsCRP > 3 &&
+    markers.alt !== undefined &&
+    markers.alt > 45
+  ) {
+    flags.push({
+      title: 'Inflammatory Diet Response Pattern',
+      markers: `hs-CRP ${markers.hsCRP} + ALT ${markers.alt}`,
+      suggestion:
+        'This pattern can reflect systemic inflammation with liver stress. Consider reducing ultra-processed foods, alcohol, and high omega-6 seed oils; prioritize whole-food anti-inflammatory meals and discuss follow-up labs with your clinician.',
+      severity: 'warning' as const,
+    });
+  }
+
+  if (
+    markers.ferritin !== undefined &&
+    markers.ferritin < 30 &&
+    markers.vitaminB12 !== undefined &&
+    markers.vitaminB12 < 350
+  ) {
+    flags.push({
+      title: 'Possible Absorption-Related Deficiency Pattern',
+      markers: `Ferritin ${markers.ferritin} + B12 ${markers.vitaminB12}`,
+      suggestion:
+        'Low ferritin with low B12 may indicate intake or absorption issues. Consider discussing evaluation for gastrointestinal causes (including celiac screening) and building meals with iron + B12-rich foods.',
+      severity: 'warning' as const,
+    });
+  }
+
+  if (
+    markers.triglycerides !== undefined &&
+    markers.triglycerides > 150 &&
+    markers.fastingInsulin !== undefined &&
+    markers.fastingInsulin > 15
+  ) {
+    flags.push({
+      title: 'Refined-Carb Sensitivity Pattern',
+      markers: `Triglycerides ${markers.triglycerides} + Fasting insulin ${markers.fastingInsulin}`,
+      suggestion:
+        'This pattern often improves with lower refined carbohydrate load. Shift toward higher-fiber carbs, protein-forward meals, and post-meal walking to blunt glucose and insulin spikes.',
+      severity: 'info' as const,
+    });
+  }
+
+  return flags;
+}
+
+function useCountUp(target: number, durationMs = 900) {
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    const startedAt = performance.now();
+    let rafId = 0;
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / durationMs);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.round(target * eased));
+      if (progress < 1) rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [target, durationMs]);
+
+  return value;
+}
+
 // ── Sub-components ──
 
 function ScoreRing({ score, size = 150 }: { score: number; size?: number }) {
@@ -231,20 +372,25 @@ function RangeBar({
   value,
   delay,
   gender,
+  onOpenDetails,
 }: {
   markerKey: keyof BloodMarkers;
   value: number;
   delay: number;
   gender?: UserProfile['gender'];
+  onOpenDetails: (markerKey: keyof BloodMarkers, value: number) => void;
 }) {
   const interp = getMarkerInterpretation(markerKey, value, gender);
   const style = getStatusStyle(interp.status);
   const needlePos = getRangePercent(markerKey, value, gender);
   const normalZone = getRangeNormalZone(markerKey, gender);
   const range = getMarkerDisplayRange(markerKey, gender);
+  const lowWidth = Math.max(0, normalZone.left);
+  const highStart = normalZone.left + normalZone.width;
+  const highWidth = Math.max(0, 100 - highStart);
 
   return (
-    <div className="space-y-1.5">
+    <button type="button" className="space-y-1.5 w-full text-left" onClick={() => onOpenDetails(markerKey, value)}>
       <div className="flex items-baseline justify-between">
         <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
           {MARKER_NAMES[markerKey]}
@@ -265,14 +411,32 @@ function RangeBar({
         </div>
       </div>
 
-      <div className="relative h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-light)' }}>
+      <div className="relative h-3 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-light)' }}>
+        <svg className="absolute inset-0 w-full h-full opacity-35" viewBox="0 0 100 24" preserveAspectRatio="none">
+          <path d="M0 24 C 18 22, 24 8, 32 8 C 40 8, 46 22, 64 24 C 76 25, 86 14, 100 10" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" />
+        </svg>
+        <div
+          className="absolute inset-y-0 left-0"
+          style={{
+            width: `${lowWidth}%`,
+            background: 'linear-gradient(90deg, color-mix(in srgb, var(--status-info) 28%, transparent), color-mix(in srgb, var(--status-info) 10%, transparent))',
+          }}
+        />
         <div
           className="absolute inset-y-0 rounded-full"
           style={{
             left: `${normalZone.left}%`,
             width: `${normalZone.width}%`,
-            backgroundColor: 'var(--status-normal-bg)',
+            background: 'linear-gradient(90deg, color-mix(in srgb, var(--status-normal) 32%, transparent), color-mix(in srgb, var(--status-normal) 16%, transparent))',
             border: '1px solid var(--status-normal-border)',
+          }}
+        />
+        <div
+          className="absolute inset-y-0"
+          style={{
+            left: `${highStart}%`,
+            width: `${highWidth}%`,
+            background: 'linear-gradient(90deg, color-mix(in srgb, var(--status-warning) 10%, transparent), color-mix(in srgb, var(--status-warning) 30%, transparent))',
           }}
         />
         <div
@@ -300,18 +464,19 @@ function RangeBar({
           {range ? `${range.maxLabel} ${range.unit}` : ''}
         </span>
       </div>
-    </div>
+    </button>
   );
 }
 
 function CategoryCard({
-  category, markers, score, delayBase, gender,
+  category, markers, score, delayBase, gender, onOpenDetails,
 }: {
   category: (typeof CATEGORIES)[number];
   markers: BloodMarkers;
   score: number;
   delayBase: number;
   gender?: UserProfile['gender'];
+  onOpenDetails: (markerKey: keyof BloodMarkers, value: number) => void;
 }) {
   const Icon = category.icon;
   const grade = getScoreGrade(score);
@@ -347,6 +512,7 @@ function CategoryCard({
             value={markers[key]!}
             delay={delayBase + i * 100}
             gender={gender}
+            onOpenDetails={onOpenDetails}
           />
         ))}
       </div>
@@ -366,7 +532,12 @@ function InsightCard({ insight, delay }: { insight: Insight; delay: number }) {
   return (
     <div
       className="anim-fade-up rounded-xl p-4 card-hover"
-      style={{ backgroundColor: cfg.bg, border: `1px solid ${cfg.border}`, animationDelay: `${delay}ms` }}
+      style={{
+        backgroundColor: cfg.bg,
+        border: `1px solid ${cfg.border}`,
+        animationDelay: `${delay}ms`,
+        boxShadow: insight.type === 'danger' ? `0 0 0 2px ${cfg.color}22` : undefined,
+      }}
     >
       <div className="flex gap-3">
         <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: cfg.color }} />
@@ -435,6 +606,66 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const foodFlags = computeFoodSensitivityFlags(markers);
+  const [activeMarker, setActiveMarker] = useState<{ key: keyof BloodMarkers; value: number } | null>(null);
+  const animatedOverallScore = useCountUp(healthScore.overall, 1100);
+  const countUpDidLogRef = useRef(false);
+
+  const prioritizedInsights = useMemo(() => {
+    const score = (insight: Insight) => {
+      let total = 0;
+      if (insight.type === 'danger') total += 100;
+      else if (insight.type === 'warning') total += 70;
+      else if (insight.type === 'success') total += 40;
+      else total += 20;
+      if (insight.recommendation) total += 25; // actionable over informational
+      return total;
+    };
+    return [...insights].sort((a, b) => score(b) - score(a));
+  }, [insights]);
+
+  const topFocusInsights = prioritizedInsights.slice(0, 3);
+  const actionableInsights = prioritizedInsights.filter((i) => i.recommendation);
+  const informationalInsights = prioritizedInsights.filter((i) => !i.recommendation);
+
+  // #region debug logs for feature verification
+  useEffect(() => {
+    if (countUpDidLogRef.current) return;
+    if (animatedOverallScore >= healthScore.overall && healthScore.overall > 0) {
+      countUpDidLogRef.current = true;
+      debugLog({
+        hypothesisId: 'Q11_score_countup',
+        location: 'components/BloodTestDashboard.tsx:score_countup_complete',
+        message: 'Score count-up reached target',
+        data: { target: healthScore.overall, final: animatedOverallScore },
+      });
+    }
+  }, [animatedOverallScore, healthScore.overall]);
+
+  useEffect(() => {
+    debugLog({
+      hypothesisId: 'Q13_insight_sort',
+      location: 'components/BloodTestDashboard.tsx:prioritized_insights',
+      message: 'Insights prioritized & grouped',
+      data: {
+        total: prioritizedInsights.length,
+        topFocus: topFocusInsights.length,
+        actionable: actionableInsights.length,
+        informational: informationalInsights.length,
+      },
+    });
+  }, [prioritizedInsights.length, topFocusInsights.length, actionableInsights.length, informationalInsights.length]);
+  // #endregion
+
+  const handleOpenMarkerDetails = (key: keyof BloodMarkers, value: number) => {
+    debugLog({
+      hypothesisId: 'Q12_marker_detail',
+      location: 'components/BloodTestDashboard.tsx:open_marker_details',
+      message: 'Opened marker detail drawer',
+      data: { marker: key, value },
+    });
+    setActiveMarker({ key, value });
+  };
 
   const handleDownloadPDF = async () => {
     setDownloadError(null);
@@ -856,7 +1087,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] mb-4" style={{ color: 'var(--text-tertiary)' }}>
                     Health Score
                   </p>
-                  <ScoreRing score={healthScore.overall} />
+                  <ScoreRing score={animatedOverallScore} />
                 </div>
               )}
 
@@ -996,6 +1227,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                   score={healthScore[cat.scoreKey]}
                   delayBase={400 + i * 150}
                   gender={profile.gender}
+                  onOpenDetails={handleOpenMarkerDetails}
                 />
               </div>
             ))}
@@ -1007,6 +1239,13 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
           <RecommendationsPanel recs={recommendations} />
         </div>
 
+        {/* 6b. Food sensitivity pattern flags */}
+        {!usedAverageMarkers && foodFlags.length > 0 && (
+          <div className="mt-8 anim-fade-up delay-9">
+            <FoodSensitivityCard flags={foodFlags} />
+          </div>
+        )}
+
         {/* 7. Flags */}
         {!usedAverageMarkers && (deficiencies.length > 0 || risks.length > 0) && (
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 anim-fade-up delay-10">
@@ -1016,15 +1255,50 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
         )}
 
         {/* 8. Insights */}
-        {!usedAverageMarkers && insights.length > 0 && (
+        {!usedAverageMarkers && prioritizedInsights.length > 0 && (
           <div className="mt-8 anim-fade-up">
+            {topFocusInsights.length > 0 && (
+              <div className="rounded-xl p-4 mb-4" style={{ background: 'var(--status-warning-bg)', border: '1px solid var(--status-warning-border)' }}>
+                <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Top 3 Things To Focus On
+                </h3>
+                <div className="space-y-1.5">
+                  {topFocusInsights.map((insight) => (
+                    <p key={`focus-${insight.title}`} className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      - {insight.title}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
             <h2 className="font-display text-xl mb-4" style={{ color: 'var(--text-primary)' }}>
               Insights & Recommendations
             </h2>
-            <div className="space-y-3">
-              {insights.map((insight, i) => (
-                <InsightCard key={i} insight={insight} delay={600 + i * 80} />
-              ))}
+            <div className="space-y-4">
+              {actionableInsights.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: 'var(--text-tertiary)' }}>
+                    Actionable
+                  </h3>
+                  <div className="space-y-3">
+                    {actionableInsights.map((insight, i) => (
+                      <InsightCard key={`act-${i}`} insight={insight} delay={600 + i * 80} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {informationalInsights.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: 'var(--text-tertiary)' }}>
+                    Informational
+                  </h3>
+                  <div className="space-y-3">
+                    {informationalInsights.map((insight, i) => (
+                      <InsightCard key={`info-${i}`} insight={insight} delay={800 + i * 80} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1037,6 +1311,60 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
           </p>
         </div>
       </div>
+
+      {activeMarker && (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/35"
+            onClick={() => setActiveMarker(null)}
+            aria-label="Close marker details"
+          />
+          <div
+            className="absolute inset-x-0 bottom-0 rounded-t-3xl p-5 md:max-w-xl md:mx-auto anim-fade-up"
+            style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+          >
+            <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ backgroundColor: 'var(--border)' }} />
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  {MARKER_NAMES[activeMarker.key]}
+                </h3>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                  Current value: {activeMarker.value} {getMarkerUnit(activeMarker.key) ?? ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveMarker(null)}
+                className="text-xs font-semibold px-2.5 py-1 rounded-md"
+                style={{ background: 'var(--border-light)', color: 'var(--text-secondary)' }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2 text-sm">
+              <p style={{ color: 'var(--text-secondary)' }}>
+                <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>What this marker measures:</span>{' '}
+                {MARKER_CONTEXT[activeMarker.key]?.description ?? 'This marker helps evaluate your metabolic and cardiometabolic health profile.'}
+              </p>
+              <p style={{ color: 'var(--text-secondary)' }}>
+                <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>What affects it:</span>{' '}
+                {MARKER_CONTEXT[activeMarker.key]?.affects ?? 'Nutrition quality, exercise, sleep quality, stress load, and medications.'}
+              </p>
+              <p style={{ color: 'var(--text-secondary)' }}>
+                <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Foods that help improve it:</span>{' '}
+                {MARKER_CONTEXT[activeMarker.key]?.foods ?? 'Whole-food meals with more fiber, lean proteins, and anti-inflammatory fats.'}
+              </p>
+              <p style={{ color: 'var(--text-secondary)' }}>
+                <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>When to retest:</span>{' '}
+                {MARKER_CONTEXT[activeMarker.key]?.retest ?? 'Usually 8-12 weeks after consistent lifestyle changes.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

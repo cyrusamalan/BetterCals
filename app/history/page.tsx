@@ -23,6 +23,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import type { AnalysisHistory, BloodMarkers } from '@/types';
+import { getMarkerInterpretation } from '@/lib/bloodParser';
 
 const MARKER_LABELS: Record<keyof BloodMarkers, string> = {
   glucose: 'Glucose (mg/dL)',
@@ -66,6 +67,8 @@ export default function HistoryPage() {
   const [analyses, setAnalyses] = useState<AnalysisHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [compareAId, setCompareAId] = useState<number | null>(null);
+  const [compareBId, setCompareBId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -89,6 +92,13 @@ export default function HistoryPage() {
 
     fetchAnalyses();
   }, [isSignedIn, isLoaded]);
+
+  useEffect(() => {
+    if (analyses.length >= 2 && (compareAId === null || compareBId === null)) {
+      setCompareAId(analyses[1].id);
+      setCompareBId(analyses[0].id);
+    }
+  }, [analyses, compareAId, compareBId]);
 
   // Chronological order for charts (oldest first)
   const chronological = useMemo(() => [...analyses].reverse(), [analyses]);
@@ -135,6 +145,49 @@ export default function HistoryPage() {
 
     return trends;
   }, [chronological]);
+
+  const compareA = useMemo(
+    () => analyses.find((a) => a.id === compareAId) ?? null,
+    [analyses, compareAId]
+  );
+  const compareB = useMemo(
+    () => analyses.find((a) => a.id === compareBId) ?? null,
+    [analyses, compareBId]
+  );
+
+  const comparisonRows = useMemo(() => {
+    if (!compareA || !compareB) return [];
+    const keys = Object.keys(MARKER_LABELS) as (keyof BloodMarkers)[];
+    const rows: {
+      key: keyof BloodMarkers;
+      label: string;
+      aVal: number;
+      bVal: number;
+      delta: number;
+      direction: 'improved' | 'worse' | 'unchanged';
+    }[] = [];
+
+    for (const key of keys) {
+      const aVal = compareA.markers[key];
+      const bVal = compareB.markers[key];
+      if (aVal === undefined || bVal === undefined) continue;
+      const aScore = getMarkerInterpretation(key, aVal, compareA.profile.gender).score;
+      const bScore = getMarkerInterpretation(key, bVal, compareB.profile.gender).score;
+      const delta = Number((bVal - aVal).toFixed(1));
+      let direction: 'improved' | 'worse' | 'unchanged' = 'unchanged';
+      if (bScore > aScore) direction = 'improved';
+      if (bScore < aScore) direction = 'worse';
+      rows.push({ key, label: MARKER_LABELS[key], aVal, bVal, delta, direction });
+    }
+
+    return rows.sort((x, y) => {
+      if (x.direction === y.direction) return Math.abs(y.delta) - Math.abs(x.delta);
+      if (x.direction === 'worse') return -1;
+      if (y.direction === 'worse') return 1;
+      if (x.direction === 'improved') return -1;
+      return 1;
+    });
+  }, [compareA, compareB]);
 
   // --- Render states ---
 
@@ -292,6 +345,109 @@ export default function HistoryPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 pb-12 space-y-6">
+        {/* Comparison mode */}
+        {analyses.length >= 2 && (
+          <div
+            className="relative overflow-hidden rounded-2xl noise"
+            style={{
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03)',
+            }}
+          >
+            <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Comparison Mode
+              </h3>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                Compare two saved analyses side by side with improvement/regression markers.
+              </p>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  Analysis A
+                  <select
+                    className="select-field mt-1"
+                    value={compareAId ?? ''}
+                    onChange={(e) => setCompareAId(Number(e.target.value))}
+                  >
+                    {analyses.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {formatDate(a.createdAt)} - Score {a.result.healthScore.overall}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  Analysis B
+                  <select
+                    className="select-field mt-1"
+                    value={compareBId ?? ''}
+                    onChange={(e) => setCompareBId(Number(e.target.value))}
+                  >
+                    {analyses.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {formatDate(a.createdAt)} - Score {a.result.healthScore.overall}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {compareA && compareB && (
+                <div className="rounded-xl p-3" style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div style={{ color: 'var(--text-tertiary)' }}>Overall score</div>
+                    <div style={{ color: 'var(--text-primary)' }}>{compareA.result.healthScore.overall}</div>
+                    <div style={{ color: 'var(--text-primary)' }}>{compareB.result.healthScore.overall}</div>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2 max-h-[340px] overflow-auto pr-1">
+                {comparisonRows.length === 0 ? (
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                    No overlapping markers between the selected analyses.
+                  </p>
+                ) : (
+                  comparisonRows.map((row) => {
+                    const badgeColor =
+                      row.direction === 'improved'
+                        ? 'var(--status-normal)'
+                        : row.direction === 'worse'
+                          ? 'var(--status-danger)'
+                          : 'var(--text-tertiary)';
+                    const icon =
+                      row.direction === 'improved' ? '↑' : row.direction === 'worse' ? '↓' : '→';
+                    return (
+                      <div
+                        key={row.key}
+                        className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center rounded-lg px-3 py-2"
+                        style={{ border: '1px solid var(--border-light)' }}
+                      >
+                        <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                          {row.label}
+                        </span>
+                        <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                          {row.aVal}
+                        </span>
+                        <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                          {row.bVal}
+                        </span>
+                        <span className="text-xs font-semibold tabular-nums" style={{ color: badgeColor }}>
+                          {icon} {row.delta > 0 ? '+' : ''}
+                          {row.delta}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Health Score Trend */}
         {healthScoreTrend.length >= 2 && (
           <div
