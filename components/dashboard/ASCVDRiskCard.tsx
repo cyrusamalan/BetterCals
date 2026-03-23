@@ -4,10 +4,12 @@ export default function ASCVDRiskCard({
   ascvdRiskScore,
   age,
   hasLipids,
+  race,
 }: {
   ascvdRiskScore: number | undefined;
   age: number;
   hasLipids: boolean;
+  race?: 'white' | 'black' | 'other';
 }) {
   const outOfRange = age < 40 || age > 79;
 
@@ -81,6 +83,11 @@ export default function ASCVDRiskCard({
               <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
                 This is an estimate (not a diagnosis). Discuss cardiovascular risk with your clinician.
               </p>
+              {race && race !== 'white' && race !== 'black' && (
+                <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
+                  Note: This model was developed for White and African-American populations and may be less accurate for other groups.
+                </p>
+              )}
             </div>
 
             <div className="hidden sm:block">

@@ -21,25 +21,21 @@ function feetInchesToCm(feet: number, inches: number): number {
 }
 
 export function calculateTDEE(profile: UserProfile): TDEEResult {
-  // Validate input ranges to catch errors early
-  if (profile.weightLbs < 40 || profile.weightLbs > 700) {
-    console.error(`⚠️ Invalid weight detected: ${profile.weightLbs} lbs. Expected 40-700 lbs.`);
-  }
-  if (profile.age < 13 || profile.age > 120) {
-    console.error(`⚠️ Invalid age detected: ${profile.age}. Expected 13-120 years.`);
-  }
+  // Clamp inputs to valid ranges to prevent garbage results
+  const weight = Math.max(40, Math.min(700, profile.weightLbs));
+  const age = Math.max(13, Math.min(120, profile.age));
   
   // Convert imperial to metric for calculation
-  const weightKg = lbsToKg(profile.weightLbs);
+  const weightKg = lbsToKg(weight);
   const heightCm = feetInchesToCm(profile.heightFeet, profile.heightInches);
-  
+
   // Mifflin-St Jeor Equation
   let bmr: number;
-  
+
   if (profile.gender === 'male') {
-    bmr = 10 * weightKg + 6.25 * heightCm - 5 * profile.age + 5;
+    bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
   } else {
-    bmr = 10 * weightKg + 6.25 * heightCm - 5 * profile.age - 161;
+    bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
   }
 
   const activityMultiplier = ACTIVITY_MULTIPLIERS[profile.activityLevel];
@@ -245,13 +241,21 @@ export function identifyRisks(markers: BloodMarkers, profile: Pick<UserProfile, 
 }
 
 export function calculateCalorieTiers(tdee: number): CalorieTier[] {
+  const floor = 1200;
+  const makeTier = (label: string, weeklyChange: string, targetDeficit: number): CalorieTier => {
+    const dailyCalories = Math.max(floor, Math.round(tdee + targetDeficit));
+    // Reflect the actual deficit after the floor is applied
+    const dailyDeficit = dailyCalories - Math.round(tdee);
+    return { label, weeklyChange, dailyCalories, dailyDeficit };
+  };
+
   return [
-    { label: 'Lose 1.5 lb/wk', weeklyChange: '-1.5 lb', dailyCalories: Math.max(1200, Math.round(tdee - 750)), dailyDeficit: -750 },
-    { label: 'Lose 1 lb/wk', weeklyChange: '-1 lb', dailyCalories: Math.max(1200, Math.round(tdee - 500)), dailyDeficit: -500 },
-    { label: 'Lose 0.5 lb/wk', weeklyChange: '-0.5 lb', dailyCalories: Math.max(1200, Math.round(tdee - 250)), dailyDeficit: -250 },
-    { label: 'Maintain', weeklyChange: '0 lb', dailyCalories: Math.round(tdee), dailyDeficit: 0 },
-    { label: 'Gain 0.5 lb/wk', weeklyChange: '+0.5 lb', dailyCalories: Math.round(tdee + 250), dailyDeficit: 250 },
-    { label: 'Gain 1 lb/wk', weeklyChange: '+1 lb', dailyCalories: Math.round(tdee + 500), dailyDeficit: 500 },
+    makeTier('Lose 1.5 lb/wk', '-1.5 lb', -750),
+    makeTier('Lose 1 lb/wk', '-1 lb', -500),
+    makeTier('Lose 0.5 lb/wk', '-0.5 lb', -250),
+    makeTier('Maintain', '0 lb', 0),
+    makeTier('Gain 0.5 lb/wk', '+0.5 lb', 250),
+    makeTier('Gain 1 lb/wk', '+1 lb', 500),
   ];
 }
 
