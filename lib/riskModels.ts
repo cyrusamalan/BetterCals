@@ -68,12 +68,19 @@ function clamp01(x: number) {
   return Math.max(0, Math.min(1, x));
 }
 
+interface PCEInputs {
+  lnAge: number;
+  lnTC: number;
+  lnHDL: number;
+  lnSBP: number;
+  treatedSbp: number;
+  smoker: number;
+  diabetes: number;
+}
+
 /** Compute the individual sum using PCE coefficients and log-transformed inputs. */
-function computePCESum(
-  coef: PCECoefficients,
-  lnAge: number, lnTC: number, lnHDL: number, lnSBP: number,
-  treatedSbp: number, smoker: number, diabetes: number,
-): number {
+function computePCESum(coef: PCECoefficients, inp: PCEInputs): number {
+  const { lnAge, lnTC, lnHDL, lnSBP, treatedSbp, smoker, diabetes } = inp;
   return (
     coef.lnAge * lnAge +
     coef.lnAgeSq * (lnAge * lnAge) +
@@ -141,14 +148,16 @@ export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers):
   const race: Race = profile.race === 'black' ? 'black' : 'white';
   const coef = COEFFICIENTS[`${race}_${profile.gender}`];
 
-  const lnAge = ln(profile.age);
-  const lnTC = ln(markers.totalCholesterol!);
-  const lnHDL = ln(markers.hdl!);
-  const lnSBP = ln(profile.bloodPressureSystolic!);
-  const smoker = profile.smoker ? 1 : 0;
-  const diabetes = profile.diabetic ? 1 : 0;
-  const treatedSbp = profile.treatedForHypertension ? 1 : 0;
+  const inputs: PCEInputs = {
+    lnAge: ln(profile.age),
+    lnTC: ln(markers.totalCholesterol!),
+    lnHDL: ln(markers.hdl!),
+    lnSBP: ln(profile.bloodPressureSystolic!),
+    smoker: profile.smoker ? 1 : 0,
+    diabetes: profile.diabetic ? 1 : 0,
+    treatedSbp: profile.treatedForHypertension ? 1 : 0,
+  };
 
-  const sum = computePCESum(coef, lnAge, lnTC, lnHDL, lnSBP, treatedSbp, smoker, diabetes);
+  const sum = computePCESum(coef, inputs);
   return { risk: pceRisk(coef, sum) };
 }
