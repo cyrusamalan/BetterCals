@@ -283,16 +283,19 @@ export function calculateWaistToHipRatio(
 ): { ratio: number; interpretation: string } {
   const ratio = Math.round((waistInches / hipInches) * 100) / 100;
   let interpretation: string;
-  // WHO waist-to-hip ratio thresholds
-  if (gender === 'male') {
-    if (ratio < 0.9) interpretation = 'Normal';
-    else if (ratio < 0.95) interpretation = 'Elevated';
-    else interpretation = 'High Risk';
+  // WHO waist-to-hip ratio thresholds (male vs female)
+  if (gender === 'male' && ratio < 0.9) {
+    interpretation = 'Normal';
+  } else if (gender === 'male' && ratio < 0.95) {
+    interpretation = 'Elevated';
+  } else if (gender === 'male') {
+    interpretation = 'High Risk';
+  } else if (ratio < 0.8) {
+    interpretation = 'Normal';
+  } else if (ratio < 0.85) {
+    interpretation = 'Elevated';
   } else {
-    // female thresholds
-    if (ratio < 0.8) interpretation = 'Normal';
-    else if (ratio < 0.85) interpretation = 'Elevated';
-    else interpretation = 'High Risk';
+    interpretation = 'High Risk';
   }
   return { ratio, interpretation };
 }
