@@ -98,7 +98,8 @@ export interface CalorieTier {
   label: string;
   weeklyChange: string;
   dailyCalories: number;
-  dailyDeficit: number;
+  /** Daily calorie change from TDEE (negative = deficit, positive = surplus) */
+  dailyChange: number;
 }
 
 export interface MacroBreakdown {
@@ -138,6 +139,7 @@ export interface AnalysisResult {
   macros: MacroBreakdown;
   recommendations: PersonalizedRecs;
   ascvdRiskScore?: number;
+  ascvdRiskReason?: string;
   usedAverageMarkers?: boolean;
 }
 

@@ -2,6 +2,11 @@ import type { BloodMarkers, UserProfile } from '@/types';
 
 type Sex = UserProfile['gender'];
 
+export interface ASCVDResult {
+  risk: number | null;
+  reason?: string;
+}
+
 function ln(x: number) {
   return Math.log(x);
 }
@@ -14,7 +19,7 @@ function clamp01(x: number) {
  * ACC/AHA Pooled Cohort Equations (2013) — simplified implementation.
  *
  * Inputs:
- * - Official model is validated for ages 40–79; we return null if out of bounds.
+ * - Official model is validated for ages 40–79; returns null with reason if out of bounds.
  * - Uses: age, sex, total cholesterol, HDL, systolic BP, smoker, diabetes, and BP treatment.
  * - If optional clinical fields are missing:
  *   - smoker defaults to false (conservative)
@@ -24,19 +29,19 @@ function clamp01(x: number) {
  *
  * Notes:
  * - The full published model is race-specific (White/Black) and includes SBP treatment status.
- * - Because `UserProfile` does not include race, this implements the "White" sex-specific coefficients.
+ * - Non-White/non-Black races use White coefficients (model limitation).
  *
  * Returns:
- * - Risk as a percentage (0–100), e.g. 7.5 means 7.5% 10-year risk.
+ * - { risk, reason } — risk as percentage (0–100), or null with an explanation.
  */
-export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers): number | null {
+export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers): ASCVDResult {
   const age = profile.age;
-  if (age < 40 || age > 79) return null;
+  if (age < 40 || age > 79) return { risk: null, reason: 'ASCVD risk modeling is validated only for ages 40–79.' };
 
   const tc = markers.totalCholesterol;
   const hdl = markers.hdl;
-  if (tc === undefined || hdl === undefined) return null;
-  if (!(tc > 0) || !(hdl > 0)) return null;
+  if (tc === undefined || hdl === undefined) return { risk: null, reason: 'Total Cholesterol and HDL are required to calculate ASCVD risk.' };
+  if (!(tc > 0) || !(hdl > 0)) return { risk: null, reason: 'Total Cholesterol and HDL must be positive values.' };
 
   const sex: Sex = profile.gender;
   // Default to white coefficients when race is not specified
@@ -44,7 +49,7 @@ export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers):
 
   // Blood pressure is required for ASCVD — do not assume a default
   const sbp = profile.bloodPressureSystolic;
-  if (sbp === undefined || sbp === null || !(sbp > 0)) return null;
+  if (sbp === undefined || sbp === null || !(sbp > 0)) return { risk: null, reason: 'Systolic blood pressure is required to calculate ASCVD risk.' };
   const smoker = profile.smoker ? 1 : 0;
   const diabetes = profile.diabetic ? 1 : 0;
   const treatedSbp = profile.treatedForHypertension ? 1 : 0;
@@ -83,7 +88,7 @@ export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers):
       coef.diabetes * diabetes;
 
     const risk = 1 - Math.pow(coef.s0_10, Math.exp(sum - coef.meanX));
-    return Math.round(clamp01(risk) * 1000) / 10;
+    return { risk: Math.round(clamp01(risk) * 1000) / 10 };
   }
 
   if (race === 'black' && sex === 'female') {
@@ -113,7 +118,7 @@ export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers):
       coef.diabetes * diabetes;
 
     const risk = 1 - Math.pow(coef.s0_10, Math.exp(sum - coef.meanX));
-    return Math.round(clamp01(risk) * 1000) / 10;
+    return { risk: Math.round(clamp01(risk) * 1000) / 10 };
   }
 
   if (sex === 'male') {
@@ -146,7 +151,7 @@ export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers):
       coef.diabetes * diabetes;
 
     const risk = 1 - Math.pow(coef.s0_10, Math.exp(sum - coef.meanX));
-    return Math.round(clamp01(risk) * 1000) / 10;
+    return { risk: Math.round(clamp01(risk) * 1000) / 10 };
   }
 
   // White women
@@ -179,6 +184,6 @@ export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers):
     coef.diabetes * diabetes;
 
   const risk = 1 - Math.pow(coef.s0_10, Math.exp(sum - coef.meanX));
-  return Math.round(clamp01(risk) * 1000) / 10;
+  return { risk: Math.round(clamp01(risk) * 1000) / 10 };
 }
 

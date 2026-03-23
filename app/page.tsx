@@ -14,6 +14,7 @@ import {
   BloodMarkers,
   AnalysisResult
 } from '@/types';
+import { isPlausibleValue } from '@/lib/bloodParser';
 import {
   calculateTDEE,
   calculateHealthScore,
@@ -32,8 +33,9 @@ type Step = 'profile' | 'blood' | 'results';
 function sanitizeBloodMarkers(input: BloodMarkers): BloodMarkers {
   const cleaned: BloodMarkers = {};
   for (const [key, value] of Object.entries(input)) {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      cleaned[key as keyof BloodMarkers] = value;
+    const k = key as keyof BloodMarkers;
+    if (typeof value === 'number' && Number.isFinite(value) && isPlausibleValue(k, value)) {
+      cleaned[k] = value;
     }
   }
   return cleaned;
@@ -55,12 +57,22 @@ export default function Home() {
       const savedMarkers = localStorage.getItem('bettercals_markers');
       const savedResult = localStorage.getItem('bettercals_result');
 
-      if (savedStep === 'profile' || savedStep === 'blood' || savedStep === 'results') {
-        setStep(savedStep);
+      const parsedProfile = savedProfile ? JSON.parse(savedProfile) as UserProfile : null;
+      const parsedMarkers = savedMarkers ? JSON.parse(savedMarkers) as BloodMarkers : {};
+      const parsedResult = savedResult ? JSON.parse(savedResult) as AnalysisResult : null;
+
+      if (parsedProfile) setProfile(parsedProfile);
+      if (savedMarkers) setMarkers(parsedMarkers);
+      if (parsedResult) setResult(parsedResult);
+
+      // Validate state coherence: only restore step if the required data exists
+      if (savedStep === 'results' && parsedProfile && parsedResult) {
+        setStep('results');
+      } else if (savedStep === 'blood' && parsedProfile) {
+        setStep('blood');
+      } else {
+        setStep('profile');
       }
-      if (savedProfile) setProfile(JSON.parse(savedProfile) as UserProfile);
-      if (savedMarkers) setMarkers(JSON.parse(savedMarkers) as BloodMarkers);
-      if (savedResult) setResult(JSON.parse(savedResult) as AnalysisResult);
     } catch {
       // If localStorage is corrupted, fail safe and start fresh.
       try {
@@ -114,7 +126,7 @@ export default function Home() {
       const healthScore = calculateHealthScore(mergedMarkers, { gender: profile.gender });
       const insights = usedAverageMarkers ? [] : generateInsights(profile, tdee, mergedMarkers);
       const deficiencies = usedAverageMarkers ? [] : identifyDeficiencies(mergedMarkers, profile);
-      const ascvdRiskScore = usedAverageMarkers ? undefined : calculateASCVDRiskScore(profile, mergedMarkers) ?? undefined;
+      const ascvdResult = usedAverageMarkers ? { risk: null, reason: undefined } : calculateASCVDRiskScore(profile, mergedMarkers);
 
       setResult({
         tdee,
@@ -125,7 +137,8 @@ export default function Home() {
         calorieTiers: calculateCalorieTiers(tdee.tdee),
         macros: calculateMacros(tdee.targetCalories, profile.goal),
         recommendations: calculateRecommendations(profile, mergedMarkers, deficiencies),
-        ascvdRiskScore,
+        ascvdRiskScore: ascvdResult.risk ?? undefined,
+        ascvdRiskReason: ascvdResult.reason,
         usedAverageMarkers,
       });
 
@@ -193,12 +206,14 @@ export default function Home() {
   }
 
   // ── Results: full-page dashboard takeover ──
-  if (step === 'results' && result) {
+  // State coherence check: results step requires both profile and result.
+  // If profile is missing (e.g. corrupted localStorage), fall back to profile step.
+  if (step === 'results' && result && profile) {
     return (
       <BloodTestDashboard
         result={result}
         markers={markers}
-        profile={profile!}
+        profile={profile}
         onReset={handleReset}
         onEditProfile={handleEditProfile}
       />
