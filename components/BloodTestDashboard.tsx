@@ -80,6 +80,7 @@ interface BloodTestDashboardProps {
   profile: UserProfile;
   onReset: () => void;
   onEditProfile?: () => void;
+  resetLabel?: string;
 }
 
 const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
@@ -566,7 +567,7 @@ function FlagSection({ title, items, variant }: { title: string; items: string[]
 
 // ── Main Dashboard ──
 
-export default function BloodTestDashboard({ result, markers, profile, onReset, onEditProfile }: BloodTestDashboardProps) {
+export default function BloodTestDashboard({ result, markers, profile, onReset, onEditProfile, resetLabel = 'New Analysis' }: BloodTestDashboardProps) {
   const { isSignedIn } = useAuth();
   const { tdee, healthScore, insights, deficiencies, risks, calorieTiers, macros, recommendations } = result;
   const grade = getScoreGrade(healthScore.overall);
@@ -787,7 +788,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
               style={{ color: 'var(--text-secondary)' }}
             >
               <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" style={{ color: 'var(--text-tertiary)' }} />
-              New Analysis
+              {resetLabel}
             </button>
             <div className="flex items-center gap-3">
               <button

@@ -12,6 +12,7 @@ import {
   Loader2,
   FolderOpen,
   AlertCircle,
+  ChevronRight,
 } from 'lucide-react';
 import {
   LineChart,
@@ -635,9 +636,10 @@ export default function HistoryPage() {
               const { result, profile } = analysis;
               const bmi = result.recommendations?.bmi;
               return (
-                <div
+                <Link
                   key={analysis.id}
-                  className="relative overflow-hidden rounded-2xl noise"
+                  href={`/history/${analysis.id}`}
+                  className="block relative overflow-hidden rounded-2xl noise transition-all hover:scale-[1.01]"
                   style={{
                     backgroundColor: 'var(--surface)',
                     border: '1px solid var(--border)',
@@ -658,15 +660,18 @@ export default function HistoryPage() {
                           {profile.weightLbs} lbs
                         </p>
                       </div>
-                      <div
-                        className="flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold"
-                        style={{
-                          backgroundColor: scoreColor(result.healthScore.overall, 0.12),
-                          color: scoreColor(result.healthScore.overall, 1),
-                        }}
-                      >
-                        <Activity className="w-3.5 h-3.5" />
-                        {result.healthScore.overall}
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold"
+                          style={{
+                            backgroundColor: scoreColor(result.healthScore.overall, 0.12),
+                            color: scoreColor(result.healthScore.overall, 1),
+                          }}
+                        >
+                          <Activity className="w-3.5 h-3.5" />
+                          {result.healthScore.overall}
+                        </div>
+                        <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
                       </div>
                     </div>
 
@@ -679,7 +684,7 @@ export default function HistoryPage() {
                       )}
                     </div>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>
