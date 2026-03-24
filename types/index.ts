@@ -134,6 +134,8 @@ export interface PersonalizedRecs {
   waistToHipInterpretation: string | null;
   homaIR: number | null;
   homaIRInterpretation: string | null;
+  tyg: number | null;
+  tygInterpretation: string | null;
   supplements: SupplementRec[];
   exerciseSuggestions: string[];
   mealTiming: MealTimingSuggestion[];

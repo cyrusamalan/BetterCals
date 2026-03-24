@@ -345,6 +345,25 @@ export function calculateRecommendations(
     else homaIRInterpretation = 'Significant Insulin Resistance';
   }
 
+  // TyG index (Triglyceride-Glucose index)
+  // Common form: TyG = ln( (TG [mg/dL] * glucose [mg/dL]) / 2 )
+  // We only show TyG when TG + glucose + HDL are all present (complete lipid + glucose panel context).
+  let tyg: number | null = null;
+  let tygInterpretation: string | null = null;
+  if (
+    markers.triglycerides !== undefined &&
+    markers.glucose !== undefined &&
+    markers.hdl !== undefined &&
+    markers.triglycerides > 0 &&
+    markers.glucose > 0 &&
+    markers.hdl > 0
+  ) {
+    tyg = Math.round(Math.log((markers.triglycerides * markers.glucose) / 2) * 100) / 100;
+    if (tyg < 8.0) tygInterpretation = 'Low Insulin Resistance Risk';
+    else if (tyg < 9.0) tygInterpretation = 'Moderate Insulin Resistance Risk';
+    else tygInterpretation = 'High Insulin Resistance Risk';
+  }
+
   // Supplements from deficiencies
   const supplementMap: Record<string, { dosage: string; reason: string }> = {
     'Vitamin D': { dosage: '2000-4000 IU daily', reason: 'Low vitamin D levels' },
@@ -400,6 +419,8 @@ export function calculateRecommendations(
     tgHdlInterpretation,
     homaIR,
     homaIRInterpretation,
+    tyg,
+    tygInterpretation,
     waistToHipRatio,
     waistToHipInterpretation,
     supplements,
@@ -453,28 +474,45 @@ function calculateMealTiming(
 export function deriveMarkers(markers: BloodMarkers): { ldl?: number; nonHdl?: number } {
   const derived: { ldl?: number; nonHdl?: number } = {};
 
-  // Friedewald LDL: LDL = TC - HDL - (TG / 5), valid only when TG < 400
-  if (
-    markers.ldl === undefined &&
-    markers.totalCholesterol !== undefined &&
-    markers.hdl !== undefined &&
-    markers.triglycerides !== undefined &&
-    markers.triglycerides < 400
-  ) {
-    const ldl = Math.round(markers.totalCholesterol - markers.hdl - markers.triglycerides / 5);
-    if (ldl >= 0) {
-      derived.ldl = ldl;
-    }
-  }
-
-  // Non-HDL = TC - HDL
+  // Non-HDL = TC - HDL (only when HDL sanity-check passes)
   if (
     markers.nonHdl === undefined &&
     markers.totalCholesterol !== undefined &&
     markers.hdl !== undefined &&
     markers.hdl <= markers.totalCholesterol
   ) {
-    derived.nonHdl = Math.round(markers.totalCholesterol - markers.hdl);
+    const nonHdl = Math.round(markers.totalCholesterol - markers.hdl);
+    if (Number.isFinite(nonHdl) && nonHdl >= 0) derived.nonHdl = nonHdl;
+  }
+
+  // LDL: try Friedewald first, then fall back to Iranian formula when Friedewald is invalid/unreliable.
+  if (markers.ldl === undefined) {
+    const tc = markers.totalCholesterol;
+    const hdl = markers.hdl;
+    const tg = markers.triglycerides;
+
+    if (tc !== undefined && hdl !== undefined && tg !== undefined) {
+      let friedewaldValid = false;
+      let friedewaldLdl: number | null = null;
+
+      if (tg < 400) {
+        const derivedFried = Math.round(tc - hdl - tg / 5);
+        if (Number.isFinite(derivedFried) && derivedFried > 0) {
+          friedewaldValid = true;
+          friedewaldLdl = derivedFried;
+        }
+      }
+
+      if (friedewaldValid && friedewaldLdl !== null) {
+        derived.ldl = friedewaldLdl;
+      } else {
+        // Iranian LDL formula (works better when TG is higher).
+        const derivedIranian = Math.round(tc / 1.19 + tg / 1.9 - hdl / 1.1 - 38);
+        if (Number.isFinite(derivedIranian) && derivedIranian > 0) {
+          derived.ldl = derivedIranian;
+        }
+      }
+    }
   }
 
   return derived;

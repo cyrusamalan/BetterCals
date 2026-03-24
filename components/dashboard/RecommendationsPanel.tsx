@@ -1,7 +1,7 @@
 'use client';
 
 import { PersonalizedRecs } from '@/types';
-import { Activity, Droplets, Scale, HeartPulse, Pill, Dumbbell, Clock, Utensils } from 'lucide-react';
+import { Activity, Droplets, Scale, HeartPulse, Pill, Dumbbell, Clock, Utensils, Flame } from 'lucide-react';
 
 interface RecommendationsPanelProps {
   recs: PersonalizedRecs;
@@ -29,6 +29,9 @@ function getRatioColor(interpretation: string | undefined | null): string {
   if (interpretation === 'Borderline' || interpretation === 'Elevated') return 'var(--status-warning)';
   if (interpretation === 'Early Insulin Resistance') return 'var(--status-warning)';
   if (interpretation === 'Significant Insulin Resistance') return 'var(--status-danger)';
+  if (interpretation === 'Low Insulin Resistance Risk') return 'var(--status-normal)';
+  if (interpretation === 'Moderate Insulin Resistance Risk') return 'var(--status-warning)';
+  if (interpretation === 'High Insulin Resistance Risk') return 'var(--status-danger)';
   if (interpretation.startsWith('High Risk')) return 'var(--status-danger)';
   return 'var(--text-secondary)';
 }
@@ -114,7 +117,8 @@ export default function RecommendationsPanel({ recs }: RecommendationsPanelProps
         {/* Ratios */}
         {(recs.ldlHdlRatio !== null && recs.ldlHdlInterpretation !== null) ||
         (recs.tgHdlRatio !== null && recs.tgHdlInterpretation !== null) ||
-        (recs.homaIR !== null && recs.homaIRInterpretation !== null) ? (
+        (recs.homaIR !== null && recs.homaIRInterpretation !== null) ||
+        (recs.tyg !== null && recs.tygInterpretation !== null) ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {/* LDL/HDL */}
             {recs.ldlHdlRatio !== null && recs.ldlHdlInterpretation !== null && (
@@ -189,6 +193,32 @@ export default function RecommendationsPanel({ recs }: RecommendationsPanelProps
                     }}
                   >
                     {recs.homaIRInterpretation}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* TyG */}
+            {recs.tyg !== null && recs.tygInterpretation !== null && (
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Flame className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: 'var(--text-tertiary)' }}>
+                    TyG Index
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-display text-2xl" style={{ color: getRatioColor(recs.tygInterpretation) }}>
+                    {recs.tyg}
+                  </span>
+                  <span
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                    style={{
+                      backgroundColor: `${getRatioColor(recs.tygInterpretation)}18`,
+                      color: getRatioColor(recs.tygInterpretation),
+                    }}
+                  >
+                    {recs.tygInterpretation}
                   </span>
                 </div>
               </div>

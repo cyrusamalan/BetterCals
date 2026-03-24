@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnalysisResult, BloodMarkers, FoodSensitivityFlag, Insight, UserProfile } from '@/types';
 import { getMarkerDisplayRange, getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
+import { MARKER_FIELDS_BY_KEY } from '@/lib/markerMetadata';
 import BetterCalsMark from '@/components/BetterCalsMark';
 import {
   Heart,
@@ -23,11 +24,11 @@ import {
   Bean,
   Save,
   Check,
-  UserCog,
   History,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
+import ProfileDropdown from '@/components/ProfileDropdown';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
 import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
@@ -102,38 +103,6 @@ const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
   creatinine: 'Creatinine',
   uricAcid: 'Uric Acid',
   fastingInsulin: 'Fasting Insulin',
-};
-
-const MARKER_CONTEXT: Partial<
-  Record<
-    keyof BloodMarkers,
-    { description: string; affects: string; foods: string; retest: string }
-  >
-> = {
-  glucose: {
-    description: 'Fasting blood sugar reflects short-term glucose control and metabolic flexibility.',
-    affects: 'Refined carbs, sleep, stress, and physical activity.',
-    foods: 'Beans, oats, lentils, vegetables, and protein-forward meals.',
-    retest: '8-12 weeks after sustained diet/activity changes.',
-  },
-  hba1c: {
-    description: 'HbA1c estimates average glucose exposure over about 3 months.',
-    affects: 'Long-term eating patterns, insulin sensitivity, sleep, and stress.',
-    foods: 'High-fiber carbs, legumes, whole foods, and balanced meals.',
-    retest: 'Every ~3 months.',
-  },
-  ldl: {
-    description: 'LDL transports cholesterol and is associated with atherosclerotic risk when elevated.',
-    affects: 'Fat quality, body fat, activity, and genetics.',
-    foods: 'Oats, legumes, nuts, fish, and olive oil-focused patterns.',
-    retest: '8-12 weeks after targeted changes.',
-  },
-  hsCRP: {
-    description: 'hs-CRP is a sensitive marker of systemic inflammation.',
-    affects: 'Sleep debt, infection, stress load, body fat, and diet quality.',
-    foods: 'Fatty fish, berries, leafy greens, legumes, and olive oil.',
-    retest: '6-10 weeks once acute illness has resolved.',
-  },
 };
 
 const CATEGORIES: {
@@ -628,6 +597,39 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
   const actionableInsights = prioritizedInsights.filter((i) => i.recommendation);
   const informationalInsights = prioritizedInsights.filter((i) => !i.recommendation);
 
+  const topDrivers = useMemo(() => {
+    const keys = Object.keys(MARKER_NAMES) as (keyof BloodMarkers)[];
+    const scored = keys
+      .filter((k) => markers[k] !== undefined)
+      .map((k) => {
+        const v = markers[k] as number;
+        const interp = getMarkerInterpretation(k, v, profile.gender);
+        const category = CATEGORIES.find((c) => c.markers.includes(k))?.label ?? 'Other';
+        const unit = getMarkerUnit(k) ?? '';
+        return {
+          key: k,
+          value: v,
+          unit,
+          category,
+          label: interp.label,
+          score: interp.score,
+          impact: 100 - interp.score,
+        };
+      })
+      .sort((a, b) => b.impact - a.impact);
+
+    return scored.slice(0, 5);
+  }, [markers, profile.gender]);
+
+  const topDriversByCategory = useMemo(() => {
+    const grouped: Record<string, typeof topDrivers> = {};
+    for (const d of topDrivers) {
+      if (!grouped[d.category]) grouped[d.category] = [];
+      grouped[d.category].push(d);
+    }
+    return grouped;
+  }, [topDrivers]);
+
   // #region debug logs for feature verification
   useEffect(() => {
     if (countUpDidLogRef.current) return;
@@ -801,21 +803,6 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                 Download Report
               </button>
 
-              {onEditProfile && (
-                <button
-                  onClick={onEditProfile}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
-                  style={{
-                    backgroundColor: 'var(--accent-subtle)',
-                    color: 'var(--accent)',
-                    border: '1px solid rgba(107, 143, 113, 0.2)',
-                  }}
-                >
-                  <UserCog className="w-4 h-4" />
-                  Edit Profile
-                </button>
-              )}
-
               {isSignedIn ? (
                 <>
                   <Link
@@ -847,6 +834,9 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                     )}
                     {saving ? 'Saving...' : saved ? 'Saved' : 'Save to History'}
                   </button>
+                  {onEditProfile && (
+                    <ProfileDropdown profile={profile} onEditProfile={onEditProfile} />
+                  )}
                 </>
               ) : (
                 <Link
@@ -970,6 +960,27 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
           </div>
         </div>
 
+        {topDrivers.length > 0 && (
+          <div className="pdf-avoid-break" style={{ marginTop: 14, border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>Top Drivers</div>
+            <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+              {Object.entries(topDriversByCategory).map(([cat, items]) => (
+                <div key={cat} style={{ display: 'grid', gap: 6 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: '#666', textTransform: 'uppercase' }}>{cat}</div>
+                  <div style={{ display: 'grid', gap: 4 }}>
+                    {items.map((d) => (
+                      <div key={d.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                        <div style={{ fontSize: 11, color: '#333' }}>{MARKER_NAMES[d.key]}</div>
+                        <div style={{ fontSize: 11, fontWeight: 700 }}>{d.value}{d.unit ? ` ${d.unit}` : ''}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="pdf-avoid-break" style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div className="pdf-avoid-break" style={{ border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>ASCVD 10-Year Risk</div>
@@ -1088,6 +1099,48 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                     Health Score
                   </p>
                   <ScoreRing score={animatedOverallScore} />
+                  {topDrivers.length > 0 && (
+                    <div
+                      className="mt-5 rounded-xl p-4 w-full"
+                      style={{
+                        backgroundColor: 'var(--bg-warm)',
+                        border: '1px solid var(--border-light)',
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          Top Drivers
+                        </h3>
+                        <span className="text-[10px] font-semibold" style={{ color: 'var(--text-tertiary)' }}>
+                          Biggest score drag
+                        </span>
+                      </div>
+                      <div className="space-y-3">
+                        {Object.entries(topDriversByCategory).map(([cat, items]) => (
+                          <div key={cat}>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-tertiary)' }}>
+                              {cat}
+                            </p>
+                            <div className="mt-2 space-y-1">
+                              {items.map((d) => (
+                                <div key={d.key} className="flex items-start justify-between gap-3">
+                                  <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                                    {MARKER_NAMES[d.key]}
+                                  </span>
+                                  <span className="text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                                    {d.value}
+                                    <span className="text-[10px] font-normal" style={{ color: 'var(--text-tertiary)' }}>
+                                      {d.unit ? ` ${d.unit}` : ''}
+                                    </span>
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1347,19 +1400,23 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
             <div className="mt-4 space-y-2 text-sm">
               <p style={{ color: 'var(--text-secondary)' }}>
                 <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>What this marker measures:</span>{' '}
-                {MARKER_CONTEXT[activeMarker.key]?.description ?? 'This marker helps evaluate your metabolic and cardiometabolic health profile.'}
+                {MARKER_FIELDS_BY_KEY[activeMarker.key]?.description ??
+                  'This marker helps evaluate your metabolic and cardiometabolic health profile.'}
               </p>
               <p style={{ color: 'var(--text-secondary)' }}>
                 <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>What affects it:</span>{' '}
-                {MARKER_CONTEXT[activeMarker.key]?.affects ?? 'Nutrition quality, exercise, sleep quality, stress load, and medications.'}
+                {MARKER_FIELDS_BY_KEY[activeMarker.key]?.affects ??
+                  'Nutrition quality, exercise, sleep quality, stress load, and medications.'}
               </p>
               <p style={{ color: 'var(--text-secondary)' }}>
                 <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Foods that help improve it:</span>{' '}
-                {MARKER_CONTEXT[activeMarker.key]?.foods ?? 'Whole-food meals with more fiber, lean proteins, and anti-inflammatory fats.'}
+                {MARKER_FIELDS_BY_KEY[activeMarker.key]?.foods ??
+                  'Whole-food meals with more fiber, lean proteins, and anti-inflammatory fats.'}
               </p>
               <p style={{ color: 'var(--text-secondary)' }}>
                 <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>When to retest:</span>{' '}
-                {MARKER_CONTEXT[activeMarker.key]?.retest ?? 'Usually 8-12 weeks after consistent lifestyle changes.'}
+                {MARKER_FIELDS_BY_KEY[activeMarker.key]?.retest ??
+                  'Usually 8-12 weeks after consistent lifestyle changes.'}
               </p>
             </div>
           </div>

@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Heart, Activity, FileText, Droplets, ChevronRight, UserCog } from 'lucide-react';
+import { Heart, Activity, FileText, Droplets, ChevronRight } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import TDEEForm from '@/components/TDEEForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
 import BloodValuesForm from '@/components/BloodValuesForm';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
 import VitalsMark from '@/components/VitalsMark';
+import ProfileDropdown from '@/components/ProfileDropdown';
 import Link from 'next/link';
 import {
   UserProfile,
@@ -25,6 +26,7 @@ import {
   calculateMacros,
   calculateRecommendations,
   calculateASCVDRiskScore,
+  deriveMarkers,
 } from '@/lib/calculations';
 import { estimateAverageMarkers } from '@/lib/averageMarkers';
 
@@ -83,8 +85,9 @@ export default function Home() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [markers, setMarkers] = useState<BloodMarkers>({});
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  const { isSignedIn, signOut } = useAuth();
+  const { isSignedIn, isLoaded: isAuthLoaded, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+  const [serverProfileLoaded, setServerProfileLoaded] = useState(false);
 
   useEffect(() => {
     try {
@@ -136,9 +139,45 @@ export default function Home() {
     }
   }, [isMounted, step, profile, markers, result]);
 
+  // Fetch server-saved profile for logged-in users → auto-skip to Step 2
+  useEffect(() => {
+    if (!isMounted || !isAuthLoaded) return;
+    if (!isSignedIn) {
+      setServerProfileLoaded(true);
+      return;
+    }
+
+    fetch('/api/profile')
+      .then((res) => {
+        if (res.ok) return res.json();
+        return null;
+      })
+      .then((data) => {
+        if (data?.profile) {
+          setProfile(data.profile);
+          if (step === 'profile') {
+            setStep('blood');
+          }
+        }
+      })
+      .catch(() => {
+        // silent — fall through to normal localStorage flow
+      })
+      .finally(() => setServerProfileLoaded(true));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMounted, isAuthLoaded, isSignedIn]);
+
   const handleProfileSubmit = (data: UserProfile) => {
     setProfile(data);
     setStep('blood');
+
+    if (isSignedIn) {
+      fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile: data }),
+      }).catch(() => {});
+    }
   };
 
   const calculateResultWithoutBlood = (profileData: UserProfile) => {
@@ -186,16 +225,8 @@ export default function Home() {
       mergedMarkers = profile ? estimateAverageMarkers(profile) : {};
     }
 
-    // Derive markers that can be computed from others
-    // Non-HDL: TC - HDL (only if HDL <= TC)
-    if (mergedMarkers.nonHdl === undefined && mergedMarkers.totalCholesterol !== undefined && mergedMarkers.hdl !== undefined && mergedMarkers.hdl <= mergedMarkers.totalCholesterol) {
-      mergedMarkers.nonHdl = Math.round(mergedMarkers.totalCholesterol - mergedMarkers.hdl);
-    }
-    // Friedewald LDL: TC - HDL - (TG / 5), valid when TG < 400
-    if (mergedMarkers.ldl === undefined && mergedMarkers.totalCholesterol !== undefined && mergedMarkers.hdl !== undefined && mergedMarkers.triglycerides !== undefined && mergedMarkers.triglycerides < 400) {
-      const derived = Math.round(mergedMarkers.totalCholesterol - mergedMarkers.hdl - mergedMarkers.triglycerides / 5);
-      if (derived > 0) mergedMarkers.ldl = derived;
-    }
+    // Derive computed lipids (Non-HDL + LDL fallback logic).
+    mergedMarkers = { ...mergedMarkers, ...deriveMarkers(mergedMarkers) };
 
     setMarkers(mergedMarkers);
 
@@ -254,7 +285,7 @@ export default function Home() {
     }
   };
 
-  if (!isMounted) {
+  if (!isMounted || !serverProfileLoaded) {
     return (
       <div className="min-h-screen px-5 py-8" style={{ background: 'linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%)' }}>
         <div className="max-w-3xl mx-auto space-y-5 animate-pulse">
@@ -376,37 +407,22 @@ export default function Home() {
               >
                 Sign in
               </Link>
+            ) : profile ? (
+              <ProfileDropdown profile={profile} onEditProfile={handleEditProfile} />
             ) : (
-              <div className="flex items-center gap-2">
-                {profile && step !== 'profile' && (
-                  <button
-                    type="button"
-                    onClick={handleEditProfile}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
-                    style={{
-                      background: 'var(--accent-subtle)',
-                      color: 'var(--accent)',
-                      border: '1px solid rgba(107, 143, 113, 0.2)',
-                    }}
-                  >
-                    <UserCog className="w-3.5 h-3.5" />
-                    Edit Profile
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={signingOut}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press disabled:opacity-50"
-                  style={{
-                    background: 'var(--border-light)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border)',
-                  }}
-                >
-                  {signingOut ? 'Signing out...' : 'Sign out'}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press disabled:opacity-50"
+                style={{
+                  background: 'var(--border-light)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                {signingOut ? 'Signing out...' : 'Sign out'}
+              </button>
             )}
           </div>
         </div>

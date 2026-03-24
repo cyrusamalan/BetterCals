@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { BloodMarkers } from '@/types';
+import { MARKER_FIELDS } from '@/lib/markerMetadata';
 import { ArrowRight, Info, TrendingUp, TrendingDown } from 'lucide-react';
 
 // #region debug log helper
@@ -46,6 +47,10 @@ interface BloodValuesFormProps {
   initialValues?: BloodMarkers;
 }
 
+// Marker field metadata is centralized in `lib/markerMetadata.ts`.
+const FIELDS = MARKER_FIELDS;
+
+/*
 const FIELDS: {
   key: keyof BloodMarkers;
   label: string;
@@ -289,6 +294,7 @@ const FIELDS: {
     step: '0.1',
   },
 ];
+*/
 
 const HEALTHY_PRESET: BloodMarkers = {
   glucose: 90,
