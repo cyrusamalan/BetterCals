@@ -132,7 +132,7 @@ export default function SignInPage() {
       <header className="auth-topbar">
         <div className="auth-topbar-left">
           <DonutHero sizePx={44} />
-          <span className="text-white/90 text-[20px] font-bold tracking-tight">BetterCals</span>
+          <span className="text-[20px] font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
         </div>
 
         <div className="auth-topbar-center" />
@@ -146,8 +146,7 @@ export default function SignInPage() {
             <h1
               className="auth-text-enter font-display text-[1.75rem] leading-tight"
               style={{
-                color: '#ffffff',
-                textShadow: '0 2px 18px rgba(0,0,0,0.55)',
+                color: 'var(--text-primary)',
               }}
             >
               Welcome back
@@ -155,9 +154,8 @@ export default function SignInPage() {
             <p
               className="auth-text-enter text-sm mt-1.5"
               style={{
-                color: 'rgba(255,255,255,0.7)',
+                color: 'var(--text-secondary)',
                 animationDelay: '0.15s',
-                textShadow: '0 2px 18px rgba(0,0,0,0.35)',
               }}
             >
               Sign in to your BetterCals account
@@ -271,11 +269,11 @@ export default function SignInPage() {
 
           {/* Bottom text (moved from left panel) */}
           <div className="auth-single-tagline">
-            <h2 className="text-white text-[1.4rem] md:text-2xl font-bold leading-snug">
+            <h2 className="text-[1.4rem] md:text-2xl font-bold leading-snug" style={{ color: 'var(--text-primary)' }}>
               Track smarter.<br />
-              <span className="text-white/60">Live healthier.</span>
+              <span style={{ color: 'var(--text-tertiary)' }}>Live healthier.</span>
             </h2>
-            <p className="text-white/40 text-sm mt-2">
+            <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
               Upload blood reports, get personalized calorie targets and deep health insights.
             </p>
           </div>
@@ -283,7 +281,7 @@ export default function SignInPage() {
           {/* Footer link */}
           <p
             className="auth-single-footer auth-text-enter text-center text-sm"
-            style={{ color: 'rgba(255,255,255,0.65)', animationDelay: '0.4s' }}
+            style={{ color: 'var(--text-secondary)', animationDelay: '0.4s' }}
           >
             Don&apos;t have an account?{' '}
             <Link

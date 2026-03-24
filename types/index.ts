@@ -115,6 +115,13 @@ export interface SupplementRec {
   reason: string;
 }
 
+export interface MealTimingSuggestion {
+  meal: string;
+  time: string;
+  calories: number;
+  focus: string;
+}
+
 export interface PersonalizedRecs {
   bmi: number;
   bmiCategory: string;
@@ -125,8 +132,13 @@ export interface PersonalizedRecs {
   tgHdlInterpretation: string | null;
   waistToHipRatio: number | null;
   waistToHipInterpretation: string | null;
+  homaIR: number | null;
+  homaIRInterpretation: string | null;
+  tyg: number | null;
+  tygInterpretation: string | null;
   supplements: SupplementRec[];
   exerciseSuggestions: string[];
+  mealTiming: MealTimingSuggestion[];
 }
 
 export interface AnalysisResult {
@@ -138,6 +150,7 @@ export interface AnalysisResult {
   calorieTiers: CalorieTier[];
   macros: MacroBreakdown;
   recommendations: PersonalizedRecs;
+  derivedMarkers?: { ldl?: number; nonHdl?: number };
   ascvdRiskScore?: number;
   ascvdRiskReason?: string;
   usedAverageMarkers?: boolean;
@@ -155,4 +168,11 @@ export interface AnalysisHistory {
   profile: UserProfile;
   markers: BloodMarkers;
   result: AnalysisResult;
+}
+
+export interface FoodSensitivityFlag {
+  title: string;
+  markers: string;
+  suggestion: string;
+  severity: 'info' | 'warning';
 }

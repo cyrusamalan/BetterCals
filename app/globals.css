@@ -39,6 +39,7 @@
   --status-info-border: #cfd9e5;
 }
 
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -207,6 +208,7 @@ body {
   transform: translateY(0) scale(0.98);
   box-shadow: none;
 }
+
 
 /* ── Noise texture overlay ── */
 .noise::before {
@@ -754,7 +756,7 @@ body {
 /* ── Single-column Auth Layout (custom) ── */
 .auth-single-page {
   min-height: 100vh;
-  background: linear-gradient(160deg, #1a1c1e 0%, #252729 40%, #1e2022 100%);
+  background: linear-gradient(170deg, #f6f5f1 0%, #eceae4 40%, #f0eeea 70%, #f5f3ef 100%);
   position: relative;
   overflow: hidden;
   display: flex;
@@ -797,10 +799,10 @@ body {
   justify-content: space-between;
   gap: 16px;
   padding: 18px 26px 10px;
-  background: rgba(18, 20, 22, 0.62);
+  background: rgba(246, 245, 241, 0.72);
   backdrop-filter: blur(18px) saturate(1.3);
   -webkit-backdrop-filter: blur(18px) saturate(1.3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(228, 226, 220, 0.5);
 }
 
 .auth-topbar-left {

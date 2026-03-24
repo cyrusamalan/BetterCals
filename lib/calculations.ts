@@ -1,4 +1,4 @@
-import { UserProfile, ActivityLevel, TDEEResult, BloodMarkers, HealthScore, Insight, CalorieTier, MacroBreakdown, PersonalizedRecs } from '@/types';
+import { UserProfile, ActivityLevel, TDEEResult, BloodMarkers, HealthScore, Insight, CalorieTier, MacroBreakdown, PersonalizedRecs, MealTimingSuggestion } from '@/types';
 import { getMarkerInterpretation } from '@/lib/bloodParser';
 import { calculateASCVDRisk, type ASCVDResult } from '@/lib/riskModels';
 
@@ -334,6 +334,36 @@ export function calculateRecommendations(
     else tgHdlInterpretation = 'High Risk (Insulin Resistant)';
   }
 
+  // HOMA-IR
+  let homaIR: number | null = null;
+  let homaIRInterpretation: string | null = null;
+  if (markers.glucose !== undefined && markers.fastingInsulin !== undefined && markers.glucose > 0 && markers.fastingInsulin > 0) {
+    homaIR = Math.round(((markers.glucose * markers.fastingInsulin) / 405) * 10) / 10;
+    if (homaIR < 1.0) homaIRInterpretation = 'Optimal';
+    else if (homaIR < 2.0) homaIRInterpretation = 'Normal';
+    else if (homaIR < 3.0) homaIRInterpretation = 'Early Insulin Resistance';
+    else homaIRInterpretation = 'Significant Insulin Resistance';
+  }
+
+  // TyG index (Triglyceride-Glucose index)
+  // Common form: TyG = ln( (TG [mg/dL] * glucose [mg/dL]) / 2 )
+  // We only show TyG when TG + glucose + HDL are all present (complete lipid + glucose panel context).
+  let tyg: number | null = null;
+  let tygInterpretation: string | null = null;
+  if (
+    markers.triglycerides !== undefined &&
+    markers.glucose !== undefined &&
+    markers.hdl !== undefined &&
+    markers.triglycerides > 0 &&
+    markers.glucose > 0 &&
+    markers.hdl > 0
+  ) {
+    tyg = Math.round(Math.log((markers.triglycerides * markers.glucose) / 2) * 100) / 100;
+    if (tyg < 8.0) tygInterpretation = 'Low Insulin Resistance Risk';
+    else if (tyg < 9.0) tygInterpretation = 'Moderate Insulin Resistance Risk';
+    else tygInterpretation = 'High Insulin Resistance Risk';
+  }
+
   // Supplements from deficiencies
   const supplementMap: Record<string, { dosage: string; reason: string }> = {
     'Vitamin D': { dosage: '2000-4000 IU daily', reason: 'Low vitamin D levels' },
@@ -374,6 +404,11 @@ export function calculateRecommendations(
     waistToHipInterpretation = whr.interpretation;
   }
 
+  // Goal-specific meal timing suggestions
+  // Splits based on goal: lose (front-loaded), maintain (balanced), gain (high-frequency)
+  const tdeeResult = calculateTDEE(profile);
+  const mealTiming = calculateMealTiming(tdeeResult.targetCalories, profile.goal);
+
   return {
     bmi,
     bmiCategory,
@@ -382,11 +417,105 @@ export function calculateRecommendations(
     ldlHdlInterpretation,
     tgHdlRatio,
     tgHdlInterpretation,
+    homaIR,
+    homaIRInterpretation,
+    tyg,
+    tygInterpretation,
     waistToHipRatio,
     waistToHipInterpretation,
     supplements,
     exerciseSuggestions,
+    mealTiming,
   };
+}
+
+/**
+ * Goal-specific meal timing suggestions.
+ *
+ * - Lose: front-loaded pattern (larger breakfast/lunch, lighter dinner) to leverage
+ *   higher morning insulin sensitivity and thermic effect.
+ * - Maintain: balanced 3-meal pattern with an optional snack.
+ * - Gain: high-frequency 4-meal pattern to maximize protein synthesis windows
+ *   (~0.4 g/kg per meal, Schoenfeld & Aragon 2018) and caloric throughput.
+ */
+function calculateMealTiming(
+  targetCalories: number,
+  goal: UserProfile['goal'],
+): MealTimingSuggestion[] {
+  if (goal === 'lose') {
+    // Front-loaded: 35% breakfast, 35% lunch, 10% snack, 20% dinner
+    return [
+      { meal: 'Breakfast', time: '7:00–8:00 AM', calories: Math.round(targetCalories * 0.35), focus: 'Protein + fiber to sustain satiety' },
+      { meal: 'Lunch', time: '12:00–1:00 PM', calories: Math.round(targetCalories * 0.35), focus: 'Lean protein + complex carbs' },
+      { meal: 'Snack', time: '3:00–4:00 PM', calories: Math.round(targetCalories * 0.10), focus: 'Protein-rich (Greek yogurt, nuts)' },
+      { meal: 'Dinner', time: '6:00–7:00 PM', calories: Math.round(targetCalories * 0.20), focus: 'Light protein + vegetables, limit carbs' },
+    ];
+  }
+
+  if (goal === 'gain') {
+    // High-frequency: 25% each for 4 meals to maximize MPS
+    return [
+      { meal: 'Breakfast', time: '7:00–8:00 AM', calories: Math.round(targetCalories * 0.25), focus: 'Protein + carbs to break overnight fast' },
+      { meal: 'Lunch', time: '11:30 AM–12:30 PM', calories: Math.round(targetCalories * 0.25), focus: 'Balanced macro-dense meal' },
+      { meal: 'Post-Workout', time: '3:00–4:00 PM', calories: Math.round(targetCalories * 0.25), focus: 'Fast carbs + protein for recovery' },
+      { meal: 'Dinner', time: '7:00–8:00 PM', calories: Math.round(targetCalories * 0.25), focus: 'Calorie-dense, include healthy fats' },
+    ];
+  }
+
+  // Maintain: balanced 3 meals + snack
+  return [
+    { meal: 'Breakfast', time: '7:00–8:00 AM', calories: Math.round(targetCalories * 0.30), focus: 'Balanced protein, carbs, and fats' },
+    { meal: 'Lunch', time: '12:00–1:00 PM', calories: Math.round(targetCalories * 0.30), focus: 'Well-rounded, nutrient-dense meal' },
+    { meal: 'Snack', time: '3:30–4:30 PM', calories: Math.round(targetCalories * 0.10), focus: 'Light protein or fruit' },
+    { meal: 'Dinner', time: '6:30–7:30 PM', calories: Math.round(targetCalories * 0.30), focus: 'Balanced macros, moderate portions' },
+  ];
+}
+
+export function deriveMarkers(markers: BloodMarkers): { ldl?: number; nonHdl?: number } {
+  const derived: { ldl?: number; nonHdl?: number } = {};
+
+  // Non-HDL = TC - HDL (only when HDL sanity-check passes)
+  if (
+    markers.nonHdl === undefined &&
+    markers.totalCholesterol !== undefined &&
+    markers.hdl !== undefined &&
+    markers.hdl <= markers.totalCholesterol
+  ) {
+    const nonHdl = Math.round(markers.totalCholesterol - markers.hdl);
+    if (Number.isFinite(nonHdl) && nonHdl >= 0) derived.nonHdl = nonHdl;
+  }
+
+  // LDL: try Friedewald first, then fall back to Iranian formula when Friedewald is invalid/unreliable.
+  if (markers.ldl === undefined) {
+    const tc = markers.totalCholesterol;
+    const hdl = markers.hdl;
+    const tg = markers.triglycerides;
+
+    if (tc !== undefined && hdl !== undefined && tg !== undefined) {
+      let friedewaldValid = false;
+      let friedewaldLdl: number | null = null;
+
+      if (tg < 400) {
+        const derivedFried = Math.round(tc - hdl - tg / 5);
+        if (Number.isFinite(derivedFried) && derivedFried > 0) {
+          friedewaldValid = true;
+          friedewaldLdl = derivedFried;
+        }
+      }
+
+      if (friedewaldValid && friedewaldLdl !== null) {
+        derived.ldl = friedewaldLdl;
+      } else {
+        // Iranian LDL formula (works better when TG is higher).
+        const derivedIranian = Math.round(tc / 1.19 + tg / 1.9 - hdl / 1.1 - 38);
+        if (Number.isFinite(derivedIranian) && derivedIranian > 0) {
+          derived.ldl = derivedIranian;
+        }
+      }
+    }
+  }
+
+  return derived;
 }
 
 export function calculateASCVDRiskScore(profile: UserProfile, markers: BloodMarkers): ASCVDResult {

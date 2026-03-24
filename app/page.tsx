@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Heart, Activity, FileText, Droplets, ChevronRight, UserCog } from 'lucide-react';
+import { Heart, Activity, FileText, Droplets, ChevronRight, History } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import TDEEForm from '@/components/TDEEForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
 import BloodValuesForm from '@/components/BloodValuesForm';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
 import VitalsMark from '@/components/VitalsMark';
+import ProfileDropdown from '@/components/ProfileDropdown';
 import Link from 'next/link';
 import {
   UserProfile,
@@ -25,10 +26,47 @@ import {
   calculateMacros,
   calculateRecommendations,
   calculateASCVDRiskScore,
+  deriveMarkers,
 } from '@/lib/calculations';
 import { estimateAverageMarkers } from '@/lib/averageMarkers';
 
 type Step = 'profile' | 'blood' | 'results';
+
+// #region debug log helper
+const DEBUG_ENDPOINT = 'http://127.0.0.1:7498/ingest/6f0bd25c-93a7-48e3-a88d-41621d1baedd';
+const DEBUG_SESSION_ID = 'dc8eb7';
+function debugLog({
+  hypothesisId,
+  location,
+  message,
+  data,
+}: {
+  hypothesisId: string;
+  location: string;
+  message: string;
+  data?: Record<string, unknown>;
+}) {
+  try {
+    fetch(DEBUG_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Debug-Session-Id': DEBUG_SESSION_ID,
+      },
+      body: JSON.stringify({
+        sessionId: DEBUG_SESSION_ID,
+        location,
+        message,
+        hypothesisId,
+        data,
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  } catch {
+    // ignore
+  }
+}
+// #endregion
 
 function sanitizeBloodMarkers(input: BloodMarkers): BloodMarkers {
   const cleaned: BloodMarkers = {};
@@ -47,8 +85,9 @@ export default function Home() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [markers, setMarkers] = useState<BloodMarkers>({});
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  const { isSignedIn, signOut } = useAuth();
+  const { isSignedIn, isLoaded: isAuthLoaded, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+  const [serverProfileLoaded, setServerProfileLoaded] = useState(false);
 
   useEffect(() => {
     try {
@@ -100,9 +139,76 @@ export default function Home() {
     }
   }, [isMounted, step, profile, markers, result]);
 
+  // Fetch server-saved profile for logged-in users → auto-skip to Step 2
+  useEffect(() => {
+    if (!isMounted || !isAuthLoaded) return;
+    if (!isSignedIn) {
+      setServerProfileLoaded(true);
+      return;
+    }
+
+    fetch('/api/profile')
+      .then((res) => {
+        if (res.ok) return res.json();
+        return null;
+      })
+      .then((data) => {
+        if (data?.profile) {
+          setProfile(data.profile);
+          if (step === 'profile') {
+            setStep('blood');
+          }
+        }
+      })
+      .catch(() => {
+        // silent — fall through to normal localStorage flow
+      })
+      .finally(() => setServerProfileLoaded(true));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMounted, isAuthLoaded, isSignedIn]);
+
   const handleProfileSubmit = (data: UserProfile) => {
     setProfile(data);
     setStep('blood');
+
+    if (isSignedIn) {
+      fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile: data }),
+      }).catch(() => {});
+    }
+  };
+
+  const calculateResultWithoutBlood = (profileData: UserProfile) => {
+    // #region debug log quick-start
+    debugLog({
+      hypothesisId: 'Q15_quickstart',
+      location: 'app/page.tsx:calculateResultWithoutBlood',
+      message: 'Quick-start calories path invoked',
+      data: { goal: profileData.goal, gender: profileData.gender, age: profileData.age },
+    });
+    // #endregion
+
+    const tdee = calculateTDEE(profileData);
+    const emptyMarkers: BloodMarkers = {};
+    const healthScore = calculateHealthScore(emptyMarkers, { gender: profileData.gender });
+
+    setMarkers(emptyMarkers);
+    setResult({
+      tdee,
+      healthScore,
+      insights: [],
+      deficiencies: [],
+      risks: [],
+      calorieTiers: calculateCalorieTiers(tdee.tdee),
+      macros: calculateMacros(tdee.targetCalories, profileData.goal),
+      recommendations: calculateRecommendations(profileData, emptyMarkers, []),
+      ascvdRiskScore: undefined,
+      ascvdRiskReason: 'Skipped blood markers',
+      usedAverageMarkers: true,
+    });
+    setStep('results');
   };
 
   const handleMarkersExtracted = (extracted: BloodMarkers) => {
@@ -118,6 +224,9 @@ export default function Home() {
     if (usedAverageMarkers) {
       mergedMarkers = profile ? estimateAverageMarkers(profile) : {};
     }
+
+    // Derive computed lipids (Non-HDL + LDL fallback logic).
+    mergedMarkers = { ...mergedMarkers, ...deriveMarkers(mergedMarkers) };
 
     setMarkers(mergedMarkers);
 
@@ -176,31 +285,14 @@ export default function Home() {
     }
   };
 
-  if (!isMounted) {
+  if (!isMounted || !serverProfileLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div
-          className="w-12 h-12 rounded-full"
-          style={{
-            /* Vibrant multi-color ring with a "C"-shaped green arc (conic-gradient + mask). */
-            background:
-              'conic-gradient(from 90deg,' +
-              ' rgba(0,0,0,0) 0deg 80deg,' + // open side of the "C" (right side)
-              ' #22c55e 80deg 220deg,' + // green "C" stroke
-              ' #b8860b 220deg 300deg,' + // warm accent for the rest of the ring
-              ' #a05a5a 300deg 360deg)', // rose accent for the remaining arc
-            WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px))',
-            mask: 'radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px))',
-            animation: 'spin 0.9s linear both',
-            filter: 'saturate(1.2) brightness(1.08)',
-          }}
-        />
-        <style jsx global>{`
-          @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
+      <div className="min-h-screen px-5 py-8" style={{ background: 'linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%)' }}>
+        <div className="max-w-3xl mx-auto space-y-5 animate-pulse">
+          <div className="h-10 w-48 rounded-xl" style={{ backgroundColor: 'var(--border-light)' }} />
+          <div className="h-24 rounded-2xl" style={{ backgroundColor: 'var(--surface)' }} />
+          <div className="h-56 rounded-3xl" style={{ backgroundColor: 'var(--surface)' }} />
+        </div>
       </div>
     );
   }
@@ -265,34 +357,39 @@ export default function Home() {
           </div>
 
           {/* Center: step pills */}
-          <div className="hidden sm:flex items-center gap-1 justify-center">
-            {steps.map((s, i) => (
-              <div key={s.key} className="flex items-center gap-1">
-                <div
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-300"
-                  style={{
-                    backgroundColor: i <= currentStepIdx ? 'var(--accent-subtle)' : 'transparent',
-                    color: i <= currentStepIdx ? 'var(--accent)' : 'var(--text-tertiary)',
-                  }}
-                >
-                  <span
-                    className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-300"
+          <div className="hidden sm:flex flex-col items-center gap-1 justify-center">
+            <div className="flex items-center gap-1">
+              {steps.map((s, i) => (
+                <div key={s.key} className="flex items-center gap-1">
+                  <div
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-300"
                     style={{
-                      backgroundColor: i <= currentStepIdx ? 'var(--accent)' : 'var(--border)',
-                      color: i <= currentStepIdx ? 'var(--text-inverse)' : 'var(--text-tertiary)',
-                      boxShadow:
-                        i === currentStepIdx ? '0 0 0 3px rgba(107, 143, 113, 0.15)' : 'none',
+                      backgroundColor: i <= currentStepIdx ? 'var(--accent-subtle)' : 'transparent',
+                      color: i <= currentStepIdx ? 'var(--accent)' : 'var(--text-tertiary)',
                     }}
                   >
-                    {i < currentStepIdx ? '\u2713' : s.num}
-                  </span>
-                  {s.label}
+                    <span
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-300"
+                      style={{
+                        backgroundColor: i <= currentStepIdx ? 'var(--accent)' : 'var(--border)',
+                        color: i <= currentStepIdx ? 'var(--text-inverse)' : 'var(--text-tertiary)',
+                        boxShadow:
+                          i === currentStepIdx ? '0 0 0 3px rgba(107, 143, 113, 0.15)' : 'none',
+                      }}
+                    >
+                      {i < currentStepIdx ? '\u2713' : s.num}
+                    </span>
+                    {s.label}
+                  </div>
+                  {i < steps.length - 1 && (
+                    <ChevronRight className="w-3 h-3" style={{ color: 'var(--border)' }} />
+                  )}
                 </div>
-                {i < steps.length - 1 && (
-                  <ChevronRight className="w-3 h-3" style={{ color: 'var(--border)' }} />
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
+            <span className="text-[10px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
+              Your progress is saved locally.
+            </span>
           </div>
 
           {/* Right: Auth */}
@@ -310,37 +407,36 @@ export default function Home() {
               >
                 Sign in
               </Link>
-            ) : (
+            ) : profile ? (
               <div className="flex items-center gap-2">
-                {profile && step !== 'profile' && (
-                  <button
-                    type="button"
-                    onClick={handleEditProfile}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
-                    style={{
-                      background: 'var(--accent-subtle)',
-                      color: 'var(--accent)',
-                      border: '1px solid rgba(107, 143, 113, 0.2)',
-                    }}
-                  >
-                    <UserCog className="w-3.5 h-3.5" />
-                    Edit Profile
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={signingOut}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press disabled:opacity-50"
+                <Link
+                  href="/history"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
                   style={{
                     background: 'var(--border-light)',
                     color: 'var(--text-primary)',
                     border: '1px solid var(--border)',
                   }}
                 >
-                  {signingOut ? 'Signing out...' : 'Sign out'}
-                </button>
+                  <History className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                  History
+                </Link>
+                <ProfileDropdown profile={profile} onEditProfile={handleEditProfile} />
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press disabled:opacity-50"
+                style={{
+                  background: 'var(--border-light)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                {signingOut ? 'Signing out...' : 'Sign out'}
+              </button>
             )}
           </div>
         </div>
@@ -361,6 +457,20 @@ export default function Home() {
               <p className="mt-2 text-base" style={{ color: 'var(--text-secondary)' }}>
                 We&apos;ll calculate your daily calorie needs using the Mifflin-St Jeor equation.
               </p>
+              {profile && (
+                <button
+                  type="button"
+                  onClick={() => calculateResultWithoutBlood(profile)}
+                  className="mt-3 text-xs font-semibold px-3 py-1.5 rounded-lg btn-press"
+                  style={{
+                    color: 'var(--accent)',
+                    background: 'var(--accent-subtle)',
+                    border: '1px solid rgba(107, 143, 113, 0.25)',
+                  }}
+                >
+                  I just want calories
+                </button>
+              )}
             </div>
 
             {/* Form container */}
@@ -409,6 +519,20 @@ export default function Home() {
               <p className="mt-2 text-base" style={{ color: 'var(--text-secondary)' }}>
                 Upload a report for automatic extraction, or enter values manually.
               </p>
+              {profile && (
+                <button
+                  type="button"
+                  onClick={() => calculateResultWithoutBlood(profile)}
+                  className="mt-3 text-xs font-semibold px-3 py-1.5 rounded-lg btn-press"
+                  style={{
+                    color: 'var(--accent)',
+                    background: 'var(--accent-subtle)',
+                    border: '1px solid rgba(107, 143, 113, 0.25)',
+                  }}
+                >
+                  I just want calories
+                </button>
+              )}
             </div>
 
             {/* Upload card */}
