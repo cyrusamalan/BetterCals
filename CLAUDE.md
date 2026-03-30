@@ -183,7 +183,7 @@ Each blood marker maps to a `MarkerStatus` → numeric score (0–100) via tiers
 | gain | 35% | 40% | 25% |
 
 ### Calorie Tiers
-6 tiers from base TDEE: −500, −250, 0, +250, +500 cal/day (min 1200 kcal).
+6 tiers from base TDEE: −750, −500, −250, 0, +250, +500 cal/day (min 1200 kcal floor applied to deficit tiers).
 
 ### ASCVD Risk (ACC/AHA 2013 Pooled Cohort Equations)
 Race/sex-specific coefficients from `lib/riskModels.ts`. Inputs: age (40–79), sex, race (white/black), TC, HDL-C, SBP, smoker, diabetic. Returns 10-year risk %.
