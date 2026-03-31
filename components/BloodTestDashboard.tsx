@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnalysisResult, BloodMarkers, FoodSensitivityFlag, Insight, UserProfile } from '@/types';
 import { getMarkerDisplayRange, getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
 import { MARKER_FIELDS_BY_KEY } from '@/lib/markerMetadata';
-import BetterCalsMark from '@/components/BetterCalsMark';
+import VitalsMark from '@/components/VitalsMark';
 import {
   Heart,
   Flame,
@@ -960,7 +960,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                     boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
                   }}
                 >
-                  <BetterCalsMark className="w-6.5 h-6.5" />
+                  <VitalsMark sizePx={26} />
                 </div>
                 <span className="text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
               </div>
