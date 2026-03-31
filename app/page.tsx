@@ -356,7 +356,19 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Center: step pills */}
+          {/* Center: step pills (mobile: compact dots, desktop: full pills) */}
+          <div className="flex sm:hidden items-center justify-center gap-2">
+            {steps.map((s, i) => (
+              <div
+                key={s.key}
+                className="w-2.5 h-2.5 rounded-full transition-all duration-300"
+                style={{
+                  backgroundColor: i <= currentStepIdx ? 'var(--accent)' : 'var(--border)',
+                  boxShadow: i === currentStepIdx ? '0 0 0 3px rgba(107, 143, 113, 0.2)' : 'none',
+                }}
+              />
+            ))}
+          </div>
           <div className="hidden sm:flex flex-col items-center gap-1 justify-center">
             <div className="flex items-center gap-1">
               {steps.map((s, i) => (

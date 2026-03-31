@@ -159,7 +159,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       </div>
 
       {/* Row 2b: Body Composition (Optional) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
         <FieldGroup icon={Ruler} label="Waist (optional)">
           <div className="relative">
             <input
@@ -409,7 +409,7 @@ function GoalSelector({ value, onChange }: { value: FormData['goal']; onChange: 
           What&apos;s Your Goal?
         </span>
       </label>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         {GOAL_OPTIONS.map((opt) => {
           const selected = value === opt.value;
           const Icon = opt.icon;

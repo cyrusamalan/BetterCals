@@ -32,7 +32,7 @@ export default function HealthRadarChart({ healthScore }: HealthRadarChartProps)
       </div>
 
       <div className="px-5 py-4">
-        <div style={{ width: '100%', height: 240 }}>
+        <div className="h-[200px] sm:h-[240px]" style={{ width: '100%' }}>
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart data={data} cx="50%" cy="50%" outerRadius="70%">
               <PolarGrid stroke="#e4e2dc" />
