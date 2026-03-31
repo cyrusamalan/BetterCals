@@ -5,7 +5,7 @@ import { Flame } from 'lucide-react';
 
 interface CalorieTiersCardProps {
   tiers: CalorieTier[];
-  userGoal: 'lose' | 'maintain' | 'gain';
+  userGoal: string;
   targetCalories: number;
 }
 
@@ -15,8 +15,8 @@ export default function CalorieTiersCard({ tiers, userGoal, targetCalories }: Ca
   }
 
   function tierMatchesGoal(tier: CalorieTier): boolean {
-    if (userGoal === 'lose') return tier.dailyChange < 0;
-    if (userGoal === 'gain') return tier.dailyChange > 0;
+    if (userGoal.startsWith('lose')) return tier.dailyChange < 0;
+    if (userGoal.startsWith('gain')) return tier.dailyChange > 0;
     return tier.dailyChange === 0;
   }
 

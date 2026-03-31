@@ -41,7 +41,7 @@ export default function ProfileDropdown({ profile, onEditProfile }: ProfileDropd
   const initials = (user?.firstName?.[0] || user?.emailAddresses?.[0]?.emailAddress?.[0] || 'U').toUpperCase();
 
   const heightDisplay = `${profile.heightFeet}'${profile.heightInches}"`;
-  const goalLabel = profile.goal === 'lose' ? 'Lose' : profile.goal === 'gain' ? 'Gain' : 'Maintain';
+  const goalLabel = profile.goal.startsWith('lose') ? 'Lose' : profile.goal.startsWith('gain') ? 'Gain' : 'Maintain';
 
   return (
     <div ref={ref} className="relative">

@@ -45,8 +45,12 @@ Basic profile + manual blood entry works without any env vars. Auth and history 
 ├── app/                          # Next.js App Router
 │   ├── page.tsx                 # 3-step wizard (main entry point)
 │   ├── layout.tsx               # Root layout: Clerk provider, fonts, metadata
+│   ├── history/
+│   │   ├── page.tsx             # Analysis history with trend charts
+│   │   └── [id]/page.tsx        # Individual historical analysis view
 │   ├── api/
 │   │   ├── extract-blood-report/route.ts   # PDF/image → markers via LLM
+│   │   ├── profile/route.ts     # GET user profile (Clerk-protected)
 │   │   └── analyses/
 │   │       ├── route.ts         # GET (list), POST (save) analyses
 │   │       └── [id]/route.ts    # GET (fetch), DELETE individual analysis
@@ -73,6 +77,7 @@ Basic profile + manual blood entry works without any env vars. Auth and history 
 │   ├── calculations.ts          # All core business logic (TDEE, scores, insights)
 │   ├── bloodParser.ts           # Marker rules, reference ranges, regex parser
 │   ├── riskModels.ts            # ACC/AHA 2013 ASCVD Pooled Cohort Equations
+│   ├── markerMetadata.ts         # Centralized marker UI metadata (labels, units, hints, dietary info, retest frequency)
 │   ├── averageMarkers.ts        # Population medians by gender/age (fallback)
 │   └── db/
 │       ├── schema.ts            # Drizzle ORM: analyses table (JSONB)
@@ -144,6 +149,7 @@ POST /api/extract-blood-report
 Protected by Clerk middleware in `proxy.ts`. Requires authenticated user.
 
 ```
+GET  /api/profile        → fetch user's saved profile
 GET  /api/analyses       → list user's saved analyses (newest first)
 POST /api/analyses       → save { profile, markers, result } as JSONB
 GET  /api/analyses/[id]  → fetch single analysis (ownership check)
@@ -216,16 +222,16 @@ All shared interfaces live here. Key types:
 ## Authentication (Clerk)
 
 - `ClerkProvider` wraps the app in `app/layout.tsx`
-- `proxy.ts` (middleware) protects `/api/analyses/*` — requires valid session
+- `proxy.ts` (middleware) protects `/api/analyses/*` and `/api/profile/*` — requires valid session
 - `useAuth()` hook used in components to conditionally show save/history features
 - Public routes: `/`, `/sign-in`, `/sign-up`
 
 ## Database (Neon + Drizzle)
 
-- `lib/db/schema.ts` — single `analyses` table with JSONB columns for `profile`, `markers`, `result`
+- `lib/db/schema.ts` — `analyses` table (JSONB columns for `profile`, `markers`, `result`) and `profiles` table (`userId` unique, `profile` JSONB, `updatedAt`)
 - `lib/db/index.ts` — singleton `db` factory using `@neondatabase/serverless`
 - `drizzle.config.ts` — points to `DATABASE_URL` env var
-- Only used for analysis history; all calculations are client-side
+- Used for analysis history and persistent user profiles; all calculations are client-side
 
 ## Development Notes
 
@@ -235,4 +241,5 @@ All shared interfaces live here. Key types:
 - **Unit convention**: User inputs imperial (lbs, ft/in); calculations use metric internally; blood markers use standard lab units (mg/dL, ng/mL, mIU/L, etc.).
 - **Physiological validation**: `sanitizeBloodMarkers()` in the API route rejects implausible values; `NaN`/`Infinity` guards are applied to all optional numeric fields.
 - **CodeRabbit**: Assertive auto-review runs on all PRs. Ignores `dist/`, `node_modules/`, `package-lock.json`.
+- **Notable dependencies**: `tesseract.js` (client-side OCR), `pdfjs-dist` (PDF text extraction), `html2pdf.js` (report export to PDF).
 - **CI**: `.github/workflows/ci.yml` — Node 20, `npm ci`, `npm run build` on push to `main` and all PRs.

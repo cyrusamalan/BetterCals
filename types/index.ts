@@ -6,7 +6,7 @@ export interface UserProfile {
   heightFeet: number; // feet - user input
   heightInches: number; // inches - user input
   activityLevel: ActivityLevel;
-  goal: 'lose' | 'maintain' | 'gain';
+  goal: 'lose-aggressive' | 'lose-moderate' | 'lose-mild' | 'maintain' | 'gain-lean' | 'gain-aggressive';
   smoker?: boolean;
   diabetic?: boolean;
   bloodPressureSystolic?: number;

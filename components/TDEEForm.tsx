@@ -2,7 +2,7 @@
 
 import { useForm } from 'react-hook-form';
 import { UserProfile, ActivityLevel } from '@/types';
-import { ArrowRight, User, Ruler, Weight, Zap, Target, Activity } from 'lucide-react';
+import { ArrowRight, User, Ruler, Weight, Zap, Target, Activity, TrendingDown, Minus, TrendingUp } from 'lucide-react';
 
 interface TDEEFormProps {
   onSubmit: (profile: UserProfile) => void;
@@ -17,7 +17,7 @@ interface FormData {
   heightFeet: number;
   heightInches: number;
   activityLevel: ActivityLevel;
-  goal: 'lose' | 'maintain' | 'gain';
+  goal: 'lose-aggressive' | 'lose-moderate' | 'lose-mild' | 'maintain' | 'gain-lean' | 'gain-aggressive';
   smoker?: boolean;
   diabetic?: boolean;
   bloodPressureSystolic?: number;
@@ -27,7 +27,7 @@ interface FormData {
 }
 
 export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     defaultValues: initialValues ? {
       age: initialValues.age,
       gender: initialValues.gender,
@@ -46,7 +46,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
     } : {
       gender: 'male',
       activityLevel: 'moderate',
-      goal: 'maintain',
+      goal: 'maintain' as const,
       smoker: false,
       diabetic: false,
       treatedForHypertension: false,
@@ -194,32 +194,22 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
         </FieldGroup>
       </div>
 
-      {/* Row 3: Activity + Goal */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <FieldGroup icon={Zap} label="Activity Level">
-          <select
-            {...register('activityLevel', { required: true })}
-            className="select-field"
-          >
-            <option value="sedentary">Sedentary (little/no exercise)</option>
-            <option value="light">Lightly Active (1-3 days/wk)</option>
-            <option value="moderate">Moderately Active (3-5 days/wk)</option>
-            <option value="active">Very Active (6-7 days/wk)</option>
-            <option value="very-active">Extra Active (physical job + exercise)</option>
-          </select>
-        </FieldGroup>
+      {/* Row 3: Activity Level */}
+      <FieldGroup icon={Zap} label="Activity Level">
+        <select
+          {...register('activityLevel', { required: true })}
+          className="select-field"
+        >
+          <option value="sedentary">Sedentary (little/no exercise)</option>
+          <option value="light">Lightly Active (1-3 days/wk)</option>
+          <option value="moderate">Moderately Active (3-5 days/wk)</option>
+          <option value="active">Very Active (6-7 days/wk)</option>
+          <option value="very-active">Extra Active (physical job + exercise)</option>
+        </select>
+      </FieldGroup>
 
-        <FieldGroup icon={Target} label="Goal">
-          <select
-            {...register('goal', { required: true })}
-            className="select-field"
-          >
-            <option value="lose">Lose Weight (-20%)</option>
-            <option value="maintain">Maintain Weight</option>
-            <option value="gain">Build Muscle (+10%)</option>
-          </select>
-        </FieldGroup>
-      </div>
+      {/* Goal Selection Cards */}
+      <GoalSelector value={watch('goal')} onChange={(g) => setValue('goal', g)} />
 
       {/* Row 4: Clinical History (ASCVD) */}
       <div
@@ -314,6 +304,131 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
         <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
       </button>
     </form>
+  );
+}
+
+const GOAL_OPTIONS: {
+  value: FormData['goal'];
+  label: string;
+  desc: string;
+  detail: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+}[] = [
+  {
+    value: 'lose-aggressive',
+    label: 'Aggressive Cut',
+    desc: '-30% calories',
+    detail: 'Fast results, higher protein to protect muscle',
+    icon: TrendingDown,
+    color: 'var(--status-danger)',
+    bgColor: 'var(--status-danger-bg, #fef2f2)',
+    borderColor: 'var(--status-danger-border, #fecaca)',
+  },
+  {
+    value: 'lose-moderate',
+    label: 'Moderate Cut',
+    desc: '-20% calories',
+    detail: 'Recommended for sustainable fat loss',
+    icon: TrendingDown,
+    color: 'var(--status-warning, #d97706)',
+    bgColor: 'var(--status-warning-bg, #fffbeb)',
+    borderColor: 'var(--status-warning-border, #fde68a)',
+  },
+  {
+    value: 'lose-mild',
+    label: 'Mild Cut',
+    desc: '-10% calories',
+    detail: 'Slow & steady, minimal metabolic stress',
+    icon: TrendingDown,
+    color: 'var(--accent-warm, #b45309)',
+    bgColor: '#fdf8f0',
+    borderColor: '#f5e6d0',
+  },
+  {
+    value: 'maintain',
+    label: 'Maintain',
+    desc: '0% change',
+    detail: 'Sustain current weight and body composition',
+    icon: Minus,
+    color: 'var(--accent)',
+    bgColor: 'var(--status-normal-bg, #f0fdf4)',
+    borderColor: 'var(--status-normal-border, #bbf7d0)',
+  },
+  {
+    value: 'gain-lean',
+    label: 'Lean Bulk',
+    desc: '+10% calories',
+    detail: 'Minimize fat gain while adding muscle',
+    icon: TrendingUp,
+    color: 'var(--status-info, #2563eb)',
+    bgColor: 'var(--status-info-bg, #eff6ff)',
+    borderColor: 'var(--status-info-border, #bfdbfe)',
+  },
+  {
+    value: 'gain-aggressive',
+    label: 'Aggressive Bulk',
+    desc: '+20% calories',
+    detail: 'Maximize muscle gain, higher carbs for training',
+    icon: TrendingUp,
+    color: 'var(--status-info, #2563eb)',
+    bgColor: 'var(--status-info-bg, #eff6ff)',
+    borderColor: 'var(--status-info-border, #bfdbfe)',
+  },
+];
+
+function GoalSelector({ value, onChange }: { value: FormData['goal']; onChange: (g: FormData['goal']) => void }) {
+  return (
+    <div>
+      <label className="flex items-center gap-1.5 mb-3">
+        <Target className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+          What&apos;s Your Goal?
+        </span>
+      </label>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {GOAL_OPTIONS.map((opt) => {
+          const selected = value === opt.value;
+          const Icon = opt.icon;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onChange(opt.value)}
+              className="relative flex flex-col items-start gap-1.5 rounded-xl px-3.5 py-3 text-left transition-all duration-200 cursor-pointer"
+              style={{
+                backgroundColor: selected ? opt.bgColor : 'var(--surface)',
+                border: `1.5px solid ${selected ? opt.borderColor : 'var(--border-light)'}`,
+                boxShadow: selected ? `0 0 0 1px ${opt.borderColor}` : 'none',
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-6 h-6 rounded-md flex items-center justify-center"
+                  style={{ backgroundColor: selected ? opt.borderColor : 'var(--bg-warm)' }}
+                >
+                  <Icon className="w-3.5 h-3.5" style={{ color: selected ? opt.color : 'var(--text-tertiary)' }} />
+                </div>
+                <span
+                  className="text-sm font-semibold"
+                  style={{ color: selected ? opt.color : 'var(--text-primary)' }}
+                >
+                  {opt.label}
+                </span>
+              </div>
+              <span className="text-[11px] font-medium" style={{ color: selected ? opt.color : 'var(--text-tertiary)' }}>
+                {opt.desc}
+              </span>
+              <span className="text-[10px] leading-tight" style={{ color: 'var(--text-tertiary)' }}>
+                {opt.detail}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

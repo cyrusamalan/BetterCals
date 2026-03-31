@@ -67,14 +67,20 @@ export function calculateTDEE(profile: UserProfile): TDEEResult {
 
   // Adjust for goal
   // Deficit/surplus ratios per common sports nutrition guidelines (ISSN, NASM):
-  // - Weight loss: 20% deficit is moderate and preserves lean mass (Helms et al., 2014)
-  // - Weight gain: 10% surplus minimizes fat gain during a lean bulk (Iraki et al., 2019)
-  let targetCalories = tdee;
-  if (profile.goal === 'lose') {
-    targetCalories = Math.round(tdee * 0.8);
-  } else if (profile.goal === 'gain') {
-    targetCalories = Math.round(tdee * 1.1);
-  }
+  // - Aggressive cut: 30% deficit (contest prep pace, risk of muscle loss — Helms et al., 2014)
+  // - Moderate cut: 20% deficit (standard recommendation, preserves lean mass)
+  // - Mild cut: 10% deficit (slow & sustainable, minimal metabolic adaptation)
+  // - Lean bulk: 10% surplus (minimizes fat gain — Iraki et al., 2019)
+  // - Aggressive bulk: 20% surplus (faster mass gain, higher fat accrual)
+  const goalMultipliers: Record<UserProfile['goal'], number> = {
+    'lose-aggressive': 0.7,
+    'lose-moderate': 0.8,
+    'lose-mild': 0.9,
+    'maintain': 1.0,
+    'gain-lean': 1.1,
+    'gain-aggressive': 1.2,
+  };
+  const targetCalories = Math.round(tdee * goalMultipliers[profile.goal]);
 
   return {
     bmr: Math.round(bmr),
@@ -136,9 +142,9 @@ export function generateInsights(profile: UserProfile, tdee: TDEEResult, markers
     type: 'info',
     title: 'Your Maintenance Calories',
     description: `Based on your profile (${profile.weightLbs} lbs, ${profile.heightFeet}'${profile.heightInches}"), you burn approximately ${tdee.tdee} calories per day.`,
-    recommendation: profile.goal === 'lose' 
-      ? `To lose weight sustainably, aim for ${tdee.targetCalories} calories daily.` 
-      : profile.goal === 'gain'
+    recommendation: profile.goal.startsWith('lose')
+      ? `To lose weight sustainably, aim for ${tdee.targetCalories} calories daily.`
+      : profile.goal.startsWith('gain')
       ? `To gain lean mass, aim for ${tdee.targetCalories} calories daily.`
       : `Maintain your current intake of ${tdee.targetCalories} calories.`,
   });
@@ -240,12 +246,16 @@ export function calculateCalorieTiers(tdee: number): CalorieTier[] {
   ];
 }
 
-export function calculateMacros(calories: number, goal: 'lose' | 'maintain' | 'gain'): MacroBreakdown {
-  const ratios = goal === 'lose'
-    ? { p: 40, c: 30, f: 30 }
-    : goal === 'gain'
-    ? { p: 35, c: 40, f: 25 }
-    : { p: 30, c: 40, f: 30 };
+export function calculateMacros(calories: number, goal: UserProfile['goal']): MacroBreakdown {
+  const macroRatios: Record<UserProfile['goal'], { p: number; c: number; f: number }> = {
+    'lose-aggressive': { p: 45, c: 25, f: 30 },  // very high protein to protect muscle in steep deficit
+    'lose-moderate':   { p: 40, c: 30, f: 30 },
+    'lose-mild':       { p: 35, c: 35, f: 30 },
+    'maintain':        { p: 30, c: 40, f: 30 },
+    'gain-lean':       { p: 35, c: 40, f: 25 },
+    'gain-aggressive': { p: 30, c: 45, f: 25 },   // higher carbs to fuel heavy training
+  };
+  const ratios = macroRatios[goal];
 
   const proteinGrams = Math.round((calories * ratios.p / 100) / 4);
   const carbGrams = Math.round((calories * ratios.c / 100) / 4);
@@ -442,7 +452,7 @@ function calculateMealTiming(
   targetCalories: number,
   goal: UserProfile['goal'],
 ): MealTimingSuggestion[] {
-  if (goal === 'lose') {
+  if (goal.startsWith('lose')) {
     // Front-loaded: 35% breakfast, 35% lunch, 10% snack, 20% dinner
     return [
       { meal: 'Breakfast', time: '7:00–8:00 AM', calories: Math.round(targetCalories * 0.35), focus: 'Protein + fiber to sustain satiety' },
@@ -452,7 +462,7 @@ function calculateMealTiming(
     ];
   }
 
-  if (goal === 'gain') {
+  if (goal.startsWith('gain')) {
     // High-frequency: 25% each for 4 meals to maximize MPS
     return [
       { meal: 'Breakfast', time: '7:00–8:00 AM', calories: Math.round(targetCalories * 0.25), focus: 'Protein + carbs to break overnight fast' },
