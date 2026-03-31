@@ -227,8 +227,10 @@ function getRangeNormalZone(key: keyof BloodMarkers, gender?: UserProfile['gende
   return { left, width: right - left };
 }
 
-function computeFoodSensitivityFlags(markers: BloodMarkers) {
+function computeFoodSensitivityFlags(markers: BloodMarkers, profile?: UserProfile) {
   const flags: FoodSensitivityFlag[] = [];
+
+  // --- Existing patterns ---
 
   if (
     markers.hsCRP !== undefined &&
@@ -273,6 +275,101 @@ function computeFoodSensitivityFlags(markers: BloodMarkers) {
         'This pattern often improves with lower refined carbohydrate load. Shift toward higher-fiber carbs, protein-forward meals, and post-meal walking to blunt glucose and insulin spikes.',
       severity: 'info' as const,
     });
+  }
+
+  // --- New marker-driven food recommendations ---
+
+  // High LDL → soluble fiber + plant sterols
+  if (markers.ldl !== undefined && markers.ldl >= 130) {
+    flags.push({
+      title: 'LDL Cholesterol — Dietary Action',
+      markers: `LDL ${markers.ldl} mg/dL`,
+      suggestion:
+        'Prioritize soluble fiber (oats, beans, lentils, barley — aim for 10+ g/day), plant sterols (nuts, seeds, avocado), and fatty fish (2–3x/week). Limit saturated fat to <7% of calories.',
+      severity: 'info' as const,
+    });
+  }
+
+  // Low ferritin → heme iron sources
+  if (markers.ferritin !== undefined && markers.ferritin < 30 && !(markers.vitaminB12 !== undefined && markers.vitaminB12 < 350)) {
+    flags.push({
+      title: 'Low Iron Stores — Dietary Action',
+      markers: `Ferritin ${markers.ferritin} ng/mL`,
+      suggestion:
+        'Include heme iron sources (red meat 2–3x/week, poultry, shellfish) and pair plant iron (spinach, lentils) with vitamin C (citrus, bell peppers) to enhance absorption. Avoid tea/coffee with iron-rich meals.',
+      severity: 'info' as const,
+    });
+  }
+
+  // Elevated glucose/HbA1c → low-GI carb guidance
+  if (
+    (markers.glucose !== undefined && markers.glucose >= 100) ||
+    (markers.hba1c !== undefined && markers.hba1c >= 5.7)
+  ) {
+    flags.push({
+      title: 'Blood Sugar Management — Carb Quality',
+      markers: [
+        markers.glucose !== undefined ? `Glucose ${markers.glucose}` : '',
+        markers.hba1c !== undefined ? `HbA1c ${markers.hba1c}%` : '',
+      ].filter(Boolean).join(' + '),
+      suggestion:
+        'Favor low-glycemic carbs (sweet potatoes, legumes, steel-cut oats) over refined grains. Always pair carbs with protein or fat to slow glucose absorption. Consider eating carbs last in a meal (protein → vegetables → carbs).',
+      severity: 'warning' as const,
+    });
+  }
+
+  // High uric acid → purine management
+  if (markers.uricAcid !== undefined && markers.uricAcid > 7.0) {
+    flags.push({
+      title: 'Elevated Uric Acid — Dietary Action',
+      markers: `Uric acid ${markers.uricAcid} mg/dL`,
+      suggestion:
+        'Limit high-purine foods (organ meats, shellfish, beer), reduce fructose (soda, fruit juice), and increase water intake. Cherries and coffee may help lower uric acid levels.',
+      severity: 'info' as const,
+    });
+  }
+
+  // Low vitamin D → dietary sources
+  if (markers.vitaminD !== undefined && markers.vitaminD < 30) {
+    flags.push({
+      title: 'Vitamin D — Dietary Support',
+      markers: `Vitamin D ${markers.vitaminD} ng/mL`,
+      suggestion:
+        'Include vitamin D-rich foods: fatty fish (salmon, mackerel, sardines), egg yolks, fortified dairy/plant milk, and mushrooms exposed to UV light. Sun exposure (10–15 min midday) also helps.',
+      severity: 'info' as const,
+    });
+  }
+
+  // High hs-CRP (without liver flag already covered) → anti-inflammatory foods
+  if (markers.hsCRP !== undefined && markers.hsCRP > 2.0 && !(markers.alt !== undefined && markers.alt > 45)) {
+    flags.push({
+      title: 'Elevated Inflammation — Anti-Inflammatory Diet',
+      markers: `hs-CRP ${markers.hsCRP} mg/L`,
+      suggestion:
+        'Increase omega-3-rich foods (fatty fish, walnuts, flaxseed), colorful vegetables (berries, leafy greens, turmeric), and extra-virgin olive oil. Reduce processed foods, refined sugar, and excess omega-6 oils.',
+      severity: 'info' as const,
+    });
+  }
+
+  // Goal-specific food guidance
+  if (profile) {
+    if (profile.goal.startsWith('lose')) {
+      flags.push({
+        title: 'Weight Loss — Satiety-Focused Eating',
+        markers: 'Goal: weight loss',
+        suggestion:
+          'Prioritize high-satiety foods: lean protein at every meal (30+ g), high-fiber vegetables, legumes, and whole grains. Eat slowly, plate food in advance, and front-load calories earlier in the day.',
+        severity: 'info' as const,
+      });
+    } else if (profile.goal.startsWith('gain')) {
+      flags.push({
+        title: 'Muscle Gain — Calorie-Dense Nutrition',
+        markers: 'Goal: muscle gain',
+        suggestion:
+          'Include calorie-dense nutrient-rich foods: nuts/nut butter, avocado, olive oil, whole eggs, dairy, and complex carbs (rice, potatoes, oats). Distribute protein across 4+ meals for optimal muscle protein synthesis.',
+        severity: 'info' as const,
+      });
+    }
   }
 
   return flags;
@@ -576,7 +673,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const foodFlags = computeFoodSensitivityFlags(markers);
+  const foodFlags = computeFoodSensitivityFlags(markers, profile);
   const [activeMarker, setActiveMarker] = useState<{ key: keyof BloodMarkers; value: number } | null>(null);
   const animatedOverallScore = useCountUp(healthScore.overall, 1100);
   const countUpDidLogRef = useRef(false);

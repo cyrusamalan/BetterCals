@@ -24,6 +24,7 @@ interface FormData {
   treatedForHypertension?: boolean;
   waistInches?: number;
   hipInches?: number;
+  bodyFatPercentage?: number;
 }
 
 export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
@@ -43,6 +44,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       treatedForHypertension: initialValues.treatedForHypertension ?? false,
       waistInches: initialValues.waistInches,
       hipInches: initialValues.hipInches,
+      bodyFatPercentage: initialValues.bodyFatPercentage,
     } : {
       gender: 'male',
       activityLevel: 'moderate',
@@ -74,6 +76,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       treatedForHypertension: data.treatedForHypertension,
       waistInches: optNum(data.waistInches),
       hipInches: optNum(data.hipInches),
+      bodyFatPercentage: optNum(data.bodyFatPercentage),
     });
   };
 
@@ -156,7 +159,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       </div>
 
       {/* Row 2b: Body Composition (Optional) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <FieldGroup icon={Ruler} label="Waist (optional)">
           <div className="relative">
             <input
@@ -189,6 +192,24 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
               style={{ color: 'var(--text-tertiary)' }}
             >
               in
+            </span>
+          </div>
+        </FieldGroup>
+
+        <FieldGroup icon={Activity} label="Body Fat % (optional)">
+          <div className="relative">
+            <input
+              type="number"
+              step="0.1"
+              {...register('bodyFatPercentage', { min: 3, max: 60, valueAsNumber: true })}
+              className="input-field pr-12"
+              placeholder="20"
+            />
+            <span
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              %
             </span>
           </div>
         </FieldGroup>

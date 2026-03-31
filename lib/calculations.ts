@@ -53,10 +53,15 @@ export function calculateTDEE(profile: UserProfile): TDEEResult {
   const weightKg = lbsToKg(weight);
   const heightCm = feetInchesToCm(profile.heightFeet, profile.heightInches);
 
-  // Mifflin-St Jeor Equation
+  // Use Katch-McArdle when body fat % is available (more accurate for lean/overweight individuals),
+  // otherwise fall back to Mifflin-St Jeor.
   let bmr: number;
 
-  if (profile.gender === 'male') {
+  if (profile.bodyFatPercentage !== undefined && profile.bodyFatPercentage > 0) {
+    // Katch-McArdle: BMR = 370 + 21.6 × LBM(kg)
+    const leanBodyMassKg = weightKg * (1 - profile.bodyFatPercentage / 100);
+    bmr = 370 + 21.6 * leanBodyMassKg;
+  } else if (profile.gender === 'male') {
     bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
   } else {
     bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
@@ -177,6 +182,113 @@ export function generateInsights(profile: UserProfile, tdee: TDEEResult, markers
     });
   }
 
+  // Cross-marker pattern insights — detect systemic patterns, not just individual flags
+  insights.push(...generateCrossMarkerInsights(profile, markers));
+
+  return insights;
+}
+
+function generateCrossMarkerInsights(profile: UserProfile, markers: BloodMarkers): Insight[] {
+  const insights: Insight[] = [];
+
+  // --- Metabolic Syndrome cluster (IDF/ATP III criteria) ---
+  const metSynCriteria = [
+    markers.glucose !== undefined && markers.glucose >= 100,
+    markers.triglycerides !== undefined && markers.triglycerides >= 150,
+    markers.hdl !== undefined && markers.hdl < (profile.gender === 'male' ? 40 : 50),
+    markers.hba1c !== undefined && markers.hba1c >= 5.7,
+    profile.waistInches !== undefined && profile.waistInches > (profile.gender === 'male' ? 40 : 35),
+  ].filter(Boolean).length;
+
+  if (metSynCriteria >= 3) {
+    insights.push({
+      type: 'danger',
+      title: 'Metabolic Syndrome Pattern',
+      description: `${metSynCriteria} of 5 metabolic syndrome criteria are met (elevated glucose, triglycerides, waist circumference, low HDL, or HbA1c).`,
+      recommendation: 'Prioritize 30+ min aerobic exercise 4x/week, reduce refined carbs, increase soluble fiber (10+ g/day), and consider consulting an endocrinologist.',
+    });
+  }
+
+  // --- Postprandial hyperglycemia: elevated HbA1c with normal fasting glucose ---
+  if (
+    markers.hba1c !== undefined && markers.hba1c >= 5.7 &&
+    markers.glucose !== undefined && markers.glucose < 100
+  ) {
+    insights.push({
+      type: 'warning',
+      title: 'Likely Postprandial Hyperglycemia',
+      description: 'HbA1c is elevated despite normal fasting glucose, suggesting blood sugar spikes after meals.',
+      recommendation: 'Take 15 min walks after meals, eat carbs with protein/fat (not alone), reduce meal carb load by 20%, and consider a continuous glucose monitor (CGM).',
+    });
+  }
+
+  // --- Nutrient malabsorption cluster ---
+  const lowNutrients = [
+    markers.ferritin !== undefined && markers.ferritin < 20,
+    markers.vitaminB12 !== undefined && markers.vitaminB12 < 300,
+    markers.albumin !== undefined && markers.albumin < 3.5,
+    markers.iron !== undefined && markers.iron < 60,
+  ].filter(Boolean).length;
+
+  if (lowNutrients >= 2) {
+    insights.push({
+      type: 'warning',
+      title: 'Possible Nutrient Malabsorption',
+      description: `${lowNutrients} micronutrient markers are below optimal, which may indicate a dietary intake or GI absorption issue.`,
+      recommendation: 'Consider testing for celiac disease (tTG antibody), assess dietary variety, and evaluate GI health with your provider if symptoms are present.',
+    });
+  }
+
+  // --- Hyperuricemia + metabolic cluster ---
+  if (
+    markers.uricAcid !== undefined && markers.uricAcid > 7.0 &&
+    ((markers.triglycerides !== undefined && markers.triglycerides > 150) ||
+     (markers.glucose !== undefined && markers.glucose >= 100))
+  ) {
+    insights.push({
+      type: 'warning',
+      title: 'Hyperuricemia with Metabolic Risk',
+      description: 'Elevated uric acid combined with metabolic markers increases gout and cardiovascular risk.',
+      recommendation: 'Reduce fructose and alcohol, stay well hydrated (2+ L/day), prioritize weight loss if overweight, and limit purine-rich foods.',
+    });
+  }
+
+  // --- Insulin resistance convergence (HOMA-IR + TyG + TG/HDL all pointing same way) ---
+  const homaIR = (markers.glucose !== undefined && markers.fastingInsulin !== undefined)
+    ? (markers.glucose * markers.fastingInsulin) / 405
+    : null;
+  const tgHdlRatio = (markers.triglycerides !== undefined && markers.hdl !== undefined && markers.hdl > 0)
+    ? markers.triglycerides / markers.hdl
+    : null;
+
+  const irSignals = [
+    homaIR !== null && homaIR > 2.0,
+    tgHdlRatio !== null && tgHdlRatio > 3.0,
+    markers.hba1c !== undefined && markers.hba1c >= 5.7,
+  ].filter(Boolean).length;
+
+  if (irSignals >= 2) {
+    insights.push({
+      type: 'danger',
+      title: 'Strong Insulin Resistance Signal',
+      description: 'Multiple independent markers (HOMA-IR, TG/HDL ratio, HbA1c) converge on insulin resistance.',
+      recommendation: 'Prioritize resistance training (builds insulin-sensitive muscle), reduce refined carbs, consider time-restricted eating (16:8), and discuss metformin with your doctor if BMI > 30.',
+    });
+  }
+
+  // --- Liver stress + inflammation ---
+  if (
+    ((markers.alt !== undefined && markers.alt > 45) || (markers.ast !== undefined && markers.ast > 40)) &&
+    markers.hsCRP !== undefined && markers.hsCRP > 3.0
+  ) {
+    insights.push({
+      type: 'warning',
+      title: 'Hepatic Stress with Systemic Inflammation',
+      description: 'Elevated liver enzymes combined with high hs-CRP suggest liver inflammation that may be part of a systemic pattern.',
+      recommendation: 'Limit alcohol, reduce processed foods, increase omega-3 intake, and discuss liver imaging (ultrasound) with your doctor.',
+    });
+  }
+
   return insights;
 }
 
@@ -246,26 +358,73 @@ export function calculateCalorieTiers(tdee: number): CalorieTier[] {
   ];
 }
 
-export function calculateMacros(calories: number, goal: UserProfile['goal']): MacroBreakdown {
-  const macroRatios: Record<UserProfile['goal'], { p: number; c: number; f: number }> = {
-    'lose-aggressive': { p: 45, c: 25, f: 30 },  // very high protein to protect muscle in steep deficit
-    'lose-moderate':   { p: 40, c: 30, f: 30 },
-    'lose-mild':       { p: 35, c: 35, f: 30 },
-    'maintain':        { p: 30, c: 40, f: 30 },
-    'gain-lean':       { p: 35, c: 40, f: 25 },
-    'gain-aggressive': { p: 30, c: 45, f: 25 },   // higher carbs to fuel heavy training
+export function calculateMacros(
+  calories: number,
+  goal: UserProfile['goal'],
+  profile?: Pick<UserProfile, 'weightLbs' | 'gender'>,
+  markers?: BloodMarkers,
+): MacroBreakdown {
+  // --- Protein: body-weight-based (g per lb) with goal-specific targets ---
+  // ISSN position stand: 1.6–2.2 g/kg (≈ 0.73–1.0 g/lb) for body composition goals.
+  // Deeper deficits need higher protein to preserve lean mass (Helms et al., 2014).
+  const proteinPerLb: Record<UserProfile['goal'], number> = {
+    'lose-aggressive': 1.0,   // maximum protein retention in steep deficit
+    'lose-moderate':   0.9,
+    'lose-mild':       0.85,
+    'maintain':        0.8,
+    'gain-lean':       0.9,
+    'gain-aggressive': 0.85,
   };
-  const ratios = macroRatios[goal];
 
-  const proteinGrams = Math.round((calories * ratios.p / 100) / 4);
-  const carbGrams = Math.round((calories * ratios.c / 100) / 4);
-  // Compute fat as residual to prevent rounding drift (total always matches)
-  const fatGrams = Math.round((calories - proteinGrams * 4 - carbGrams * 4) / 9);
+  const weightLbs = profile?.weightLbs ?? 154; // fallback to ~70 kg
+  let proteinGrams = Math.round(weightLbs * proteinPerLb[goal]);
+
+  // Cap protein calories at 45% of total to leave room for carbs/fat
+  const maxProteinCal = Math.round(calories * 0.45);
+  proteinGrams = Math.min(proteinGrams, Math.round(maxProteinCal / 4));
+
+  const proteinCal = proteinGrams * 4;
+  const remaining = calories - proteinCal;
+
+  // --- Carb/fat split: base ratios adjusted by insulin resistance markers ---
+  // Default carb fraction of remaining calories (after protein)
+  const baseCarbFractions: Record<UserProfile['goal'], number> = {
+    'lose-aggressive': 0.45,
+    'lose-moderate':   0.50,
+    'lose-mild':       0.55,
+    'maintain':        0.55,
+    'gain-lean':       0.60,
+    'gain-aggressive': 0.65,
+  };
+  let carbFraction = baseCarbFractions[goal];
+
+  // Adjust for insulin resistance: reduce carbs, increase fat
+  if (markers) {
+    const homaIR = (markers.glucose !== undefined && markers.fastingInsulin !== undefined)
+      ? (markers.glucose * markers.fastingInsulin) / 405
+      : null;
+    if (homaIR !== null && homaIR > 2.0) {
+      carbFraction -= 0.10; // shift 10% from carbs to fat for IR
+    }
+    if (markers.triglycerides !== undefined && markers.triglycerides > 150) {
+      carbFraction -= 0.05; // further reduce carbs for high TG
+    }
+    // Floor: don't go below 30% of remaining as carbs
+    carbFraction = Math.max(0.30, carbFraction);
+  }
+
+  const carbGrams = Math.round((remaining * carbFraction) / 4);
+  const fatGrams = Math.round((remaining - carbGrams * 4) / 9);
+
+  // Compute actual percentages
+  const pctP = Math.round((proteinCal / calories) * 100);
+  const pctC = Math.round((carbGrams * 4 / calories) * 100);
+  const pctF = 100 - pctP - pctC;
 
   return {
-    protein: { grams: proteinGrams, pct: ratios.p },
-    carbs: { grams: carbGrams, pct: ratios.c },
-    fat: { grams: fatGrams, pct: ratios.f },
+    protein: { grams: proteinGrams, pct: pctP },
+    carbs: { grams: carbGrams, pct: pctC },
+    fat: { grams: fatGrams, pct: pctF },
     calories,
   };
 }
@@ -374,22 +533,87 @@ export function calculateRecommendations(
     else tygInterpretation = 'High Insulin Resistance Risk';
   }
 
-  // Supplements from deficiencies
-  const supplementMap: Record<string, { dosage: string; reason: string }> = {
-    'Vitamin D': { dosage: '2000-4000 IU daily', reason: 'Low vitamin D levels' },
-    'Vitamin B12': { dosage: '1000 mcg daily', reason: 'B12 deficiency detected' },
-    'Iron (Ferritin)': { dosage: '18-27 mg daily (with vitamin C)', reason: 'Low ferritin stores' },
-    'Serum Iron': { dosage: '18-27 mg daily (with vitamin C)', reason: 'Low serum iron levels' },
-    'Albumin': { dosage: 'Increase dietary protein intake', reason: 'Low albumin — may indicate poor nutrition or liver issues' },
-  };
-  const supplements = deficiencies
-    .filter((d) => supplementMap[d])
-    .map((d) => ({ name: d, ...supplementMap[d] }));
+  // --- Supplements: severity-tiered dosing for deficiencies + marker-driven additions ---
+  const supplements: { name: string; dosage: string; reason: string }[] = [];
 
-  // Exercise suggestions
+  // Vitamin D — tiered by severity
+  if (markers.vitaminD !== undefined) {
+    if (markers.vitaminD < 12) {
+      supplements.push({ name: 'Vitamin D3', dosage: '5000–6000 IU daily', reason: 'Severe deficiency (<12 ng/mL) — load aggressively, retest in 8 weeks' });
+    } else if (markers.vitaminD < 20) {
+      supplements.push({ name: 'Vitamin D3', dosage: '3000–4000 IU daily', reason: 'Deficiency (<20 ng/mL) — supplement to reach 40–60 ng/mL' });
+    } else if (markers.vitaminD < 30) {
+      supplements.push({ name: 'Vitamin D3', dosage: '2000 IU daily', reason: 'Insufficiency (<30 ng/mL) — maintenance dose to optimize levels' });
+    }
+  } else if (deficiencies.includes('Vitamin D')) {
+    supplements.push({ name: 'Vitamin D3', dosage: '2000–4000 IU daily', reason: 'Low vitamin D levels' });
+  }
+
+  // Vitamin B12
+  if (markers.vitaminB12 !== undefined && markers.vitaminB12 < 300) {
+    const dosage = markers.vitaminB12 < 200
+      ? '2000 mcg sublingual daily (or discuss injections with your doctor)'
+      : '1000 mcg daily';
+    supplements.push({ name: 'Vitamin B12', dosage, reason: `B12 at ${markers.vitaminB12} pg/mL — below optimal range (>400)` });
+  } else if (deficiencies.includes('Vitamin B12')) {
+    supplements.push({ name: 'Vitamin B12', dosage: '1000 mcg daily', reason: 'B12 deficiency detected' });
+  }
+
+  // Iron — only if not inflamed (CRP check)
+  const ironDeficient = deficiencies.includes('Iron (Ferritin)') || deficiencies.includes('Serum Iron');
+  if (ironDeficient) {
+    const inflamed = markers.hsCRP !== undefined && markers.hsCRP > 3.0;
+    if (inflamed) {
+      supplements.push({ name: 'Iron', dosage: 'Defer until inflammation resolves', reason: 'Low iron stores, but elevated hs-CRP — iron supplementation during inflammation can be counterproductive. Resolve inflammation first.' });
+    } else {
+      const dosage = profile.gender === 'female'
+        ? '18–27 mg daily (with vitamin C for absorption)'
+        : '8–18 mg daily (with vitamin C for absorption)';
+      supplements.push({ name: 'Iron', dosage, reason: 'Low ferritin/iron stores — take on an empty stomach or with vitamin C' });
+    }
+  }
+
+  // Albumin
+  if (deficiencies.includes('Albumin')) {
+    supplements.push({ name: 'Dietary Protein', dosage: 'Increase to 1.2+ g/kg/day', reason: 'Low albumin — prioritize complete protein sources (eggs, dairy, poultry, fish)' });
+  }
+
+  // Omega-3 — triggered by lipid markers
+  if (
+    (markers.triglycerides !== undefined && markers.triglycerides > 150) ||
+    (markers.apoB !== undefined && markers.apoB > 100) ||
+    (markers.hsCRP !== undefined && markers.hsCRP > 2.0)
+  ) {
+    const reasons: string[] = [];
+    if (markers.triglycerides !== undefined && markers.triglycerides > 150) reasons.push('elevated triglycerides');
+    if (markers.apoB !== undefined && markers.apoB > 100) reasons.push('high ApoB');
+    if (markers.hsCRP !== undefined && markers.hsCRP > 2.0) reasons.push('elevated hs-CRP');
+    supplements.push({ name: 'Omega-3 (EPA/DHA)', dosage: '2–3 g EPA+DHA daily', reason: `Supports lipid profile and reduces inflammation (${reasons.join(', ')})` });
+  }
+
+  // Magnesium — broadly beneficial, recommended when metabolic markers are off
+  const homaIRVal = (markers.glucose !== undefined && markers.fastingInsulin !== undefined)
+    ? (markers.glucose * markers.fastingInsulin) / 405
+    : null;
+  if (
+    (homaIRVal !== null && homaIRVal > 1.5) ||
+    (markers.glucose !== undefined && markers.glucose >= 100) ||
+    (markers.hba1c !== undefined && markers.hba1c >= 5.7)
+  ) {
+    supplements.push({ name: 'Magnesium Glycinate', dosage: '300–400 mg daily', reason: 'Supports insulin sensitivity, metabolic health, and muscle recovery — often depleted in insulin-resistant states' });
+  }
+
+  // Creatine — for gain goals or active individuals
+  if (profile.goal.startsWith('gain') || profile.activityLevel === 'active' || profile.activityLevel === 'very-active') {
+    supplements.push({ name: 'Creatine Monohydrate', dosage: '3–5 g daily', reason: 'Supports strength, power output, and lean mass — most studied sports supplement (ISSN position stand)' });
+  }
+
+  // --- Exercise suggestions: activity-level baseline + marker-driven adjustments ---
   const exerciseSuggestions: string[] = [];
+
+  // Baseline by activity level
   if (activityIdx <= 1) {
-    exerciseSuggestions.push('Start with 20-30 min daily walks to build a base');
+    exerciseSuggestions.push('Start with 20–30 min daily walks to build a base');
     exerciseSuggestions.push('Add 2 bodyweight strength sessions per week');
   } else if (activityIdx <= 2) {
     exerciseSuggestions.push('Increase to 150 min moderate cardio per week');
@@ -398,11 +622,28 @@ export function calculateRecommendations(
     exerciseSuggestions.push('Maintain current activity with periodized training');
     exerciseSuggestions.push('Include mobility and recovery work');
   }
+
+  // Marker-driven additions
   if (markers.ldl !== undefined && markers.ldl >= 130) {
     exerciseSuggestions.push('Prioritize steady-state cardio (30+ min) to support cholesterol levels');
   }
   if (markers.glucose !== undefined && markers.glucose >= 100) {
-    exerciseSuggestions.push('Post-meal walks (15 min) can help regulate blood sugar');
+    exerciseSuggestions.push('Post-meal walks (15 min) help regulate blood sugar — especially after carb-heavy meals');
+  }
+  if (markers.ferritin !== undefined && markers.ferritin < 30) {
+    exerciseSuggestions.push('Caution with intense cardio while ferritin is low — risk of exercise intolerance and fatigue. Begin iron supplementation 2+ weeks before increasing training volume.');
+  }
+  if (markers.tsh !== undefined && markers.tsh > 5) {
+    exerciseSuggestions.push('Elevated TSH suggests hypothyroid tendency — favor moderate cardio (3x30 min) over high-intensity. Avoid extreme volume until thyroid is managed.');
+  }
+  if ((markers.alt !== undefined && markers.alt > 50) || (markers.ast !== undefined && markers.ast > 50)) {
+    exerciseSuggestions.push('Elevated liver enzymes — reduce high-intensity work temporarily. Focus on steady-state aerobic exercise to support liver recovery.');
+  }
+  if (markers.uricAcid !== undefined && markers.uricAcid > 7.0) {
+    exerciseSuggestions.push('High uric acid increases gout risk — stay well hydrated during exercise, avoid fructose-heavy sports drinks, and favor low-impact activities during flares.');
+  }
+  if (markers.hsCRP !== undefined && markers.hsCRP > 3.0) {
+    exerciseSuggestions.push('Elevated hs-CRP indicates systemic inflammation — consider anti-inflammatory activities (yoga, swimming, walking) alongside strength training.');
   }
 
   // Waist-to-hip ratio

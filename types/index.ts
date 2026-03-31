@@ -13,6 +13,7 @@ export interface UserProfile {
   treatedForHypertension?: boolean;
   waistInches?: number;
   hipInches?: number;
+  bodyFatPercentage?: number; // optional; enables Katch-McArdle TDEE
 }
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active';
