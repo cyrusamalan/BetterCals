@@ -34,7 +34,7 @@ export default function MacroDonutChart({ macros }: MacroDonutChartProps) {
       </div>
 
       <div className="px-5 py-4">
-        <div className="relative mx-auto" style={{ width: 180, height: 180 }}>
+        <div className="relative mx-auto w-[150px] h-[150px] sm:w-[180px] sm:h-[180px]">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie

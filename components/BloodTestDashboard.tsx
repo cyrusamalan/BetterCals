@@ -877,20 +877,20 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
           WebkitBackdropFilter: 'blur(16px)',
         }}
       >
-        <div className="max-w-5xl mx-auto px-5 py-4">
-          <div className="flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 sm:px-5 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-2">
             <button
               onClick={onReset}
-              className="flex items-center gap-1.5 text-sm font-medium group btn-press"
+              className="flex items-center gap-1.5 text-sm font-medium group btn-press shrink-0"
               style={{ color: 'var(--text-secondary)' }}
             >
               <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" style={{ color: 'var(--text-tertiary)' }} />
-              {resetLabel}
+              <span className="hidden sm:inline">{resetLabel}</span>
             </button>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
               <button
                 onClick={handleDownloadPDF}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press"
                 style={{
                   backgroundColor: 'var(--border-light)',
                   color: 'var(--text-primary)',
@@ -898,14 +898,14 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                 }}
               >
                 <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                Download Report
+                <span className="hidden sm:inline">Download Report</span>
               </button>
 
               {isSignedIn ? (
                 <>
                   <Link
                     href="/history"
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
+                    className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press"
                     style={{
                       backgroundColor: 'var(--border-light)',
                       color: 'var(--text-primary)',
@@ -913,12 +913,12 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                     }}
                   >
                     <History className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                    History
+                    <span className="hidden sm:inline">History</span>
                   </Link>
                   <button
                     onClick={handleSaveToHistory}
                     disabled={saving || saved}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press disabled:opacity-50"
+                    className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press disabled:opacity-50"
                     style={{
                       backgroundColor: saved ? 'var(--status-normal-bg)' : 'var(--border-light)',
                       color: saved ? 'var(--status-normal)' : 'var(--text-primary)',
@@ -930,7 +930,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                     ) : (
                       <Save className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
                     )}
-                    {saving ? 'Saving...' : saved ? 'Saved' : 'Save to History'}
+                    <span className="hidden sm:inline">{saving ? 'Saving...' : saved ? 'Saved' : 'Save to History'}</span>
                   </button>
                   {onEditProfile && (
                     <ProfileDropdown profile={profile} onEditProfile={onEditProfile} />
@@ -939,7 +939,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
               ) : (
                 <Link
                   href="/sign-in"
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold btn-press"
+                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press"
                   style={{
                     backgroundColor: 'var(--accent)',
                     color: 'var(--text-inverse)',
@@ -947,22 +947,22 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                   }}
                 >
                   <Save className="w-4 h-4" />
-                  Sign in to Save
+                  <span className="hidden sm:inline">Sign in to Save</span>
                 </Link>
               )}
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <div
-                  className="w-9 h-9 rounded-[14px] flex items-center justify-center"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-[14px] flex items-center justify-center"
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1px solid #d2d2cc',
                     boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
                   }}
                 >
-                  <VitalsMark sizePx={26} />
+                  <VitalsMark sizePx={22} />
                 </div>
-                <span className="text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
+                <span className="hidden sm:inline text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
               </div>
             </div>
           </div>
@@ -1174,7 +1174,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
       </div>
 
       {/* Screen UI */}
-      <div id="screen-content" className="max-w-5xl mx-auto px-5 pt-8">
+      <div id="screen-content" className="max-w-5xl mx-auto px-4 sm:px-5 pt-6 sm:pt-8">
         {/* 1. Hero: Score + BMR/TDEE inline + BMI badge */}
         <div className="anim-fade-up delay-1">
           <div
@@ -1190,7 +1190,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
               style={{ background: `radial-gradient(circle, ${grade.color} 0%, transparent 70%)` }}
             />
 
-            <div className="relative grid grid-cols-1 md:grid-cols-[auto_1fr] gap-8 p-6 md:p-8">
+            <div className="relative grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 sm:gap-8 p-4 sm:p-6 md:p-8">
               {hasMarkers && (
                 <div className="flex flex-col items-center justify-center">
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] mb-4" style={{ color: 'var(--text-tertiary)' }}>
@@ -1301,7 +1301,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                 </div>
 
                 {hasMarkers && (
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                     {CATEGORIES.map((cat, idx) => {
                       const s = healthScore[cat.scoreKey];
                       const g = getScoreGrade(s);

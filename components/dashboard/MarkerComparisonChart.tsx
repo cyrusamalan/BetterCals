@@ -201,9 +201,9 @@ export default function MarkerComparisonChart({ markers, gender }: MarkerCompari
       <div className="px-5 py-4">
         <div style={{ width: '100%', height: Math.max(200, data.length * 36) }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
+            <BarChart data={data} layout="vertical" margin={{ left: 0, right: 10, top: 5, bottom: 5 }}>
               <XAxis type="number" domain={[0, bellCurveMax]} tick={{ fontSize: 10, fill: '#948e84' }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#5c5850' }} width={60} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#5c5850' }} width={50} />
               <Tooltip
                 formatter={(value: number) => [`${value}%`, 'of midpoint']}
                 contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e4e2dc' }}
