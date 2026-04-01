@@ -129,7 +129,7 @@ const CATEGORIES: {
     label: 'Cardiovascular',
     icon: Heart,
     scoreKey: 'cardiovascular',
-    markers: ['totalCholesterol', 'ldl', 'hdl', 'triglycerides'],
+    markers: ['totalCholesterol', 'ldl', 'hdl', 'triglycerides', 'nonHdl', 'apoB', 'hsCRP'],
     accent: 'var(--accent-rose)',
     accentBg: '#f9ecec',
   },

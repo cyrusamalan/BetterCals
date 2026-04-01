@@ -226,7 +226,8 @@ export default function Home() {
     }
 
     // Derive computed lipids (Non-HDL + LDL fallback logic).
-    mergedMarkers = { ...mergedMarkers, ...deriveMarkers(mergedMarkers) };
+    const derived = deriveMarkers(mergedMarkers);
+    mergedMarkers = { ...mergedMarkers, ...derived };
 
     setMarkers(mergedMarkers);
 
@@ -249,6 +250,7 @@ export default function Home() {
         ascvdRiskScore: ascvdResult.risk ?? undefined,
         ascvdRiskReason: ascvdResult.reason,
         usedAverageMarkers,
+        derivedMarkers: derived,
       });
 
       setStep('results');
