@@ -167,6 +167,98 @@ export const POPULATION_MEDIANS: Record<UserProfile['gender'], Record<AgeBand, B
   },
 };
 
+export type PopulationComparisonDirection = 'higherIsBetter' | 'lowerIsBetter' | 'ambiguous';
+
+const POPULATION_DIRECTION: Partial<Record<keyof BloodMarkers, PopulationComparisonDirection>> = {
+  hdl: 'higherIsBetter',
+  vitaminD: 'higherIsBetter',
+  vitaminB12: 'higherIsBetter',
+
+  glucose: 'lowerIsBetter',
+  hba1c: 'lowerIsBetter',
+  totalCholesterol: 'lowerIsBetter',
+  nonHdl: 'lowerIsBetter',
+  ldl: 'lowerIsBetter',
+  triglycerides: 'lowerIsBetter',
+  apoB: 'lowerIsBetter',
+  hsCRP: 'lowerIsBetter',
+  alt: 'lowerIsBetter',
+  ast: 'lowerIsBetter',
+  creatinine: 'lowerIsBetter',
+  uricAcid: 'lowerIsBetter',
+  fastingInsulin: 'lowerIsBetter',
+
+  // These can be meaningfully "too low" or "too high" depending on context.
+  ferritin: 'ambiguous',
+  iron: 'ambiguous',
+  tsh: 'ambiguous',
+  albumin: 'ambiguous',
+};
+
+// Rough, marker-specific spread on a log scale. Higher = wider distribution.
+// These are heuristics for UX (not clinical statistics).
+const LOG_SIGMA: Partial<Record<keyof BloodMarkers, number>> = {
+  glucose: 0.08,
+  hba1c: 0.06,
+  hdl: 0.18,
+  ldl: 0.22,
+  triglycerides: 0.35,
+  totalCholesterol: 0.18,
+  vitaminD: 0.35,
+  hsCRP: 0.7,
+  fastingInsulin: 0.5,
+};
+
+function normalCdf(z: number): number {
+  // Abramowitz & Stegun approximation (fast + sufficient for UI).
+  const sign = z < 0 ? -1 : 1;
+  const x = Math.abs(z) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const erf = 1 - (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t) * Math.exp(-x * x);
+  return 0.5 * (1 + sign * erf);
+}
+
+export function getPopulationMedian(profile: Pick<UserProfile, 'age' | 'gender'>): BloodMarkers {
+  const ageBand = getAgeBand(profile.age);
+  return { ...(POPULATION_MEDIANS[profile.gender]?.[ageBand] ?? {}) };
+}
+
+export function getPopulationMedianForMarker(
+  profile: Pick<UserProfile, 'age' | 'gender'>,
+  marker: keyof BloodMarkers,
+): number | undefined {
+  const table = getPopulationMedian(profile);
+  return table[marker];
+}
+
+export function estimatePopulationHealthPercentile(params: {
+  profile: Pick<UserProfile, 'age' | 'gender'>;
+  marker: keyof BloodMarkers;
+  value: number;
+}): number | null {
+  const { profile, marker, value } = params;
+  if (!Number.isFinite(value) || value <= 0) return null;
+
+  const median = getPopulationMedianForMarker(profile, marker);
+  if (!Number.isFinite(median) || !median || median <= 0) return null;
+
+  const direction = POPULATION_DIRECTION[marker] ?? 'ambiguous';
+  if (direction === 'ambiguous') return null;
+
+  const sigma = LOG_SIGMA[marker] ?? 0.25;
+  const z = Math.log(value / median) / sigma;
+  const valuePct = normalCdf(z) * 100; // % of population below this value
+
+  const healthPct = direction === 'higherIsBetter' ? valuePct : 100 - valuePct;
+  const clamped = Math.min(99, Math.max(1, healthPct)); // avoid awkward 0/100 UX
+  return Math.round(clamped);
+}
+
 export function estimateAverageMarkers(profile: UserProfile): BloodMarkers {
   const ageBand = getAgeBand(profile.age);
   const fromTable = POPULATION_MEDIANS[profile.gender]?.[ageBand];

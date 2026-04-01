@@ -1609,7 +1609,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
               />
             </div>
             <div className="md:col-span-2">
-              <MarkerComparisonChart markers={markers} gender={profile.gender} />
+              <MarkerComparisonChart markers={markers} profile={{ age: profile.age, gender: profile.gender }} />
             </div>
           </div>
         )}

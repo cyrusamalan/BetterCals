@@ -2,6 +2,7 @@
 
 import type { BloodMarkers, UserProfile } from '@/types';
 import { getMarkerDisplayRange, getMarkerInterpretation, getMarkerTiers } from '@/lib/bloodParser';
+import { estimatePopulationHealthPercentile, getPopulationMedianForMarker } from '@/lib/averageMarkers';
 import {
   BarChart,
   Bar,
@@ -17,7 +18,7 @@ import {
 
 interface MarkerComparisonChartProps {
   markers: BloodMarkers;
-  gender?: UserProfile['gender'];
+  profile?: Pick<UserProfile, 'age' | 'gender'>;
 }
 
 const MARKER_SHORT: Record<keyof BloodMarkers, string> = {
@@ -53,7 +54,8 @@ const STATUS_COLORS: Record<string, string> = {
   unknown: '#8a857c',
 };
 
-export default function MarkerComparisonChart({ markers, gender }: MarkerComparisonChartProps) {
+export default function MarkerComparisonChart({ markers, profile }: MarkerComparisonChartProps) {
+  const gender = profile?.gender;
   const keys = (Object.keys(markers) as (keyof BloodMarkers)[]);
   const data = keys
     .filter((key) => markers[key] !== undefined && getMarkerDisplayRange(key, gender))
@@ -63,11 +65,16 @@ export default function MarkerComparisonChart({ markers, gender }: MarkerCompari
       const midpoint = (range.min + range.max) / 2;
       const pct = Math.round((value / midpoint) * 100);
       const interp = getMarkerInterpretation(key, value, gender);
+      const popMedian = profile ? getPopulationMedianForMarker(profile, key) : undefined;
+      const popHealthPct = profile ? estimatePopulationHealthPercentile({ profile, marker: key, value }) : null;
       return {
         key,
         name: MARKER_SHORT[key],
         pct,
         fill: STATUS_COLORS[interp.status] || STATUS_COLORS.normal,
+        value,
+        popMedian,
+        popHealthPct,
       };
     });
 
@@ -205,8 +212,47 @@ export default function MarkerComparisonChart({ markers, gender }: MarkerCompari
               <XAxis type="number" domain={[0, bellCurveMax]} tick={{ fontSize: 10, fill: '#948e84' }} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#5c5850' }} width={50} />
               <Tooltip
-                formatter={(value: number) => [`${value}%`, 'of midpoint']}
-                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e4e2dc' }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0]?.payload as (typeof data)[number] | undefined;
+                  if (!d) return null;
+
+                  return (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        borderRadius: 10,
+                        border: '1px solid #e4e2dc',
+                        background: 'rgba(255,255,255,0.96)',
+                        padding: '10px 10px',
+                        boxShadow: '0 8px 28px rgba(0,0,0,0.10)',
+                        minWidth: 180,
+                      }}
+                    >
+                      <div className="font-semibold" style={{ color: '#3c3a35' }}>
+                        {d.name}
+                      </div>
+                      <div className="mt-1" style={{ color: '#6b675f' }}>
+                        {d.pct}% <span style={{ color: '#948e84' }}>of reference midpoint</span>
+                      </div>
+                      {profile && d.popMedian !== undefined ? (
+                        <div className="mt-1" style={{ color: '#6b675f' }}>
+                          Median (age/sex): <span className="font-semibold">{d.popMedian}</span>
+                        </div>
+                      ) : null}
+                      {profile && d.popHealthPct !== null ? (
+                        <div className="mt-1" style={{ color: '#6b675f' }}>
+                          Better than <span className="font-semibold">{d.popHealthPct}%</span>
+                        </div>
+                      ) : null}
+                      {profile && d.popMedian !== undefined && d.popHealthPct === null ? (
+                        <div className="mt-1" style={{ color: '#948e84' }}>
+                          Percentile unavailable for this marker
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                }}
               />
               {zoneBands ? (
                 <>
