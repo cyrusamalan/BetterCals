@@ -1,57 +1,65 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import {
+  AlertCircle,
   ArrowLeft,
+  FolderOpen,
+  Loader2,
+  Sparkles,
   TrendingUp,
   Activity,
-  Heart,
   Scale,
-  Loader2,
-  FolderOpen,
-  AlertCircle,
   ChevronRight,
 } from 'lucide-react';
 import {
-  LineChart,
+  CartesianGrid,
+  Legend,
   Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
 } from 'recharts';
-import type { AnalysisHistory, BloodMarkers } from '@/types';
-import { getMarkerInterpretation } from '@/lib/bloodParser';
+import ThemeToggle from '@/components/ThemeToggle';
+import {
+  AnalysisHistory,
+  BloodMarkers,
+  MarkerForecast,
+} from '@/types';
+import { deriveMarkerForecasts } from '@/lib/derivedInsights';
+import { getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
 
 const MARKER_LABELS: Record<keyof BloodMarkers, string> = {
-  glucose: 'Glucose (mg/dL)',
-  hba1c: 'HbA1c (%)',
-  totalCholesterol: 'Total Cholesterol (mg/dL)',
-  nonHdl: 'Non-HDL (mg/dL)',
-  ldl: 'LDL (mg/dL)',
-  hdl: 'HDL (mg/dL)',
-  triglycerides: 'Triglycerides (mg/dL)',
-  apoB: 'ApoB (mg/dL)',
-  hsCRP: 'hs-CRP (mg/L)',
-  tsh: 'TSH (mIU/L)',
-  vitaminD: 'Vitamin D (ng/mL)',
-  vitaminB12: 'Vitamin B12 (pg/mL)',
-  ferritin: 'Ferritin (ng/mL)',
-  iron: 'Iron (mcg/dL)',
-  alt: 'ALT (U/L)',
-  ast: 'AST (U/L)',
-  albumin: 'Albumin (g/dL)',
-  creatinine: 'Creatinine (mg/dL)',
-  uricAcid: 'Uric Acid (mg/dL)',
-  fastingInsulin: 'Fasting Insulin (mIU/L)',
+  glucose: 'Glucose',
+  hba1c: 'HbA1c',
+  totalCholesterol: 'Total Cholesterol',
+  nonHdl: 'Non-HDL',
+  ldl: 'LDL',
+  hdl: 'HDL',
+  triglycerides: 'Triglycerides',
+  apoB: 'ApoB',
+  hsCRP: 'hs-CRP',
+  tsh: 'TSH',
+  vitaminD: 'Vitamin D',
+  vitaminB12: 'Vitamin B12',
+  ferritin: 'Ferritin',
+  iron: 'Iron',
+  alt: 'ALT',
+  ast: 'AST',
+  albumin: 'Albumin',
+  creatinine: 'Creatinine',
+  uricAcid: 'Uric Acid',
+  fastingInsulin: 'Fasting Insulin',
 };
 
+type ComparisonDirection = 'improved' | 'worse' | 'unchanged';
+
 function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', {
+  return new Date(iso).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -59,8 +67,35 @@ function formatDate(iso: string): string {
 }
 
 function formatShortDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function scoreColor(score: number, alpha: number): string {
+  if (score >= 80) return `rgba(107, 143, 113, ${alpha})`;
+  if (score >= 60) return `rgba(212, 165, 116, ${alpha})`;
+  return `rgba(192, 57, 43, ${alpha})`;
+}
+
+function directionColor(direction: ComparisonDirection): string {
+  if (direction === 'improved') return 'var(--status-normal)';
+  if (direction === 'worse') return 'var(--status-danger)';
+  return 'var(--text-tertiary)';
+}
+
+function MetricPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      className="rounded-lg px-3 py-2 text-center"
+      style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}
+    >
+      <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'var(--text-tertiary)' }}>
+        {label}
+      </p>
+      <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--text-primary)' }}>
+        {value}
+      </p>
+    </div>
+  );
 }
 
 export default function HistoryPage() {
@@ -92,7 +127,7 @@ export default function HistoryPage() {
     }
 
     fetchAnalyses();
-  }, [isSignedIn, isLoaded]);
+  }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
     if (analyses.length >= 2 && (compareAId === null || compareBId === null)) {
@@ -101,103 +136,125 @@ export default function HistoryPage() {
     }
   }, [analyses, compareAId, compareBId]);
 
-  // Chronological order for charts (oldest first)
   const chronological = useMemo(() => [...analyses].reverse(), [analyses]);
+  const markerForecasts = useMemo(() => deriveMarkerForecasts(analyses), [analyses]);
+  const forecastByMarker = useMemo(
+    () => Object.fromEntries(markerForecasts.map((forecast) => [forecast.marker, forecast])),
+    [markerForecasts]
+  );
 
-  // Health score trend data
   const healthScoreTrend = useMemo(
     () =>
-      chronological.map((a) => ({
-        date: formatShortDate(a.createdAt),
-        overall: a.result.healthScore.overall,
-        metabolic: a.result.healthScore.metabolic,
-        cardiovascular: a.result.healthScore.cardiovascular,
+      chronological.map((analysis) => ({
+        date: formatShortDate(analysis.createdAt),
+        overall: analysis.result.healthScore.overall,
+        metabolic: analysis.result.healthScore.metabolic,
+        cardiovascular: analysis.result.healthScore.cardiovascular,
       })),
     [chronological]
   );
 
-  // Weight trend data
   const weightTrend = useMemo(() => {
-    const points = chronological.map((a) => ({
-      date: formatShortDate(a.createdAt),
-      weight: a.profile.weightLbs,
+    const points = chronological.map((analysis) => ({
+      date: formatShortDate(analysis.createdAt),
+      weight: analysis.profile.weightLbs,
     }));
-    const uniqueWeights = new Set(points.map((p) => p.weight));
-    return uniqueWeights.size > 1 ? points : [];
+    return new Set(points.map((point) => point.weight)).size > 1 ? points : [];
   }, [chronological]);
 
-  // Find markers that appear across multiple analyses
   const markerTrends = useMemo(() => {
-    const markerKeys = Object.keys(MARKER_LABELS) as (keyof BloodMarkers)[];
-    const trends: { key: keyof BloodMarkers; label: string; data: { date: string; value: number }[] }[] = [];
+    const keys = Object.keys(MARKER_LABELS) as (keyof BloodMarkers)[];
+    return keys
+      .map((key) => {
+        const historyData = chronological
+          .map((analysis) => ({
+            date: formatShortDate(analysis.createdAt),
+            value: analysis.markers[key],
+          }))
+          .filter((point): point is { date: string; value: number } => typeof point.value === 'number');
 
-    for (const key of markerKeys) {
-      const points: { date: string; value: number }[] = [];
-      for (const a of chronological) {
-        const val = a.markers[key];
-        if (val !== undefined && val !== null) {
-          points.push({ date: formatShortDate(a.createdAt), value: val });
+        if (historyData.length < 2) return null;
+
+        const forecast = forecastByMarker[key];
+        const chartData: Array<{ date: string; value?: number; projected?: number }> = [...historyData];
+        if (forecast) {
+          chartData.push({
+            date: formatShortDate(forecast.projectedDate),
+            value: historyData[historyData.length - 1].value,
+            projected: historyData[historyData.length - 1].value,
+          });
+          chartData.push({
+            date: formatShortDate(forecast.projectedDate),
+            value: undefined,
+            projected: forecast.projectedValue,
+          });
         }
-      }
-      if (points.length >= 2) {
-        trends.push({ key, label: MARKER_LABELS[key], data: points });
-      }
-    }
 
-    return trends;
-  }, [chronological]);
+        return {
+          key,
+          label: MARKER_LABELS[key],
+          unit: getMarkerUnit(key) ?? '',
+          data: chartData,
+          latestValue: historyData[historyData.length - 1].value,
+          forecast,
+        };
+      })
+      .filter((trend): trend is NonNullable<typeof trend> => trend !== null)
+      .sort((a, b) => {
+        const aWeight = a.forecast ? Math.abs(a.forecast.slopePer30Days) : 0;
+        const bWeight = b.forecast ? Math.abs(b.forecast.slopePer30Days) : 0;
+        return bWeight - aWeight;
+      });
+  }, [chronological, forecastByMarker]);
 
   const compareA = useMemo(
-    () => analyses.find((a) => a.id === compareAId) ?? null,
+    () => analyses.find((analysis) => analysis.id === compareAId) ?? null,
     [analyses, compareAId]
   );
   const compareB = useMemo(
-    () => analyses.find((a) => a.id === compareBId) ?? null,
+    () => analyses.find((analysis) => analysis.id === compareBId) ?? null,
     [analyses, compareBId]
   );
 
   const comparisonRows = useMemo(() => {
     if (!compareA || !compareB) return [];
+
     const keys = Object.keys(MARKER_LABELS) as (keyof BloodMarkers)[];
-    const rows: {
-      key: keyof BloodMarkers;
-      label: string;
-      aVal: number;
-      bVal: number;
-      delta: number;
-      direction: 'improved' | 'worse' | 'unchanged';
-    }[] = [];
-
-    for (const key of keys) {
-      const aVal = compareA.markers[key];
-      const bVal = compareB.markers[key];
-      if (aVal === undefined || bVal === undefined) continue;
-      const aScore = getMarkerInterpretation(key, aVal, compareA.profile.gender).score;
-      const bScore = getMarkerInterpretation(key, bVal, compareB.profile.gender).score;
-      const delta = Number((bVal - aVal).toFixed(1));
-      let direction: 'improved' | 'worse' | 'unchanged' = 'unchanged';
-      if (bScore > aScore) direction = 'improved';
-      if (bScore < aScore) direction = 'worse';
-      rows.push({ key, label: MARKER_LABELS[key], aVal, bVal, delta, direction });
-    }
-
-    return rows.sort((x, y) => {
-      if (x.direction === y.direction) return Math.abs(y.delta) - Math.abs(x.delta);
-      if (x.direction === 'worse') return -1;
-      if (y.direction === 'worse') return 1;
-      if (x.direction === 'improved') return -1;
-      return 1;
-    });
+    return keys
+      .map((key) => {
+        const aVal = compareA.markers[key];
+        const bVal = compareB.markers[key];
+        if (typeof aVal !== 'number' || typeof bVal !== 'number') return null;
+        const aScore = getMarkerInterpretation(key, aVal, compareA.profile.gender).score;
+        const bScore = getMarkerInterpretation(key, bVal, compareB.profile.gender).score;
+        const direction: ComparisonDirection =
+          bScore > aScore ? 'improved' : bScore < aScore ? 'worse' : 'unchanged';
+        return {
+          key,
+          label: MARKER_LABELS[key],
+          aVal,
+          bVal,
+          delta: Number((bVal - aVal).toFixed(1)),
+          direction,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null)
+      .sort((left, right) => {
+        const priority = { worse: 0, improved: 1, unchanged: 2 };
+        return priority[left.direction] - priority[right.direction] || Math.abs(right.delta) - Math.abs(left.delta);
+      });
   }, [compareA, compareB]);
 
-  // --- Render states ---
+  const comparisonSummary = useMemo(() => {
+    const improved = comparisonRows.filter((row) => row.direction === 'improved');
+    const worsened = comparisonRows.filter((row) => row.direction === 'worse');
+    const unchanged = comparisonRows.filter((row) => row.direction === 'unchanged');
+    return { improved, worsened, unchanged };
+  }, [comparisonRows]);
 
   if (!isLoaded || loading) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: 'var(--bg-warm)' }}
-      >
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-warm)' }}>
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} />
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
@@ -210,145 +267,67 @@ export default function HistoryPage() {
 
   if (!isSignedIn) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center px-4"
-        style={{ backgroundColor: 'var(--bg-warm)' }}
-      >
-        <div
-          className="relative overflow-hidden rounded-2xl noise max-w-md w-full text-center p-8"
-          style={{
-            backgroundColor: 'var(--surface)',
-            border: '1px solid var(--border)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03)',
-          }}
-        >
-          <AlertCircle className="w-10 h-10 mx-auto mb-4" style={{ color: 'var(--text-tertiary)' }} />
-          <h2 className="font-display text-xl font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
-            Sign in required
-          </h2>
-          <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
-            Please sign in to view your analysis history and track trends over time.
-          </p>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: 'var(--accent)',
-              color: '#fff',
-            }}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Home
-          </Link>
-        </div>
-      </div>
+      <EmptyState
+        icon={<AlertCircle className="w-10 h-10 mx-auto mb-4" style={{ color: 'var(--text-tertiary)' }} />}
+        title="Sign in required"
+        description="Please sign in to view your analysis history and track trends over time."
+        ctaLabel="Back to Home"
+      />
     );
   }
 
   if (error) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center px-4"
-        style={{ backgroundColor: 'var(--bg-warm)' }}
-      >
-        <div
-          className="relative overflow-hidden rounded-2xl noise max-w-md w-full text-center p-8"
-          style={{
-            backgroundColor: 'var(--surface)',
-            border: '1px solid var(--border)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03)',
-          }}
-        >
-          <AlertCircle className="w-10 h-10 mx-auto mb-4" style={{ color: '#c0392b' }} />
-          <h2 className="font-display text-xl font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
-            Error loading history
-          </h2>
-          <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
-            {error}
-          </p>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: 'var(--accent)',
-              color: '#fff',
-            }}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Home
-          </Link>
-        </div>
-      </div>
+      <EmptyState
+        icon={<AlertCircle className="w-10 h-10 mx-auto mb-4" style={{ color: 'var(--status-danger)' }} />}
+        title="Error loading history"
+        description={error}
+        ctaLabel="Back to Home"
+      />
     );
   }
 
   if (analyses.length === 0) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center px-4"
-        style={{ backgroundColor: 'var(--bg-warm)' }}
-      >
-        <div
-          className="relative overflow-hidden rounded-2xl noise max-w-md w-full text-center p-8"
-          style={{
-            backgroundColor: 'var(--surface)',
-            border: '1px solid var(--border)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03)',
-          }}
-        >
-          <FolderOpen className="w-10 h-10 mx-auto mb-4" style={{ color: 'var(--text-tertiary)' }} />
-          <h2 className="font-display text-xl font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
-            No analyses yet
-          </h2>
-          <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
-            Complete your first analysis and save it to start tracking your health trends over time.
-          </p>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: 'var(--accent)',
-              color: '#fff',
-            }}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Start an Analysis
-          </Link>
-        </div>
-      </div>
+      <EmptyState
+        icon={<FolderOpen className="w-10 h-10 mx-auto mb-4" style={{ color: 'var(--text-tertiary)' }} />}
+        title="No analyses yet"
+        description="Complete your first analysis and save it to start tracking your health trends over time."
+        ctaLabel="Start an Analysis"
+      />
     );
   }
 
-  // --- Main history dashboard ---
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-warm)' }}>
-      {/* Header */}
-      <div className="max-w-5xl mx-auto px-4 pt-8 pb-4">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-sm font-medium mb-6 transition-colors hover:opacity-80"
-          style={{ color: 'var(--accent)' }}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Home
-        </Link>
-
-        <div className="flex items-center gap-3 mb-2">
-          <TrendingUp className="w-6 h-6" style={{ color: 'var(--accent)' }} />
-          <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            History &amp; Trends
-          </h1>
+      <div className="max-w-6xl mx-auto px-4 pt-8 pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-sm font-medium mb-4 transition-colors hover:opacity-80"
+              style={{ color: 'var(--accent)' }}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Home
+            </Link>
+            <div className="flex items-center gap-3 mb-2">
+              <TrendingUp className="w-6 h-6" style={{ color: 'var(--accent)' }} />
+              <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                History &amp; Trends
+              </h1>
+            </div>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Track progress across {analyses.length} saved {analyses.length === 1 ? 'analysis' : 'analyses'} with forecasts and side-by-side comparisons.
+            </p>
+          </div>
+          <ThemeToggle />
         </div>
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Track how your health metrics change over time across {analyses.length} saved{' '}
-          {analyses.length === 1 ? 'analysis' : 'analyses'}.
-        </p>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 pb-12 space-y-6">
-        {/* Comparison mode */}
-        {analyses.length >= 2 && (
-          <div
+      <div className="max-w-6xl mx-auto px-4 pb-12 space-y-6">
+        {analyses.length >= 2 && compareA && compareB && (
+          <section
             className="relative overflow-hidden rounded-2xl noise"
             style={{
               backgroundColor: 'var(--surface)',
@@ -356,224 +335,137 @@ export default function HistoryPage() {
               boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03)',
             }}
           >
-            <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Comparison Mode
-              </h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-                Compare two saved analyses side by side with improvement/regression markers.
-              </p>
+            <div className="px-5 py-4 flex items-start justify-between gap-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
+              <div>
+                <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Before / After Comparison
+                </h2>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                  Compare two saved analyses and see what improved, worsened, or stayed flat.
+                </p>
+              </div>
+              <Sparkles className="w-4 h-4" style={{ color: 'var(--accent)' }} />
             </div>
+
             <div className="px-5 py-4 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  Analysis A
+                  Earlier analysis
                   <select
                     className="select-field mt-1"
                     value={compareAId ?? ''}
                     onChange={(e) => setCompareAId(Number(e.target.value))}
                   >
-                    {analyses.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {formatDate(a.createdAt)} - Score {a.result.healthScore.overall}
+                    {analyses.map((analysis) => (
+                      <option key={analysis.id} value={analysis.id}>
+                        {formatDate(analysis.createdAt)} · score {analysis.result.healthScore.overall}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  Analysis B
+                  Later analysis
                   <select
                     className="select-field mt-1"
                     value={compareBId ?? ''}
                     onChange={(e) => setCompareBId(Number(e.target.value))}
                   >
-                    {analyses.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {formatDate(a.createdAt)} - Score {a.result.healthScore.overall}
+                    {analyses.map((analysis) => (
+                      <option key={analysis.id} value={analysis.id}>
+                        {formatDate(analysis.createdAt)} · score {analysis.result.healthScore.overall}
                       </option>
                     ))}
                   </select>
                 </label>
               </div>
 
-              {compareA && compareB && (
-                <div className="rounded-xl p-3" style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div style={{ color: 'var(--text-tertiary)' }}>Overall score</div>
-                    <div style={{ color: 'var(--text-primary)' }}>{compareA.result.healthScore.overall}</div>
-                    <div style={{ color: 'var(--text-primary)' }}>{compareB.result.healthScore.overall}</div>
-                  </div>
-                </div>
-              )}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <SummaryCard
+                  title="Improved"
+                  value={comparisonSummary.improved.length.toString()}
+                  subtitle="markers moved in a better direction"
+                  color="var(--status-normal)"
+                />
+                <SummaryCard
+                  title="Worsened"
+                  value={comparisonSummary.worsened.length.toString()}
+                  subtitle="markers need more attention"
+                  color="var(--status-danger)"
+                />
+                <SummaryCard
+                  title="Overall score delta"
+                  value={`${compareB.result.healthScore.overall - compareA.result.healthScore.overall >= 0 ? '+' : ''}${compareB.result.healthScore.overall - compareA.result.healthScore.overall}`}
+                  subtitle={`${formatShortDate(compareA.createdAt)} to ${formatShortDate(compareB.createdAt)}`}
+                  color="var(--accent)"
+                />
+              </div>
 
-              <div className="space-y-2 max-h-[340px] overflow-auto pr-1">
-                {comparisonRows.length === 0 ? (
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                    No overlapping markers between the selected analyses.
-                  </p>
-                ) : (
-                  comparisonRows.map((row) => {
-                    const badgeColor =
-                      row.direction === 'improved'
-                        ? 'var(--status-normal)'
-                        : row.direction === 'worse'
-                          ? 'var(--status-danger)'
-                          : 'var(--text-tertiary)';
-                    const icon =
-                      row.direction === 'improved' ? '↑' : row.direction === 'worse' ? '↓' : '→';
-                    return (
-                      <div
-                        key={row.key}
-                        className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center rounded-lg px-3 py-2"
-                        style={{ border: '1px solid var(--border-light)' }}
-                      >
-                        <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-                          {row.label}
-                        </span>
-                        <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                          {row.aVal}
-                        </span>
-                        <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                          {row.bVal}
-                        </span>
-                        <span className="text-xs font-semibold tabular-nums" style={{ color: badgeColor }}>
-                          {icon} {row.delta > 0 ? '+' : ''}
-                          {row.delta}
-                        </span>
-                      </div>
-                    );
-                  })
-                )}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <ComparisonColumn
+                  title="Biggest improvements"
+                  rows={comparisonSummary.improved.slice(0, 5)}
+                  emptyLabel="No measurable improvements yet."
+                />
+                <ComparisonColumn
+                  title="Needs attention"
+                  rows={comparisonSummary.worsened.slice(0, 5)}
+                  emptyLabel="No regressions in overlapping markers."
+                />
+                <ComparisonColumn
+                  title="Stable markers"
+                  rows={comparisonSummary.unchanged.slice(0, 5)}
+                  emptyLabel="No unchanged overlaps."
+                />
               </div>
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Health Score Trend */}
         {healthScoreTrend.length >= 2 && (
-          <div
-            className="relative overflow-hidden rounded-2xl noise"
-            style={{
-              backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03)',
-            }}
-          >
-            <div
-              className="px-5 py-4 flex items-center gap-2"
-              style={{ borderBottom: '1px solid var(--border-light)' }}
-            >
-              <Activity className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Health Score Trend
-              </h3>
-            </div>
-            <div className="px-5 py-4">
-              <div style={{ width: '100%', height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={healthScoreTrend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e4e2dc" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#948e84' }} />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#948e84' }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'var(--surface)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="overall"
-                      stroke="#6b8f71"
-                      strokeWidth={2}
-                      dot={{ r: 4, fill: '#6b8f71' }}
-                      name="Overall"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="metabolic"
-                      stroke="#d4a574"
-                      strokeWidth={1.5}
-                      dot={{ r: 3, fill: '#d4a574' }}
-                      name="Metabolic"
-                      strokeDasharray="4 2"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="cardiovascular"
-                      stroke="#c0392b"
-                      strokeWidth={1.5}
-                      dot={{ r: 3, fill: '#c0392b' }}
-                      name="Cardiovascular"
-                      strokeDasharray="4 2"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
+          <TrendCard title="Health Score Trend" icon={<Activity className="w-4 h-4" style={{ color: 'var(--accent)' }} />}>
+            <ChartShell height={260}>
+              <LineChart data={healthScoreTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'currentColor' }} stroke="var(--text-tertiary)" />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: 'currentColor' }} stroke="var(--text-tertiary)" />
+                <Tooltip contentStyle={tooltipStyle()} />
+                <Legend />
+                <Line type="monotone" dataKey="overall" stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 4 }} name="Overall" />
+                <Line type="monotone" dataKey="metabolic" stroke="var(--accent-warm)" strokeWidth={1.8} dot={{ r: 3 }} name="Metabolic" strokeDasharray="4 2" />
+                <Line type="monotone" dataKey="cardiovascular" stroke="var(--status-danger)" strokeWidth={1.8} dot={{ r: 3 }} name="Cardiovascular" strokeDasharray="4 2" />
+              </LineChart>
+            </ChartShell>
+          </TrendCard>
         )}
 
-        {/* Weight Trend */}
         {weightTrend.length >= 2 && (
-          <div
-            className="relative overflow-hidden rounded-2xl noise"
-            style={{
-              backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03)',
-            }}
-          >
-            <div
-              className="px-5 py-4 flex items-center gap-2"
-              style={{ borderBottom: '1px solid var(--border-light)' }}
-            >
-              <Scale className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Weight Trend (lbs)
-              </h3>
-            </div>
-            <div className="px-5 py-4">
-              <div style={{ width: '100%', height: 220 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={weightTrend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e4e2dc" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#948e84' }} />
-                    <YAxis domain={['dataMin - 5', 'dataMax + 5']} tick={{ fontSize: 11, fill: '#948e84' }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'var(--surface)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="weight"
-                      stroke="#6b8f71"
-                      strokeWidth={2}
-                      dot={{ r: 4, fill: '#6b8f71' }}
-                      name="Weight (lbs)"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
+          <TrendCard title="Weight Trend" icon={<Scale className="w-4 h-4" style={{ color: 'var(--accent)' }} />}>
+            <ChartShell height={220}>
+              <LineChart data={weightTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'currentColor' }} stroke="var(--text-tertiary)" />
+                <YAxis domain={['dataMin - 5', 'dataMax + 5']} tick={{ fontSize: 11, fill: 'currentColor' }} stroke="var(--text-tertiary)" />
+                <Tooltip contentStyle={tooltipStyle()} />
+                <Line type="monotone" dataKey="weight" stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 4 }} name="Weight (lbs)" />
+              </LineChart>
+            </ChartShell>
+          </TrendCard>
         )}
 
-        {/* Blood Marker Trends */}
         {markerTrends.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Heart className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-              <h2 className="font-display text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Blood Marker Trends
-              </h2>
+          <section>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <h2 className="font-display text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Marker Trends & Forecasts
+                </h2>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                  Forecasts appear only for markers with at least 3 historical data points.
+                </p>
+              </div>
+              <ThemeToggle />
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {markerTrends.map((trend) => (
                 <div
@@ -585,49 +477,67 @@ export default function HistoryPage() {
                     boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03)',
                   }}
                 >
-                  <div
-                    className="px-5 py-3"
-                    style={{ borderBottom: '1px solid var(--border-light)' }}
-                  >
-                    <h4 className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                      {trend.label}
-                    </h4>
+                  <div className="px-5 py-4 flex items-start justify-between gap-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
+                    <div>
+                      <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {trend.label}
+                      </h3>
+                      <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                        Latest: {trend.latestValue}{trend.unit ? ` ${trend.unit}` : ''}
+                      </p>
+                    </div>
+                    {trend.forecast ? (
+                      <div
+                        className="rounded-lg px-2.5 py-1.5 text-right"
+                        style={{ backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--border-light)' }}
+                      >
+                        <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent)' }}>
+                          90-Day Forecast
+                        </p>
+                        <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                          {trend.forecast.projectedValue}{trend.unit ? ` ${trend.unit}` : ''}
+                        </p>
+                        <p className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+                          by {formatShortDate(trend.forecast.projectedDate)}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] max-w-[10rem] text-right" style={{ color: 'var(--text-tertiary)' }}>
+                        Add one more saved result to unlock forecasting.
+                      </p>
+                    )}
                   </div>
+
                   <div className="px-3 py-3">
-                    <div style={{ width: '100%', height: 180 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={trend.data}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e4e2dc" />
-                          <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#948e84' }} />
-                          <YAxis tick={{ fontSize: 10, fill: '#948e84' }} />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'var(--surface)',
-                              border: '1px solid var(--border)',
-                              borderRadius: 8,
-                              fontSize: 12,
-                            }}
-                          />
+                    <ChartShell height={190}>
+                      <LineChart data={trend.data}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'currentColor' }} stroke="var(--text-tertiary)" />
+                        <YAxis tick={{ fontSize: 10, fill: 'currentColor' }} stroke="var(--text-tertiary)" />
+                        <Tooltip contentStyle={tooltipStyle()} />
+                        <Line type="monotone" dataKey="value" stroke="var(--accent)" strokeWidth={2.2} dot={{ r: 3 }} connectNulls={false} name="History" />
+                        {trend.forecast && (
                           <Line
                             type="monotone"
-                            dataKey="value"
-                            stroke="#6b8f71"
+                            dataKey="projected"
+                            stroke="var(--accent-warm)"
                             strokeWidth={2}
-                            dot={{ r: 3, fill: '#6b8f71' }}
-                            name={trend.label}
+                            dot={{ r: 3 }}
+                            strokeDasharray="5 4"
+                            connectNulls
+                            name="Projected"
                           />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
+                        )}
+                      </LineChart>
+                    </ChartShell>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Analysis Cards */}
-        <div>
+        <section>
           <h2 className="font-display text-lg font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
             All Analyses
           </h2>
@@ -652,12 +562,8 @@ export default function HistoryPage() {
                         <p className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>
                           {formatDate(analysis.createdAt)}
                         </p>
-                        <p
-                          className="text-sm font-semibold mt-0.5"
-                          style={{ color: 'var(--text-primary)' }}
-                        >
-                          {profile.gender === 'male' ? 'Male' : 'Female'}, {profile.age}y,{' '}
-                          {profile.weightLbs} lbs
+                        <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                          {profile.gender === 'male' ? 'Male' : 'Female'}, {profile.age}y, {profile.weightLbs} lbs
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -679,8 +585,10 @@ export default function HistoryPage() {
                       <MetricPill label="BMR" value={`${result.tdee.bmr} kcal`} />
                       <MetricPill label="TDEE" value={`${result.tdee.tdee} kcal`} />
                       <MetricPill label="Target" value={`${result.tdee.targetCalories} kcal`} />
-                      {bmi !== undefined && bmi !== null && (
+                      {bmi !== undefined && bmi !== null ? (
                         <MetricPill label="BMI" value={bmi.toFixed(1)} />
+                      ) : (
+                        <MetricPill label="Markers" value={Object.keys(analysis.markers).length.toString()} />
                       )}
                     </div>
                   </div>
@@ -688,33 +596,179 @@ export default function HistoryPage() {
               );
             })}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
 }
 
-function MetricPill({ label, value }: { label: string; value: string }) {
+function ComparisonColumn({
+  title,
+  rows,
+  emptyLabel,
+}: {
+  title: string;
+  rows: Array<{
+    key: keyof BloodMarkers;
+    label: string;
+    aVal: number;
+    bVal: number;
+    delta: number;
+    direction: ComparisonDirection;
+  }>;
+  emptyLabel: string;
+}) {
   return (
     <div
-      className="rounded-lg px-3 py-2 text-center"
-      style={{
-        backgroundColor: 'var(--bg-warm)',
-        border: '1px solid var(--border-light)',
-      }}
+      className="rounded-xl p-4"
+      style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}
     >
-      <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'var(--text-tertiary)' }}>
-        {label}
+      <h3 className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-tertiary)' }}>
+        {title}
+      </h3>
+      <div className="mt-3 space-y-2">
+        {rows.length === 0 ? (
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {emptyLabel}
+          </p>
+        ) : (
+          rows.map((row) => (
+            <div key={row.key} className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  {row.label}
+                </p>
+                <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                  {row.aVal} → {row.bVal}
+                </p>
+              </div>
+              <span className="text-xs font-semibold tabular-nums" style={{ color: directionColor(row.direction) }}>
+                {row.delta > 0 ? '+' : ''}
+                {row.delta}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SummaryCard({
+  title,
+  value,
+  subtitle,
+  color,
+}: {
+  title: string;
+  value: string;
+  subtitle: string;
+  color: string;
+}) {
+  return (
+    <div
+      className="rounded-xl p-4"
+      style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-tertiary)' }}>
+        {title}
       </p>
-      <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--text-primary)' }}>
+      <p className="font-display text-3xl mt-2" style={{ color }}>
         {value}
+      </p>
+      <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+        {subtitle}
       </p>
     </div>
   );
 }
 
-function scoreColor(score: number, alpha: number): string {
-  if (score >= 80) return `rgba(107, 143, 113, ${alpha})`; // green
-  if (score >= 60) return `rgba(212, 165, 116, ${alpha})`; // amber
-  return `rgba(192, 57, 43, ${alpha})`; // red
+function TrendCard({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      className="relative overflow-hidden rounded-2xl noise"
+      style={{
+        backgroundColor: 'var(--surface)',
+        border: '1px solid var(--border)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03)',
+      }}
+    >
+      <div className="px-5 py-4 flex items-center gap-2" style={{ borderBottom: '1px solid var(--border-light)' }}>
+        {icon}
+        <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          {title}
+        </h2>
+      </div>
+      <div className="px-5 py-4">{children}</div>
+    </section>
+  );
+}
+
+function ChartShell({ height, children }: { height: number; children: React.ReactNode }) {
+  return (
+    <div style={{ width: '100%', height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        {children as React.ReactElement}
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function tooltipStyle() {
+  return {
+    backgroundColor: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    fontSize: 12,
+    color: 'var(--text-primary)',
+  };
+}
+
+function EmptyState({
+  icon,
+  title,
+  description,
+  ctaLabel,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  ctaLabel: string;
+}) {
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: 'var(--bg-warm)' }}>
+      <div
+        className="relative overflow-hidden rounded-2xl noise max-w-md w-full text-center p-8"
+        style={{
+          backgroundColor: 'var(--surface)',
+          border: '1px solid var(--border)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03)',
+        }}
+      >
+        {icon}
+        <h2 className="font-display text-xl font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+          {title}
+        </h2>
+        <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
+          {description}
+        </p>
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          style={{ backgroundColor: 'var(--accent)', color: '#fff' }}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          {ctaLabel}
+        </Link>
+      </div>
+    </div>
+  );
 }

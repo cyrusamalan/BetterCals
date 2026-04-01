@@ -29,10 +29,14 @@ import {
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import ProfileDropdown from '@/components/ProfileDropdown';
+import ThemeToggle from '@/components/ThemeToggle';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
 import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
 import FoodSensitivityCard from '@/components/dashboard/FoodSensitivityCard';
+import ActionPlanCard from '@/components/dashboard/ActionPlanCard';
+import PopulationBenchmarksCard from '@/components/dashboard/PopulationBenchmarksCard';
+import { deriveActionPlan, derivePopulationBenchmarks } from '@/lib/derivedInsights';
 
 // #region debug log helper
 const DEBUG_ENDPOINT = 'http://127.0.0.1:7498/ingest/6f0bd25c-93a7-48e3-a88d-41621d1baedd';
@@ -691,9 +695,16 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
     return [...insights].sort((a, b) => score(b) - score(a));
   }, [insights]);
 
-  const topFocusInsights = prioritizedInsights.slice(0, 3);
   const actionableInsights = prioritizedInsights.filter((i) => i.recommendation);
   const informationalInsights = prioritizedInsights.filter((i) => !i.recommendation);
+  const actionPlan = useMemo(
+    () => result.actionPlan ?? deriveActionPlan(profile, markers, insights, deficiencies, risks),
+    [result.actionPlan, profile, markers, insights, deficiencies, risks]
+  );
+  const populationBenchmarks = useMemo(
+    () => derivePopulationBenchmarks(profile, markers),
+    [profile, markers]
+  );
 
   const topDrivers = useMemo(() => {
     const keys = Object.keys(MARKER_NAMES) as (keyof BloodMarkers)[];
@@ -749,12 +760,11 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
       message: 'Insights prioritized & grouped',
       data: {
         total: prioritizedInsights.length,
-        topFocus: topFocusInsights.length,
         actionable: actionableInsights.length,
         informational: informationalInsights.length,
       },
     });
-  }, [prioritizedInsights.length, topFocusInsights.length, actionableInsights.length, informationalInsights.length]);
+  }, [prioritizedInsights.length, actionableInsights.length, informationalInsights.length]);
   // #endregion
 
   const handleOpenMarkerDetails = (key: keyof BloodMarkers, value: number) => {
@@ -952,6 +962,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
               )}
 
               <div className="flex items-center gap-2 shrink-0">
+                <ThemeToggle />
                 <div
                   className="w-8 h-8 sm:w-9 sm:h-9 rounded-[14px] flex items-center justify-center"
                   style={{
@@ -1327,7 +1338,21 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
           </div>
         </div>
 
-        {/* 2. Calorie Goal Tiers */}
+        {/* 2. Monthly action plan */}
+        {!usedAverageMarkers && (
+          <div className="mt-8 anim-fade-up delay-2">
+            <ActionPlanCard items={actionPlan} />
+          </div>
+        )}
+
+        {/* 3. Population benchmarks */}
+        {!usedAverageMarkers && populationBenchmarks.length > 0 && (
+          <div className="mt-8 anim-fade-up delay-3">
+            <PopulationBenchmarksCard benchmarks={populationBenchmarks} />
+          </div>
+        )}
+
+        {/* 4. Calorie Goal Tiers */}
         <div className="mt-8 anim-fade-up delay-2">
           <CalorieTiersCard
             tiers={calorieTiers}
@@ -1336,12 +1361,12 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
           />
         </div>
 
-        {/* 3. Macro Breakdown */}
+        {/* 5. Macro Breakdown */}
         <div className="mt-8 anim-fade-up delay-3">
           <MacroDonutChart macros={macros} />
         </div>
 
-        {/* 4. Charts row — radar, ASCVD, and full-width marker comparison */}
+        {/* 6. Charts row — radar, ASCVD, and full-width marker comparison */}
         {hasMarkers && (
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-5 anim-fade-up delay-4">
             {/* Top Left: Radar */}
@@ -1367,7 +1392,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
           </div>
         )}
 
-        {/* 5. Category cards with range bars */}
+        {/* 7. Category cards with range bars */}
         {hasMarkers && (
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-5">
             {CATEGORIES.map((cat, i) => (
@@ -1385,19 +1410,19 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
           </div>
         )}
 
-        {/* 6. Recommendations panel */}
+        {/* 8. Recommendations panel */}
         <div className="mt-8 anim-fade-up delay-9">
           <RecommendationsPanel recs={recommendations} />
         </div>
 
-        {/* 6b. Food sensitivity pattern flags */}
+        {/* 8b. Food sensitivity pattern flags */}
         {!usedAverageMarkers && foodFlags.length > 0 && (
           <div className="mt-8 anim-fade-up delay-9">
             <FoodSensitivityCard flags={foodFlags} />
           </div>
         )}
 
-        {/* 7. Flags */}
+        {/* 9. Flags */}
         {!usedAverageMarkers && (deficiencies.length > 0 || risks.length > 0) && (
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 anim-fade-up delay-10">
             <FlagSection title="Potential Deficiencies" items={deficiencies} variant="warning" />
@@ -1405,23 +1430,9 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
           </div>
         )}
 
-        {/* 8. Insights */}
+        {/* 10. Insights */}
         {!usedAverageMarkers && prioritizedInsights.length > 0 && (
           <div className="mt-8 anim-fade-up">
-            {topFocusInsights.length > 0 && (
-              <div className="rounded-xl p-4 mb-4" style={{ background: 'var(--status-warning-bg)', border: '1px solid var(--status-warning-border)' }}>
-                <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
-                  Top 3 Things To Focus On
-                </h3>
-                <div className="space-y-1.5">
-                  {topFocusInsights.map((insight) => (
-                    <p key={`focus-${insight.title}`} className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      - {insight.title}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
             <h2 className="font-display text-xl mb-4" style={{ color: 'var(--text-primary)' }}>
               Insights & Recommendations
             </h2>
@@ -1454,7 +1465,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
           </div>
         )}
 
-        {/* 9. Footer */}
+        {/* 11. Footer */}
         <div className="mt-12 pt-6 text-center anim-fade-up" style={{ borderTop: '1px solid var(--border-light)' }}>
           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
             BetterCals provides estimates for informational purposes only.
