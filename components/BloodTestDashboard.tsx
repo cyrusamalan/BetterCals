@@ -2,8 +2,8 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AnalysisResult, BloodMarkers, FoodSensitivityFlag, Insight, UserProfile } from '@/types';
-import { getMarkerDisplayRange, getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
+import { AnalysisResult, BloodMarkers, FoodSensitivityFlag, Insight, MarkerStatus, UserProfile } from '@/types';
+import { getMarkerDisplayRange, getMarkerInterpretation, getMarkerTiers, getMarkerUnit } from '@/lib/bloodParser';
 import { MARKER_FIELDS_BY_KEY } from '@/lib/markerMetadata';
 import VitalsMark from '@/components/VitalsMark';
 import {
@@ -25,14 +25,21 @@ import {
   Save,
   Check,
   History,
+  Rows3,
+  Brain,
+  LineChart,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import ProfileDropdown from '@/components/ProfileDropdown';
+import ThemeToggle from '@/components/ThemeToggle';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
 import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
 import FoodSensitivityCard from '@/components/dashboard/FoodSensitivityCard';
+import ActionPlanCard from '@/components/dashboard/ActionPlanCard';
+import PopulationBenchmarksCard from '@/components/dashboard/PopulationBenchmarksCard';
+import { deriveActionPlan, derivePopulationBenchmarks } from '@/lib/derivedInsights';
 
 // #region debug log helper
 const DEBUG_ENDPOINT = 'http://127.0.0.1:7498/ingest/6f0bd25c-93a7-48e3-a88d-41621d1baedd';
@@ -171,6 +178,21 @@ const CATEGORIES: {
   },
 ];
 
+const BIOMARKER_COLUMNS: Array<Array<(typeof CATEGORIES)[number]['key']>> = [
+  ['metabolic', 'nutritional'],
+  ['cardiovascular'],
+  ['hormonal', 'renal', 'hepatic'],
+];
+
+type ResultsTab = 'biomarkers' | 'recommendations' | 'insights' | 'trends';
+
+const TAB_META: Record<ResultsTab, { label: string; icon: React.ElementType }> = {
+  biomarkers: { label: 'Biomarkers', icon: Rows3 },
+  recommendations: { label: 'Recommendations', icon: Brain },
+  insights: { label: 'Insights', icon: Shield },
+  trends: { label: 'Trends', icon: LineChart },
+};
+
 function getBmiScore(bmi: number): number {
   if (bmi < 18.5) return 50;
   if (bmi < 25) return 90;
@@ -206,6 +228,25 @@ function getStatusStyle(status: string) {
   }
 }
 
+function getStatusTone(status: MarkerStatus) {
+  const style = getStatusStyle(status);
+  return {
+    ...style,
+    fill:
+      status === 'optimal' || status === 'normal'
+        ? 'var(--status-normal)'
+        : status === 'low'
+          ? 'var(--status-info)'
+          : status === 'borderline'
+            ? 'var(--accent-warm)'
+            : status === 'high'
+              ? 'var(--status-warning)'
+              : status === 'critical'
+                ? 'var(--status-danger)'
+                : 'var(--text-tertiary)',
+  };
+}
+
 function getRangePercent(key: keyof BloodMarkers, value: number, gender?: UserProfile['gender']): number {
   const range = getMarkerDisplayRange(key, gender);
   if (!range) return 50;
@@ -225,6 +266,42 @@ function getRangeNormalZone(key: keyof BloodMarkers, gender?: UserProfile['gende
   const left = ((range.min - visualMin) / (visualMax - visualMin)) * 100;
   const right = ((range.max - visualMin) / (visualMax - visualMin)) * 100;
   return { left, width: right - left };
+}
+
+function getRangeSegments(key: keyof BloodMarkers, gender?: UserProfile['gender']) {
+  const tiers = getMarkerTiers(key, gender);
+  const reference = getMarkerDisplayRange(key, gender);
+  if (!reference || tiers.length === 0) {
+    return [
+      {
+        left: 0,
+        width: 100,
+        label: 'Reference',
+        status: 'normal' as MarkerStatus,
+      },
+    ];
+  }
+
+  const highestFiniteMax = tiers
+    .map((tier) => tier.max)
+    .filter((max) => Number.isFinite(max) && max < 9999)
+    .reduce((current, max) => Math.max(current, max), reference.max);
+  const visualMin = Math.max(0, Math.min(reference.min, tiers[0]?.min ?? reference.min));
+  const visualMax = Math.max(reference.max * 1.2, highestFiniteMax);
+
+  return tiers.map((tier, index) => {
+    const tierMin = Math.max(visualMin, tier.min);
+    const tierMaxRaw = Number.isFinite(tier.max) && tier.max < 9999 ? tier.max : visualMax;
+    const tierMax = Math.max(tierMin, Math.min(visualMax, tierMaxRaw));
+    const left = ((tierMin - visualMin) / Math.max(1, visualMax - visualMin)) * 100;
+    const right = ((tierMax - visualMin) / Math.max(1, visualMax - visualMin)) * 100;
+    return {
+      left: Math.max(0, Math.min(100, left)),
+      width: Math.max(index === tiers.length - 1 ? 100 - left : 4, right - left),
+      label: getStatusStyle(tier.status).label,
+      status: tier.status,
+    };
+  });
 }
 
 function computeFoodSensitivityFlags(markers: BloodMarkers, profile?: UserProfile) {
@@ -448,64 +525,59 @@ function RangeBar({
   onOpenDetails: (markerKey: keyof BloodMarkers, value: number) => void;
 }) {
   const interp = getMarkerInterpretation(markerKey, value, gender);
-  const style = getStatusStyle(interp.status);
+  const style = getStatusTone(interp.status);
   const needlePos = getRangePercent(markerKey, value, gender);
-  const normalZone = getRangeNormalZone(markerKey, gender);
   const range = getMarkerDisplayRange(markerKey, gender);
-  const lowWidth = Math.max(0, normalZone.left);
-  const highStart = normalZone.left + normalZone.width;
-  const highWidth = Math.max(0, 100 - highStart);
+  const segments = getRangeSegments(markerKey, gender);
 
   return (
-    <button type="button" className="space-y-1.5 w-full text-left" onClick={() => onOpenDetails(markerKey, value)}>
-      <div className="flex items-baseline justify-between">
-        <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+    <button
+      type="button"
+      className="w-full text-left rounded-lg p-2.5 transition-colors"
+      onClick={() => onOpenDetails(markerKey, value)}
+      style={{
+        backgroundColor: 'var(--bg-warm)',
+        border: `1px solid ${style.fill}33`,
+        boxShadow: `inset 0 0 0 1px ${style.fill}22`,
+      }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-[13px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
           {MARKER_NAMES[markerKey]}
         </span>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold tabular-nums" style={{ color: style.color }}>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <span className="text-[13px] font-semibold tabular-nums" style={{ color: style.fill }}>
             {value}
             <span className="text-[10px] font-normal ml-0.5" style={{ color: 'var(--text-tertiary)' }}>
               {range?.unit}
             </span>
           </span>
           <span
-            className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
-            style={{ color: style.color, backgroundColor: style.bg }}
+            className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded-full"
+            style={{ color: style.fill, backgroundColor: style.bg, border: `1px solid ${style.fill}44` }}
           >
             {interp.label}
           </span>
         </div>
       </div>
 
-      <div className="relative h-3 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-light)' }}>
-        <svg className="absolute inset-0 w-full h-full opacity-35" viewBox="0 0 100 24" preserveAspectRatio="none">
-          <path d="M0 24 C 18 22, 24 8, 32 8 C 40 8, 46 22, 64 24 C 76 25, 86 14, 100 10" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" />
-        </svg>
-        <div
-          className="absolute inset-y-0 left-0"
-          style={{
-            width: `${lowWidth}%`,
-            background: 'linear-gradient(90deg, color-mix(in srgb, var(--status-info) 28%, transparent), color-mix(in srgb, var(--status-info) 10%, transparent))',
-          }}
-        />
-        <div
-          className="absolute inset-y-0 rounded-full"
-          style={{
-            left: `${normalZone.left}%`,
-            width: `${normalZone.width}%`,
-            background: 'linear-gradient(90deg, color-mix(in srgb, var(--status-normal) 32%, transparent), color-mix(in srgb, var(--status-normal) 16%, transparent))',
-            border: '1px solid var(--status-normal-border)',
-          }}
-        />
-        <div
-          className="absolute inset-y-0"
-          style={{
-            left: `${highStart}%`,
-            width: `${highWidth}%`,
-            background: 'linear-gradient(90deg, color-mix(in srgb, var(--status-warning) 10%, transparent), color-mix(in srgb, var(--status-warning) 30%, transparent))',
-          }}
-        />
+      <div className="mt-2.5 relative h-3 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-light)' }}>
+        {segments.map((segment, index) => {
+          const segmentStyle = getStatusTone(segment.status);
+          return (
+            <div
+              key={`${segment.label}-${index}`}
+              className="absolute inset-y-0"
+              style={{
+                left: `${segment.left}%`,
+                width: `${segment.width}%`,
+                backgroundColor: segmentStyle.fill,
+                opacity: segment.status === interp.status ? 0.95 : 0.55,
+                borderRight: index < segments.length - 1 ? '1px solid rgba(255,255,255,0.55)' : 'none',
+              }}
+            />
+          );
+        })}
         <div
           className="absolute top-1/2 needle-pop"
           style={{
@@ -515,20 +587,33 @@ function RangeBar({
           }}
         >
           <div
-            className="w-3 h-3 rounded-full border-2"
+            className="w-3.5 h-3.5 rounded-full border-2"
             style={{
-              backgroundColor: style.color,
+              backgroundColor: style.fill,
               borderColor: 'var(--surface)',
-              boxShadow: `0 0 0 1px ${style.color}33, 0 1px 3px ${style.color}22`,
+              boxShadow: `0 0 0 2px ${style.fill}28, 0 2px 8px ${style.fill}45`,
             }}
           />
         </div>
       </div>
 
-      <div className="flex justify-between">
-        <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>{range?.min}</span>
-        <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium" style={{ color: 'var(--text-tertiary)' }}>{range?.min}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--status-normal)' }}>
+          Optimal / Normal Range
+        </span>
+        <span className="text-[11px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
           {range ? `${range.maxLabel} ${range.unit}` : ''}
+        </span>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between gap-3 text-[10px]">
+        <div className="flex items-center gap-1.5" style={{ color: style.fill }}>
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: style.fill }} />
+          <span className="font-semibold uppercase tracking-[0.1em]">Current Status</span>
+        </div>
+        <span style={{ color: 'var(--text-tertiary)' }}>
+          Tap for details
         </span>
       </div>
     </button>
@@ -559,7 +644,7 @@ function CategoryCard({
         boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03)',
       }}
     >
-      <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border-light)' }}>
+      <div className="flex items-center justify-between px-4 py-3.5" style={{ borderBottom: '1px solid var(--border-light)' }}>
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: category.accentBg }}>
             <Icon className="w-4 h-4" style={{ color: category.accent }} />
@@ -571,7 +656,7 @@ function CategoryCard({
           <span className="text-[10px] font-medium" style={{ color: 'var(--text-tertiary)' }}>/100</span>
         </div>
       </div>
-      <div className="px-5 py-4 space-y-5">
+      <div className="px-4 py-3 space-y-3">
         {present.map((key, i) => (
           <RangeBar
             key={key}
@@ -662,6 +747,35 @@ function FlagSection({ title, items, variant }: { title: string; items: string[]
   );
 }
 
+function TabButton({
+  tab,
+  active,
+  onClick,
+}: {
+  tab: ResultsTab;
+  active: boolean;
+  onClick: (tab: ResultsTab) => void;
+}) {
+  const Icon = TAB_META[tab].icon;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(tab)}
+      className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all"
+      style={{
+        backgroundColor: active ? 'var(--text-primary)' : 'var(--bg-warm)',
+        color: active ? 'var(--text-inverse)' : 'var(--text-secondary)',
+        border: active ? '1px solid var(--text-primary)' : '1px solid var(--border-light)',
+        boxShadow: active ? '0 10px 22px rgba(0,0,0,0.08)' : 'none',
+      }}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {TAB_META[tab].label}
+    </button>
+  );
+}
+
 // ── Main Dashboard ──
 
 export default function BloodTestDashboard({ result, markers, profile, onReset, onEditProfile, resetLabel = 'New Analysis' }: BloodTestDashboardProps) {
@@ -675,6 +789,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
   const [saved, setSaved] = useState(false);
   const foodFlags = computeFoodSensitivityFlags(markers, profile);
   const [activeMarker, setActiveMarker] = useState<{ key: keyof BloodMarkers; value: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<ResultsTab>('biomarkers');
   const animatedOverallScore = useCountUp(healthScore.overall, 1100);
   const countUpDidLogRef = useRef(false);
 
@@ -691,9 +806,16 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
     return [...insights].sort((a, b) => score(b) - score(a));
   }, [insights]);
 
-  const topFocusInsights = prioritizedInsights.slice(0, 3);
   const actionableInsights = prioritizedInsights.filter((i) => i.recommendation);
   const informationalInsights = prioritizedInsights.filter((i) => !i.recommendation);
+  const actionPlan = useMemo(
+    () => result.actionPlan ?? deriveActionPlan(profile, markers, insights, deficiencies, risks),
+    [result.actionPlan, profile, markers, insights, deficiencies, risks]
+  );
+  const populationBenchmarks = useMemo(
+    () => derivePopulationBenchmarks(profile, markers),
+    [profile, markers]
+  );
 
   const topDrivers = useMemo(() => {
     const keys = Object.keys(MARKER_NAMES) as (keyof BloodMarkers)[];
@@ -727,6 +849,14 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
     }
     return grouped;
   }, [topDrivers]);
+  const visibleCategories = useMemo(
+    () => CATEGORIES.filter((category) => category.markers.some((marker) => markers[marker] !== undefined)),
+    [markers]
+  );
+  const visibleCategoriesByKey = useMemo(
+    () => Object.fromEntries(visibleCategories.map((category) => [category.key, category])),
+    [visibleCategories]
+  );
 
   // #region debug logs for feature verification
   useEffect(() => {
@@ -749,12 +879,11 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
       message: 'Insights prioritized & grouped',
       data: {
         total: prioritizedInsights.length,
-        topFocus: topFocusInsights.length,
         actionable: actionableInsights.length,
         informational: informationalInsights.length,
       },
     });
-  }, [prioritizedInsights.length, topFocusInsights.length, actionableInsights.length, informationalInsights.length]);
+  }, [prioritizedInsights.length, actionableInsights.length, informationalInsights.length]);
   // #endregion
 
   const handleOpenMarkerDetails = (key: keyof BloodMarkers, value: number) => {
@@ -861,6 +990,15 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
   }
 
   const ascvdDisplay = result.ascvdRiskScore != null ? `${result.ascvdRiskScore.toFixed(1)}%` : 'N/A';
+  const availableTabs = useMemo(() => {
+    const tabs: ResultsTab[] = [];
+    if (hasMarkers) tabs.push('biomarkers');
+    if (!usedAverageMarkers) tabs.push('recommendations');
+    if (!usedAverageMarkers && (prioritizedInsights.length > 0 || deficiencies.length > 0 || risks.length > 0)) tabs.push('insights');
+    if (hasMarkers) tabs.push('trends');
+    return tabs;
+  }, [hasMarkers, usedAverageMarkers, prioritizedInsights.length, deficiencies.length, risks.length]);
+  const displayedTab = availableTabs.includes(activeTab) ? activeTab : (availableTabs[0] ?? 'biomarkers');
 
   return (
     <div
@@ -952,6 +1090,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
               )}
 
               <div className="flex items-center gap-2 shrink-0">
+                <ThemeToggle />
                 <div
                   className="w-8 h-8 sm:w-9 sm:h-9 rounded-[14px] flex items-center justify-center"
                   style={{
@@ -1322,34 +1461,144 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                     })}
                   </div>
                 )}
+
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] mb-3" style={{ color: 'var(--text-tertiary)' }}>
+                    Jump To Section
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {availableTabs.map((tab) => (
+                      <TabButton key={tab} tab={tab} active={displayedTab === tab} onClick={setActiveTab} />
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 2. Calorie Goal Tiers */}
-        <div className="mt-8 anim-fade-up delay-2">
-          <CalorieTiersCard
-            tiers={calorieTiers}
-            userGoal={profile.goal}
-            targetCalories={tdee.targetCalories}
-          />
-        </div>
+        {displayedTab === 'biomarkers' && hasMarkers && (
+          <>
+            {!usedAverageMarkers && populationBenchmarks.length > 0 && (
+              <div className="mt-8 anim-fade-up delay-2">
+                <PopulationBenchmarksCard benchmarks={populationBenchmarks} />
+              </div>
+            )}
 
-        {/* 3. Macro Breakdown */}
-        <div className="mt-8 anim-fade-up delay-3">
-          <MacroDonutChart macros={macros} />
-        </div>
+            <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4 items-start xl:hidden">
+              {visibleCategories.map((cat, i) => (
+                <div key={cat.key} className={`anim-fade-up delay-${i + 3}`}>
+                  <CategoryCard
+                    category={cat}
+                    markers={markers}
+                    score={healthScore[cat.scoreKey]}
+                    delayBase={400 + i * 150}
+                    gender={profile.gender}
+                    onOpenDetails={handleOpenMarkerDetails}
+                  />
+                </div>
+              ))}
+            </div>
 
-        {/* 4. Charts row — radar, ASCVD, and full-width marker comparison */}
-        {hasMarkers && (
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-5 anim-fade-up delay-4">
-            {/* Top Left: Radar */}
+            <div className="mt-6 hidden xl:grid xl:grid-cols-3 gap-4 items-start">
+              {BIOMARKER_COLUMNS.map((column, columnIndex) => (
+                <div key={`column-${columnIndex}`} className="space-y-4">
+                  {column.map((categoryKey, itemIndex) => {
+                    const category = visibleCategoriesByKey[categoryKey];
+                    if (!category) return null;
+                    return (
+                      <div key={category.key} className={`anim-fade-up delay-${columnIndex + itemIndex + 3}`}>
+                        <CategoryCard
+                          category={category}
+                          markers={markers}
+                          score={healthScore[category.scoreKey]}
+                          delayBase={400 + (columnIndex * 2 + itemIndex) * 150}
+                          gender={profile.gender}
+                          onOpenDetails={handleOpenMarkerDetails}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {displayedTab === 'recommendations' && !usedAverageMarkers && (
+          <>
+            <div className="mt-8 anim-fade-up delay-2">
+              <ActionPlanCard items={actionPlan} />
+            </div>
+            <div className="mt-8 anim-fade-up delay-3">
+              <RecommendationsPanel recs={recommendations} />
+            </div>
+            <div className="mt-8 grid grid-cols-1 xl:grid-cols-2 gap-5 anim-fade-up delay-4">
+              <CalorieTiersCard
+                tiers={calorieTiers}
+                userGoal={profile.goal}
+                targetCalories={tdee.targetCalories}
+              />
+              <MacroDonutChart macros={macros} />
+            </div>
+            {foodFlags.length > 0 && (
+              <div className="mt-8 anim-fade-up delay-5">
+                <FoodSensitivityCard flags={foodFlags} />
+              </div>
+            )}
+          </>
+        )}
+
+        {displayedTab === 'insights' && !usedAverageMarkers && (
+          <div className="mt-8 anim-fade-up">
+            {(deficiencies.length > 0 || risks.length > 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FlagSection title="Potential Deficiencies" items={deficiencies} variant="warning" />
+                <FlagSection title="Health Risks" items={risks} variant="danger" />
+              </div>
+            )}
+
+            {prioritizedInsights.length > 0 && (
+              <div className="mt-8">
+                <h2 className="font-display text-xl mb-4" style={{ color: 'var(--text-primary)' }}>
+                  Insights & Recommendations
+                </h2>
+                <div className="space-y-4">
+                  {actionableInsights.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: 'var(--text-tertiary)' }}>
+                        Actionable
+                      </h3>
+                      <div className="space-y-3">
+                        {actionableInsights.map((insight, i) => (
+                          <InsightCard key={`act-${i}`} insight={insight} delay={600 + i * 80} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {informationalInsights.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: 'var(--text-tertiary)' }}>
+                        Informational
+                      </h3>
+                      <div className="space-y-3">
+                        {informationalInsights.map((insight, i) => (
+                          <InsightCard key={`info-${i}`} insight={insight} delay={800 + i * 80} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {displayedTab === 'trends' && hasMarkers && (
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-5 anim-fade-up delay-2">
             <div className="md:col-span-1 h-full">
               <HealthRadarChart healthScore={healthScore} />
             </div>
-            
-            {/* Top Right: ASCVD Risk */}
             <div className="md:col-span-1 h-full">
               <ASCVDRiskCard
                 ascvdRiskScore={result.ascvdRiskScore}
@@ -1359,102 +1608,13 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                 race={profile.race}
               />
             </div>
-            
-            {/* Bottom: Full Width Comparison Chart */}
             <div className="md:col-span-2">
               <MarkerComparisonChart markers={markers} gender={profile.gender} />
             </div>
           </div>
         )}
 
-        {/* 5. Category cards with range bars */}
-        {hasMarkers && (
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-5">
-            {CATEGORIES.map((cat, i) => (
-              <div key={cat.key} className={`anim-fade-up delay-${i + 5}`}>
-                <CategoryCard
-                  category={cat}
-                  markers={markers}
-                  score={healthScore[cat.scoreKey]}
-                  delayBase={400 + i * 150}
-                  gender={profile.gender}
-                  onOpenDetails={handleOpenMarkerDetails}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 6. Recommendations panel */}
-        <div className="mt-8 anim-fade-up delay-9">
-          <RecommendationsPanel recs={recommendations} />
-        </div>
-
-        {/* 6b. Food sensitivity pattern flags */}
-        {!usedAverageMarkers && foodFlags.length > 0 && (
-          <div className="mt-8 anim-fade-up delay-9">
-            <FoodSensitivityCard flags={foodFlags} />
-          </div>
-        )}
-
-        {/* 7. Flags */}
-        {!usedAverageMarkers && (deficiencies.length > 0 || risks.length > 0) && (
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 anim-fade-up delay-10">
-            <FlagSection title="Potential Deficiencies" items={deficiencies} variant="warning" />
-            <FlagSection title="Health Risks" items={risks} variant="danger" />
-          </div>
-        )}
-
-        {/* 8. Insights */}
-        {!usedAverageMarkers && prioritizedInsights.length > 0 && (
-          <div className="mt-8 anim-fade-up">
-            {topFocusInsights.length > 0 && (
-              <div className="rounded-xl p-4 mb-4" style={{ background: 'var(--status-warning-bg)', border: '1px solid var(--status-warning-border)' }}>
-                <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
-                  Top 3 Things To Focus On
-                </h3>
-                <div className="space-y-1.5">
-                  {topFocusInsights.map((insight) => (
-                    <p key={`focus-${insight.title}`} className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      - {insight.title}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
-            <h2 className="font-display text-xl mb-4" style={{ color: 'var(--text-primary)' }}>
-              Insights & Recommendations
-            </h2>
-            <div className="space-y-4">
-              {actionableInsights.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: 'var(--text-tertiary)' }}>
-                    Actionable
-                  </h3>
-                  <div className="space-y-3">
-                    {actionableInsights.map((insight, i) => (
-                      <InsightCard key={`act-${i}`} insight={insight} delay={600 + i * 80} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {informationalInsights.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: 'var(--text-tertiary)' }}>
-                    Informational
-                  </h3>
-                  <div className="space-y-3">
-                    {informationalInsights.map((insight, i) => (
-                      <InsightCard key={`info-${i}`} insight={insight} delay={800 + i * 80} />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* 9. Footer */}
+        {/* 11. Footer */}
         <div className="mt-12 pt-6 text-center anim-fade-up" style={{ borderTop: '1px solid var(--border-light)' }}>
           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
             BetterCals provides estimates for informational purposes only.

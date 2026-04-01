@@ -9,6 +9,7 @@ import BloodValuesForm from '@/components/BloodValuesForm';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
 import VitalsMark from '@/components/VitalsMark';
 import ProfileDropdown from '@/components/ProfileDropdown';
+import ThemeToggle from '@/components/ThemeToggle';
 import Link from 'next/link';
 import {
   UserProfile,
@@ -408,7 +409,9 @@ export default function Home() {
 
           {/* Right: Auth */}
           <div className="flex items-center justify-end">
-            {!isSignedIn ? (
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              {!isSignedIn ? (
               <Link
                 href="/sign-in"
                 className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
@@ -421,37 +424,38 @@ export default function Home() {
               >
                 Sign in
               </Link>
-            ) : profile ? (
-              <div className="flex items-center gap-2">
-                <Link
-                  href="/history"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
+              ) : profile ? (
+                <>
+                  <Link
+                    href="/history"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                    style={{
+                      background: 'var(--border-light)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <History className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                    History
+                  </Link>
+                  <ProfileDropdown profile={profile} onEditProfile={handleEditProfile} />
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  disabled={signingOut}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press disabled:opacity-50"
                   style={{
                     background: 'var(--border-light)',
                     color: 'var(--text-primary)',
                     border: '1px solid var(--border)',
                   }}
                 >
-                  <History className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
-                  History
-                </Link>
-                <ProfileDropdown profile={profile} onEditProfile={handleEditProfile} />
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSignOut}
-                disabled={signingOut}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press disabled:opacity-50"
-                style={{
-                  background: 'var(--border-light)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border)',
-                }}
-              >
-                {signingOut ? 'Signing out...' : 'Sign out'}
-              </button>
-            )}
+                  {signingOut ? 'Signing out...' : 'Sign out'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </header>

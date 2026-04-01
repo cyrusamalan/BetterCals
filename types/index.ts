@@ -95,6 +95,14 @@ export interface Insight {
   recommendation?: string;
 }
 
+export interface ActionPlanItem {
+  id: string;
+  title: string;
+  rationale: string;
+  priority: 1 | 2 | 3;
+  relatedMarkers: (keyof BloodMarkers)[];
+}
+
 export interface CalorieTier {
   label: string;
   weeklyChange: string;
@@ -155,6 +163,7 @@ export interface AnalysisResult {
   ascvdRiskScore?: number;
   ascvdRiskReason?: string;
   usedAverageMarkers?: boolean;
+  actionPlan?: ActionPlanItem[];
 }
 
 export interface ParsedBloodReport {
@@ -169,6 +178,21 @@ export interface AnalysisHistory {
   profile: UserProfile;
   markers: BloodMarkers;
   result: AnalysisResult;
+}
+
+export interface MarkerForecast {
+  marker: keyof BloodMarkers;
+  points: number;
+  slopePer30Days: number;
+  projectedValue: number;
+  projectedDate: string;
+}
+
+export interface PopulationBenchmark {
+  marker: keyof BloodMarkers;
+  benchmarkValue: number;
+  userValue: number;
+  delta: number;
 }
 
 export interface FoodSensitivityFlag {

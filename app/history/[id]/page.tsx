@@ -17,11 +17,7 @@ export default function AnalysisDetailPage() {
 
   useEffect(() => {
     if (!isLoaded) return;
-    if (!isSignedIn) {
-      setError('Sign in to view analysis history.');
-      setLoading(false);
-      return;
-    }
+    if (!isSignedIn) return;
 
     fetch(`/api/analyses/${id}`)
       .then((res) => {
@@ -32,6 +28,34 @@ export default function AnalysisDetailPage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id, isLoaded, isSignedIn]);
+
+  if (isLoaded && !isSignedIn) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center px-5"
+        style={{ background: 'linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%)' }}
+      >
+        <div className="text-center max-w-sm">
+          <AlertCircle className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-tertiary)' }} />
+          <p className="text-sm font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>
+            Sign in to view analysis history.
+          </p>
+          <button
+            onClick={() => router.push('/history')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold btn-press"
+            style={{
+              background: 'var(--border-light)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to History
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || !isLoaded) {
     return (
