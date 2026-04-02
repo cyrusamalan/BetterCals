@@ -11,12 +11,57 @@ export interface UserProfile {
   diabetic?: boolean;
   bloodPressureSystolic?: number;
   treatedForHypertension?: boolean;
+  /** Drinks per week (12oz beer / 5oz wine / 1.5oz spirits) */
+  alcoholDrinksPerWeek?: number;
+  /** First-degree relative with premature ASCVD */
+  familyHeartDisease?: boolean;
+  /** Female: estrogen or combined HRT */
+  takingHRT?: boolean;
+  chronicKidneyDisease?: boolean;
   waistInches?: number;
   hipInches?: number;
   bodyFatPercentage?: number; // optional; enables Katch-McArdle TDEE
+
+  // Advanced activity (overrides activityLevel for TDEE when enabled)
+  advancedActivity?: boolean;
+  dailySteps?: number;
+  occupationType?: OccupationType;
+  exerciseTemplate?: ExerciseTemplate;
+  exerciseSessions?: ExerciseSession[];
+
+  // Enhanced goals (multi-select)
+  focusGoal?: FocusGoal[];
+
+  // Lifestyle context
+  sleepHoursAvg?: number;
+  stressLevel?: 'low' | 'moderate' | 'high' | 'very-high';
+  dietaryPattern?: DietaryPattern;
+  menstrualStatus?: MenstrualStatus;
+
+  // Medication context
+  takingStatins?: boolean;
+  takingThyroidMeds?: boolean;
 }
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active';
+
+export type OccupationType = 'desk' | 'standing' | 'light-labor' | 'heavy-labor';
+
+export type ExerciseType = 'strength' | 'cardio-low' | 'cardio-moderate' | 'cardio-high' | 'sports' | 'flexibility';
+
+export type ExerciseTemplate = 'strength-focused' | 'cardio-focused' | 'balanced' | 'light-recovery' | 'athlete' | 'custom';
+
+export interface ExerciseSession {
+  type: ExerciseType;
+  durationMinutes: number;
+  frequencyPerWeek: number;
+}
+
+export type FocusGoal = 'fat-loss' | 'muscle-gain' | 'metabolic-health' | 'endurance' | 'longevity' | 'general-wellness';
+
+export type DietaryPattern = 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'low-carb';
+
+export type MenstrualStatus = 'regular' | 'irregular' | 'postmenopausal' | 'not-applicable';
 
 export interface BloodMarkers {
   glucose?: number; // mg/dL (fasting)
@@ -76,6 +121,9 @@ export interface TDEEResult {
   tdee: number;
   targetCalories: number;
   activityMultiplier: number;
+  // Breakdown when advanced activity mode is used
+  neatCalories?: number;
+  exerciseCalories?: number;
 }
 
 export interface HealthScore {
@@ -116,12 +164,16 @@ export interface MacroBreakdown {
   carbs: { grams: number; pct: number };
   fat: { grams: number; pct: number };
   calories: number;
+  /** Both fat-loss and muscle-gain focus selected — prioritize protein and training */
+  recompMode?: boolean;
 }
 
 export interface SupplementRec {
   name: string;
   dosage: string;
   reason: string;
+  /** e.g. CKD caution for potassium-heavy supplements */
+  warning?: string;
 }
 
 export interface MealTimingSuggestion {

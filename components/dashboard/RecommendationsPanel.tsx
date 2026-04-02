@@ -1,10 +1,11 @@
 'use client';
 
-import { PersonalizedRecs } from '@/types';
-import { Activity, Droplets, Scale, HeartPulse, Pill, Dumbbell, Clock, Utensils, Flame } from 'lucide-react';
+import { PersonalizedRecs, TDEEResult } from '@/types';
+import { Activity, Droplets, Scale, HeartPulse, Pill, Dumbbell, Clock, Utensils, Flame, Footprints, Zap } from 'lucide-react';
 
 interface RecommendationsPanelProps {
   recs: PersonalizedRecs;
+  tdee?: TDEEResult;
 }
 
 function getBmiColor(category: string): string {
@@ -36,7 +37,7 @@ function getRatioColor(interpretation: string | undefined | null): string {
   return 'var(--text-secondary)';
 }
 
-export default function RecommendationsPanel({ recs }: RecommendationsPanelProps) {
+export default function RecommendationsPanel({ recs, tdee }: RecommendationsPanelProps) {
   const glasses = Math.round(recs.waterIntakeOz / 8);
   const bmiColor = getBmiColor(recs.bmiCategory);
   const bmiPos = getBmiPosition(recs.bmi);
@@ -60,6 +61,39 @@ export default function RecommendationsPanel({ recs }: RecommendationsPanelProps
       </div>
 
       <div className="px-5 py-5 space-y-6">
+        {/* TDEE Breakdown (shown when advanced activity mode was used) */}
+        {tdee && tdee.neatCalories !== undefined && tdee.exerciseCalories !== undefined && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Zap className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+              <span className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: 'var(--text-tertiary)' }}>
+                TDEE Breakdown
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2 mb-3">
+              <span className="font-display text-3xl" style={{ color: 'var(--accent)' }}>{tdee.tdee}</span>
+              <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>kcal/day</span>
+            </div>
+            <div className="space-y-1.5">
+              {[
+                { label: 'Basal Metabolic Rate (BMR)', value: tdee.bmr, icon: Activity },
+                { label: 'Non-Exercise Activity (NEAT)', value: tdee.neatCalories, icon: Footprints },
+                { label: 'Exercise', value: tdee.exerciseCalories, icon: Dumbbell },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center justify-between py-1.5">
+                  <div className="flex items-center gap-2">
+                    <item.icon className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
+                  </div>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {item.value} kcal
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* BMI */}
         <div>
           <div className="flex items-center gap-2 mb-3">
@@ -295,9 +329,9 @@ export default function RecommendationsPanel({ recs }: RecommendationsPanelProps
               </span>
             </div>
             <div className="space-y-2">
-              {recs.supplements.map((sup) => (
+              {recs.supplements.map((sup, i) => (
                 <div
-                  key={sup.name}
+                  key={`${sup.name}-${i}`}
                   className="flex items-start gap-3 p-3 rounded-xl"
                   style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}
                 >
@@ -307,6 +341,11 @@ export default function RecommendationsPanel({ recs }: RecommendationsPanelProps
                       <span className="text-xs" style={{ color: 'var(--accent)' }}>{sup.dosage}</span>
                     </div>
                     <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{sup.reason}</p>
+                    {sup.warning && (
+                      <p className="text-[11px] mt-1.5 font-medium" style={{ color: 'var(--status-warning)' }}>
+                        {sup.warning}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}

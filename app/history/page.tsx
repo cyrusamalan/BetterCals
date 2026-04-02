@@ -32,6 +32,7 @@ import {
 } from '@/types';
 import { deriveMarkerForecasts } from '@/lib/derivedInsights';
 import { getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
+import MarkerEducationDrawer from '@/components/dashboard/MarkerEducationDrawer';
 
 const MARKER_LABELS: Record<keyof BloodMarkers, string> = {
   glucose: 'Glucose',
@@ -105,6 +106,7 @@ export default function HistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [compareAId, setCompareAId] = useState<number | null>(null);
   const [compareBId, setCompareBId] = useState<number | null>(null);
+  const [activeMarker, setActiveMarker] = useState<{ key: keyof BloodMarkers; value: number } | null>(null);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -405,16 +407,19 @@ export default function HistoryPage() {
                   title="Biggest improvements"
                   rows={comparisonSummary.improved.slice(0, 5)}
                   emptyLabel="No measurable improvements yet."
+                  onOpenMarker={(key, value) => setActiveMarker({ key, value })}
                 />
                 <ComparisonColumn
                   title="Needs attention"
                   rows={comparisonSummary.worsened.slice(0, 5)}
                   emptyLabel="No regressions in overlapping markers."
+                  onOpenMarker={(key, value) => setActiveMarker({ key, value })}
                 />
                 <ComparisonColumn
                   title="Stable markers"
                   rows={comparisonSummary.unchanged.slice(0, 5)}
                   emptyLabel="No unchanged overlaps."
+                  onOpenMarker={(key, value) => setActiveMarker({ key, value })}
                 />
               </div>
             </div>
@@ -479,9 +484,16 @@ export default function HistoryPage() {
                 >
                   <div className="px-5 py-4 flex items-start justify-between gap-3" style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <div>
-                      <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {trend.label}
-                      </h3>
+                      <button
+                        type="button"
+                        className="text-left"
+                        onClick={() => setActiveMarker({ key: trend.key, value: trend.latestValue })}
+                        aria-label={`Open ${trend.label} details`}
+                      >
+                        <h3 className="text-sm font-semibold hover:opacity-80 transition-opacity" style={{ color: 'var(--text-primary)' }}>
+                          {trend.label}
+                        </h3>
+                      </button>
                       <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
                         Latest: {trend.latestValue}{trend.unit ? ` ${trend.unit}` : ''}
                       </p>
@@ -598,6 +610,13 @@ export default function HistoryPage() {
           </div>
         </section>
       </div>
+
+      <MarkerEducationDrawer
+        open={activeMarker !== null}
+        markerKey={activeMarker?.key ?? null}
+        value={activeMarker?.value ?? null}
+        onClose={() => setActiveMarker(null)}
+      />
     </div>
   );
 }
@@ -606,6 +625,7 @@ function ComparisonColumn({
   title,
   rows,
   emptyLabel,
+  onOpenMarker,
 }: {
   title: string;
   rows: Array<{
@@ -617,6 +637,7 @@ function ComparisonColumn({
     direction: ComparisonDirection;
   }>;
   emptyLabel: string;
+  onOpenMarker?: (key: keyof BloodMarkers, value: number) => void;
 }) {
   return (
     <div
@@ -635,9 +656,22 @@ function ComparisonColumn({
           rows.map((row) => (
             <div key={row.key} className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  {row.label}
-                </p>
+                {onOpenMarker ? (
+                  <button
+                    type="button"
+                    className="text-left"
+                    onClick={() => onOpenMarker(row.key, row.bVal)}
+                    aria-label={`Open ${row.label} details`}
+                  >
+                    <p className="text-sm font-medium hover:opacity-80 transition-opacity" style={{ color: 'var(--text-primary)' }}>
+                      {row.label}
+                    </p>
+                  </button>
+                ) : (
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {row.label}
+                  </p>
+                )}
                 <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
                   {row.aVal} → {row.bVal}
                 </p>
