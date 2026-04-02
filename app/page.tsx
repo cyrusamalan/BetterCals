@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import {
@@ -10,9 +11,11 @@ import {
   HeartPulse,
   LineChart,
   History,
+  Play,
 } from 'lucide-react';
 import VitalsMark from '@/components/VitalsMark';
 import ThemeToggle from '@/components/ThemeToggle';
+import DemoModal from '@/components/DemoModal';
 
 function FeatureCard({
   icon,
@@ -95,6 +98,7 @@ function StepCard({
 
 export default function HomePage() {
   const { isSignedIn } = useAuth();
+  const [demoOpen, setDemoOpen] = useState(false);
 
   return (
     <div
@@ -232,18 +236,19 @@ export default function HomePage() {
                   <LineChart className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
                 </Link>
               ) : (
-                <Link
-                  href="/sign-in"
+                <button
+                  onClick={() => setDemoOpen(true)}
                   className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold btn-press"
                   style={{
                     background: 'var(--border-light)',
                     color: 'var(--text-primary)',
                     border: '1px solid var(--border)',
+                    cursor: 'pointer',
                   }}
                 >
-                  Save & track results
-                  <History className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                </Link>
+                  <Play className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+                  See it in action
+                </button>
               )}
             </div>
 
@@ -387,6 +392,8 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+
+      <DemoModal open={demoOpen} onCloseAction={() => setDemoOpen(false)} />
     </div>
   );
 }
