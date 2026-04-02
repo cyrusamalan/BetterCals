@@ -1,4 +1,4 @@
-import { UserProfile, ActivityLevel, TDEEResult, BloodMarkers, HealthScore, Insight, CalorieTier, MacroBreakdown, PersonalizedRecs, MealTimingSuggestion } from '@/types';
+import { UserProfile, ActivityLevel, TDEEResult, BloodMarkers, HealthScore, Insight, CalorieTier, MacroBreakdown, PersonalizedRecs, MealTimingSuggestion, ExerciseSession, ExerciseType, ExerciseTemplate, FocusGoal, DietaryPattern } from '@/types';
 import { getMarkerInterpretation } from '@/lib/bloodParser';
 import { calculateASCVDRisk, type ASCVDResult } from '@/lib/riskModels';
 
@@ -34,6 +34,72 @@ const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   'very-active': 1.9,
 };
 
+// MET values for exercise types (Compendium of Physical Activities)
+const EXERCISE_METS: Record<ExerciseType, number> = {
+  'strength': 5,
+  'cardio-low': 3.5,
+  'cardio-moderate': 6,
+  'cardio-high': 9,
+  'sports': 7,
+  'flexibility': 2.5,
+};
+
+// Occupation NEAT offsets (kcal/day above basal desk work)
+const OCCUPATION_NEAT: Record<string, number> = {
+  'desk': 0,
+  'standing': 150,
+  'light-labor': 350,
+  'heavy-labor': 600,
+};
+
+// Exercise template presets → ExerciseSession[]
+const EXERCISE_TEMPLATE_SESSIONS: Record<Exclude<ExerciseTemplate, 'custom'>, ExerciseSession[]> = {
+  'strength-focused': [
+    { type: 'strength', durationMinutes: 50, frequencyPerWeek: 4 },
+    { type: 'cardio-moderate', durationMinutes: 25, frequencyPerWeek: 1 },
+  ],
+  'cardio-focused': [
+    { type: 'strength', durationMinutes: 40, frequencyPerWeek: 2 },
+    { type: 'cardio-moderate', durationMinutes: 35, frequencyPerWeek: 3 },
+  ],
+  'balanced': [
+    { type: 'strength', durationMinutes: 45, frequencyPerWeek: 3 },
+    { type: 'cardio-moderate', durationMinutes: 30, frequencyPerWeek: 2 },
+  ],
+  'light-recovery': [
+    { type: 'flexibility', durationMinutes: 30, frequencyPerWeek: 2 },
+    { type: 'cardio-low', durationMinutes: 30, frequencyPerWeek: 2 },
+  ],
+  'athlete': [
+    { type: 'strength', durationMinutes: 60, frequencyPerWeek: 3 },
+    { type: 'cardio-high', durationMinutes: 30, frequencyPerWeek: 2 },
+    { type: 'sports', durationMinutes: 60, frequencyPerWeek: 1 },
+  ],
+};
+
+/** Resolve exercise sessions from template or custom input. */
+export function resolveExerciseSessions(profile: UserProfile): ExerciseSession[] {
+  if (profile.exerciseSessions && profile.exerciseSessions.length > 0) {
+    return profile.exerciseSessions;
+  }
+  if (profile.exerciseTemplate && profile.exerciseTemplate !== 'custom') {
+    return EXERCISE_TEMPLATE_SESSIONS[profile.exerciseTemplate];
+  }
+  return [];
+}
+
+/** Calculate daily exercise calories from sessions using MET values. */
+function calculateExerciseCalories(sessions: ExerciseSession[], weightKg: number): number {
+  let weeklyTotal = 0;
+  for (const session of sessions) {
+    const met = EXERCISE_METS[session.type];
+    // MET formula: kcal = MET × weightKg × hours
+    // Subtract 1 MET (resting) to avoid double-counting BMR
+    weeklyTotal += (met - 1) * weightKg * (session.durationMinutes / 60) * session.frequencyPerWeek;
+  }
+  return Math.round(weeklyTotal / 7); // daily average
+}
+
 // Conversion utilities
 function lbsToKg(lbs: number): number {
   return lbs * 0.453592;
@@ -67,16 +133,35 @@ export function calculateTDEE(profile: UserProfile): TDEEResult {
     bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
   }
 
-  const activityMultiplier = ACTIVITY_MULTIPLIERS[profile.activityLevel];
-  const tdee = Math.round(bmr * activityMultiplier);
+  // Advanced activity: component-based TDEE (BMR + NEAT + exercise)
+  // Simple mode: multiplier-based TDEE (BMR × activity multiplier)
+  let tdee: number;
+  let activityMultiplier: number;
+  let neatCalories: number | undefined;
+  let exerciseCalories: number | undefined;
+
+  if (profile.advancedActivity && profile.dailySteps !== undefined) {
+    // NEAT from steps: ~0.04 kcal per step, scaled by body weight relative to 70kg reference
+    const stepsNeat = Math.round(profile.dailySteps * 0.04 * (weightKg / 70));
+
+    // NEAT from occupation
+    const occupationNeat = OCCUPATION_NEAT[profile.occupationType ?? 'desk'] ?? 0;
+
+    neatCalories = stepsNeat + occupationNeat;
+
+    // Exercise calories from sessions (template or custom)
+    const sessions = resolveExerciseSessions(profile);
+    exerciseCalories = calculateExerciseCalories(sessions, weightKg);
+
+    tdee = Math.round(bmr + neatCalories + exerciseCalories);
+    // Store a computed multiplier for display/backwards compat
+    activityMultiplier = Math.round((tdee / bmr) * 100) / 100;
+  } else {
+    activityMultiplier = ACTIVITY_MULTIPLIERS[profile.activityLevel];
+    tdee = Math.round(bmr * activityMultiplier);
+  }
 
   // Adjust for goal
-  // Deficit/surplus ratios per common sports nutrition guidelines (ISSN, NASM):
-  // - Aggressive cut: 30% deficit (contest prep pace, risk of muscle loss — Helms et al., 2014)
-  // - Moderate cut: 20% deficit (standard recommendation, preserves lean mass)
-  // - Mild cut: 10% deficit (slow & sustainable, minimal metabolic adaptation)
-  // - Lean bulk: 10% surplus (minimizes fat gain — Iraki et al., 2019)
-  // - Aggressive bulk: 20% surplus (faster mass gain, higher fat accrual)
   const goalMultipliers: Record<UserProfile['goal'], number> = {
     'lose-aggressive': 0.7,
     'lose-moderate': 0.8,
@@ -92,6 +177,8 @@ export function calculateTDEE(profile: UserProfile): TDEEResult {
     tdee,
     targetCalories,
     activityMultiplier,
+    neatCalories,
+    exerciseCalories,
   };
 }
 
@@ -289,6 +376,97 @@ function generateCrossMarkerInsights(profile: UserProfile, markers: BloodMarkers
     });
   }
 
+  // --- Medication-aware insights ---
+
+  // Statins: contextualize LDL and ALT
+  if (profile.takingStatins) {
+    if (markers.ldl !== undefined && markers.ldl < 100) {
+      insights.push({
+        type: 'success',
+        title: 'LDL Well-Controlled on Statin Therapy',
+        description: `LDL at ${markers.ldl} mg/dL is within target range while on statin therapy.`,
+        recommendation: 'Continue current statin regimen. Retest lipid panel annually or as directed by your physician.',
+      });
+    }
+    if (markers.alt !== undefined && markers.alt > 40) {
+      insights.push({
+        type: 'warning',
+        title: 'Elevated ALT — Possible Statin Effect',
+        description: `ALT at ${markers.alt} U/L may be related to statin therapy. Mild elevations (<3x upper limit) are common and usually benign.`,
+        recommendation: 'Discuss with your prescribing physician. Persistent elevations above 3x normal may warrant dose adjustment or switching statins.',
+      });
+    }
+  }
+
+  // Thyroid medication: contextualize TSH
+  if (profile.takingThyroidMeds && markers.tsh !== undefined) {
+    const tshInterp = getMarkerInterpretation('tsh', markers.tsh, profile.gender);
+    if (tshInterp.status === 'optimal' || tshInterp.status === 'normal') {
+      insights.push({
+        type: 'success',
+        title: 'TSH Well-Managed on Medication',
+        description: `TSH at ${markers.tsh} mIU/L is within target range on thyroid medication.`,
+        recommendation: 'Continue current thyroid medication. Retest TSH every 6–12 months or if symptoms change.',
+      });
+    }
+  }
+
+  // --- Dietary pattern insights ---
+
+  // Keto + elevated LDL: lean mass hyper-responder context
+  if (profile.dietaryPattern === 'keto' && markers.ldl !== undefined && markers.ldl >= 130 && !profile.takingStatins) {
+    insights.push({
+      type: 'info',
+      title: 'Elevated LDL on Ketogenic Diet',
+      description: `LDL at ${markers.ldl} mg/dL may reflect a lean mass hyper-responder pattern common on low-carb/keto diets — LDL rises while triglycerides and HDL often improve.`,
+      recommendation: 'Request ApoB and Lp(a) testing for a more accurate cardiovascular risk assessment. If ApoB is normal (<90 mg/dL), the elevated LDL is less concerning.',
+    });
+  }
+
+  // Vegan/vegetarian + low B12/ferritin: expected context
+  if (
+    (profile.dietaryPattern === 'vegan' || profile.dietaryPattern === 'vegetarian') &&
+    markers.vitaminB12 !== undefined && markers.vitaminB12 < 300
+  ) {
+    insights.push({
+      type: 'warning',
+      title: `Low B12 — Common on ${profile.dietaryPattern === 'vegan' ? 'Vegan' : 'Vegetarian'} Diet`,
+      description: `B12 at ${markers.vitaminB12} pg/mL is below optimal. Plant-based diets provide limited bioavailable B12.`,
+      recommendation: 'Supplement with B12 (2000 mcg/day sublingual for vegans, 1000 mcg/day for vegetarians). Retest in 3 months.',
+    });
+  }
+
+  // --- Lifestyle-aware insights ---
+
+  // Poor sleep + elevated glucose/hsCRP
+  if (profile.sleepHoursAvg !== undefined && profile.sleepHoursAvg < 6) {
+    const sleepMarkers: string[] = [];
+    if (markers.glucose !== undefined && markers.glucose >= 100) sleepMarkers.push('fasting glucose');
+    if (markers.hsCRP !== undefined && markers.hsCRP > 2.0) sleepMarkers.push('hs-CRP');
+    if (markers.hba1c !== undefined && markers.hba1c >= 5.7) sleepMarkers.push('HbA1c');
+    if (sleepMarkers.length > 0) {
+      insights.push({
+        type: 'warning',
+        title: 'Poor Sleep May Be Elevating Markers',
+        description: `Averaging ${profile.sleepHoursAvg} hours of sleep may be contributing to elevated ${sleepMarkers.join(' and ')}. Sleep deprivation raises cortisol, increases insulin resistance, and promotes inflammation.`,
+        recommendation: 'Prioritize 7–9 hours of sleep before focusing on dietary interventions. Improving sleep alone can lower glucose and inflammatory markers.',
+      });
+    }
+  }
+
+  // Menstrual status + borderline ferritin
+  if (
+    profile.menstrualStatus === 'regular' &&
+    markers.ferritin !== undefined && markers.ferritin >= 12 && markers.ferritin < 30
+  ) {
+    insights.push({
+      type: 'warning',
+      title: 'Borderline Ferritin with Menstrual Iron Losses',
+      description: `Ferritin at ${markers.ferritin} ng/mL is borderline. Regular menstruation causes ongoing iron losses that will likely deplete stores further.`,
+      recommendation: 'Begin iron supplementation (18 mg/day with vitamin C) proactively. Retest ferritin in 3 months. Target >50 ng/mL for optimal energy and exercise performance.',
+    });
+  }
+
   return insights;
 }
 
@@ -361,7 +539,7 @@ export function calculateCalorieTiers(tdee: number): CalorieTier[] {
 export function calculateMacros(
   calories: number,
   goal: UserProfile['goal'],
-  profile?: Pick<UserProfile, 'weightLbs' | 'gender'>,
+  profile?: Pick<UserProfile, 'weightLbs' | 'gender' | 'focusGoal' | 'dietaryPattern'>,
   markers?: BloodMarkers,
 ): MacroBreakdown {
   // --- Protein: body-weight-based (g per lb) with goal-specific targets ---
@@ -413,11 +591,48 @@ export function calculateMacros(
     carbFraction = Math.max(0.30, carbFraction);
   }
 
-  const carbGrams = Math.round((remaining * carbFraction) / 4);
-  const fatGrams = Math.round((remaining - carbGrams * 4) / 9);
+  // Focus goal adjustments
+  if (profile?.focusGoal) {
+    switch (profile.focusGoal) {
+      case 'fat-loss':
+        proteinGrams = Math.round(Math.max(proteinGrams, weightLbs * 1.0));
+        // Re-cap protein at 45%
+        proteinGrams = Math.min(proteinGrams, Math.round(calories * 0.45 / 4));
+        carbFraction -= 0.10;
+        break;
+      case 'muscle-gain':
+        carbFraction += 0.10;
+        break;
+      case 'metabolic-health':
+        carbFraction -= 0.10;
+        break;
+      case 'endurance':
+        carbFraction += 0.15;
+        break;
+      case 'longevity':
+        // Slight carb reduction, moderate fat emphasis
+        carbFraction -= 0.05;
+        break;
+    }
+    carbFraction = Math.max(0.20, Math.min(0.75, carbFraction));
+  }
+
+  // Dietary pattern carb caps
+  if (profile?.dietaryPattern === 'keto') {
+    carbFraction = Math.min(carbFraction, 0.20);
+  } else if (profile?.dietaryPattern === 'low-carb') {
+    carbFraction = Math.min(carbFraction, 0.30);
+  }
+
+  // Recalculate protein calories after possible focus goal changes
+  const proteinCal2 = proteinGrams * 4;
+  const remaining2 = calories - proteinCal2;
+
+  const carbGrams = Math.round((remaining2 * carbFraction) / 4);
+  const fatGrams = Math.round((remaining2 - carbGrams * 4) / 9);
 
   // Compute actual percentages
-  const pctP = Math.round((proteinCal / calories) * 100);
+  const pctP = Math.round((proteinCal2 / calories) * 100);
   const pctC = Math.round((carbGrams * 4 / calories) * 100);
   const pctF = 100 - pctP - pctC;
 
@@ -476,11 +691,15 @@ export function calculateRecommendations(
 ): PersonalizedRecs {
   const { bmi, category: bmiCategory } = calculateBMI(profile.weightLbs, profile.heightFeet, profile.heightInches);
 
-  // Water: ~0.5 oz per lb bodyweight + 16 oz per activity tier above sedentary
-  // Base rate from National Academies of Sciences (2005) adequate intake guidelines;
-  // activity add-on approximates ACSM fluid replacement recommendations (~480 mL/session).
+  // Water: ~0.5 oz per lb bodyweight + activity add-on
   const activityIdx = ACTIVITY_TIERS.indexOf(profile.activityLevel);
-  const waterIntakeOz = Math.round(profile.weightLbs * 0.5 + activityIdx * 16);
+  let waterIntakeOz: number;
+  if (profile.advancedActivity && profile.dailySteps !== undefined) {
+    // Scale by steps: base + 8oz per 2000 steps
+    waterIntakeOz = Math.round(profile.weightLbs * 0.5 + (profile.dailySteps / 2000) * 8);
+  } else {
+    waterIntakeOz = Math.round(profile.weightLbs * 0.5 + activityIdx * 16);
+  }
 
   // LDL/HDL ratio
   let ldlHdlRatio: number | null = null;
@@ -603,9 +822,62 @@ export function calculateRecommendations(
     supplements.push({ name: 'Magnesium Glycinate', dosage: '300–400 mg daily', reason: 'Supports insulin sensitivity, metabolic health, and muscle recovery — often depleted in insulin-resistant states' });
   }
 
-  // Creatine — for gain goals or active individuals
-  if (profile.goal.startsWith('gain') || profile.activityLevel === 'active' || profile.activityLevel === 'very-active') {
+  // Creatine — for gain goals, muscle-gain focus, or active individuals
+  if (
+    profile.goal.startsWith('gain') ||
+    profile.focusGoal === 'muscle-gain' ||
+    profile.activityLevel === 'active' ||
+    profile.activityLevel === 'very-active'
+  ) {
     supplements.push({ name: 'Creatine Monohydrate', dosage: '3–5 g daily', reason: 'Supports strength, power output, and lean mass — most studied sports supplement (ISSN position stand)' });
+  }
+
+  // --- Lifestyle-driven supplements ---
+
+  // Dietary pattern: vegan → B12 + algal DHA; vegetarian → B12 if not already flagged
+  if (profile.dietaryPattern === 'vegan') {
+    if (!supplements.some(s => s.name === 'Vitamin B12')) {
+      supplements.push({ name: 'Vitamin B12', dosage: '2000 mcg daily (sublingual or spray)', reason: 'Essential for vegans — B12 is not available from plant sources' });
+    }
+    supplements.push({ name: 'Algal Omega-3 (DHA)', dosage: '250–500 mg DHA daily', reason: 'Plant-based DHA source — vegans have no dietary DHA intake' });
+  } else if (profile.dietaryPattern === 'vegetarian' && !supplements.some(s => s.name === 'Vitamin B12')) {
+    supplements.push({ name: 'Vitamin B12', dosage: '1000 mcg daily', reason: 'Vegetarians are at risk of B12 insufficiency — limited bioavailable dietary sources' });
+  }
+
+  // Sleep: poor sleep → magnesium + melatonin
+  if (profile.sleepHoursAvg !== undefined && profile.sleepHoursAvg < 6) {
+    if (!supplements.some(s => s.name === 'Magnesium Glycinate')) {
+      supplements.push({ name: 'Magnesium Glycinate', dosage: '400 mg before bed', reason: 'Supports sleep quality and relaxation — especially important with short sleep duration' });
+    }
+    supplements.push({ name: 'Melatonin', dosage: '0.5–1 mg 30 min before bed', reason: 'Low-dose melatonin supports circadian rhythm when sleep is consistently under 6 hours' });
+  }
+
+  // Stress: high/very-high → ashwagandha + magnesium
+  if (profile.stressLevel === 'high' || profile.stressLevel === 'very-high') {
+    supplements.push({ name: 'Ashwagandha (KSM-66)', dosage: '600 mg daily', reason: 'Clinically shown to reduce cortisol and perceived stress (Chandrasekhar et al., 2012)' });
+    if (!supplements.some(s => s.name === 'Magnesium Glycinate')) {
+      supplements.push({ name: 'Magnesium Glycinate', dosage: '300–400 mg daily', reason: 'Supports stress resilience and nervous system function — often depleted under chronic stress' });
+    }
+  }
+
+  // Menstrual status: regular cycle + borderline ferritin → heighten iron urgency
+  if (
+    profile.menstrualStatus === 'regular' &&
+    markers.ferritin !== undefined && markers.ferritin < 30 && markers.ferritin >= 12 &&
+    !ironDeficient
+  ) {
+    const inflamed = markers.hsCRP !== undefined && markers.hsCRP > 3.0;
+    if (!inflamed) {
+      supplements.push({ name: 'Iron', dosage: '18 mg daily (with vitamin C)', reason: 'Ferritin is borderline and monthly menstrual losses increase depletion risk — supplement proactively' });
+    }
+  }
+
+  // Focus goal: endurance → electrolytes; longevity → omega-3 if not already added
+  if (profile.focusGoal === 'endurance') {
+    supplements.push({ name: 'Electrolyte Mix', dosage: 'During and after training sessions', reason: 'Endurance training increases sodium, potassium, and magnesium losses through sweat' });
+  }
+  if (profile.focusGoal === 'longevity' && !supplements.some(s => s.name.includes('Omega-3'))) {
+    supplements.push({ name: 'Omega-3 (EPA/DHA)', dosage: '1–2 g EPA+DHA daily', reason: 'Supports cardiovascular health, cognitive function, and healthy aging' });
   }
 
   // --- Exercise suggestions: activity-level baseline + marker-driven adjustments ---
@@ -646,6 +918,50 @@ export function calculateRecommendations(
     exerciseSuggestions.push('Elevated hs-CRP indicates systemic inflammation — consider anti-inflammatory activities (yoga, swimming, walking) alongside strength training.');
   }
 
+  // Focus goal → exercise suggestions
+  if (profile.focusGoal === 'endurance') {
+    exerciseSuggestions.push('Build a zone 2 cardio base (60–70% max HR) for 80% of cardio volume — this builds aerobic capacity with minimal fatigue.');
+    exerciseSuggestions.push('Include 1–2 interval sessions per week to improve VO2max and lactate threshold.');
+  } else if (profile.focusGoal === 'muscle-gain') {
+    exerciseSuggestions.push('Prioritize 3–4 strength sessions per week, hitting each major muscle group 2x with progressive overload.');
+    exerciseSuggestions.push('Limit cardio to 2–3 short sessions (20 min) to preserve recovery capacity for hypertrophy.');
+  } else if (profile.focusGoal === 'fat-loss') {
+    exerciseSuggestions.push('Combine strength training (3x/week) with daily step targets (8000+) — NEAT is the biggest lever for fat loss.');
+    exerciseSuggestions.push('Add 1–2 HIIT sessions per week (20 min) to boost metabolic rate and preserve lean mass.');
+  } else if (profile.focusGoal === 'metabolic-health') {
+    exerciseSuggestions.push('Take 15-minute walks after each meal — post-meal movement is the most effective way to blunt glucose spikes.');
+    exerciseSuggestions.push('Aim for 3x strength training per week — muscle mass is the largest insulin-sensitive tissue in the body.');
+  } else if (profile.focusGoal === 'longevity') {
+    exerciseSuggestions.push('Build VO2max with 1–2 high-intensity sessions per week — VO2max is the strongest predictor of all-cause mortality.');
+    exerciseSuggestions.push('Include zone 2 cardio (3+ hours/week), strength training (2–3x/week), and daily mobility work.');
+  }
+
+  // Exercise gap detection from advanced activity sessions
+  if (profile.advancedActivity) {
+    const sessions = resolveExerciseSessions(profile);
+    const hasStrength = sessions.some(s => s.type === 'strength');
+    const hasCardio = sessions.some(s => ['cardio-low', 'cardio-moderate', 'cardio-high'].includes(s.type));
+    const allHighIntensity = sessions.length > 0 && sessions.every(s => ['cardio-high', 'strength', 'sports'].includes(s.type));
+
+    if (!hasStrength && sessions.length > 0) {
+      exerciseSuggestions.push('Your current routine has no strength training — adding 2–3 sessions per week supports metabolic health, bone density, and injury prevention.');
+    }
+    if (!hasCardio && sessions.length > 0) {
+      exerciseSuggestions.push('Your current routine has no dedicated cardio — adding 2–3 sessions per week (even brisk walking) supports cardiovascular health and recovery.');
+    }
+    if (allHighIntensity && sessions.length >= 5) {
+      exerciseSuggestions.push('Your routine is all high-intensity — consider replacing 1–2 sessions with low-intensity recovery work (yoga, walking, swimming) to prevent overtraining.');
+    }
+  }
+
+  // Lifestyle-driven exercise adjustments
+  if (profile.sleepHoursAvg !== undefined && profile.sleepHoursAvg < 6) {
+    exerciseSuggestions.push('Sleep under 6 hours impairs recovery and increases injury risk — reduce training intensity until sleep improves, and prioritize sleep hygiene.');
+  }
+  if (profile.stressLevel === 'high' || profile.stressLevel === 'very-high') {
+    exerciseSuggestions.push('High stress elevates cortisol — add dedicated stress-reduction activities (yoga, tai chi, nature walks) and limit high-intensity sessions to 2–3 per week.');
+  }
+
   // Waist-to-hip ratio
   let waistToHipRatio: number | null = null;
   let waistToHipInterpretation: string | null = null;
@@ -658,7 +974,7 @@ export function calculateRecommendations(
   // Goal-specific meal timing suggestions
   // Splits based on goal: lose (front-loaded), maintain (balanced), gain (high-frequency)
   const tdeeResult = calculateTDEE(profile);
-  const mealTiming = calculateMealTiming(tdeeResult.targetCalories, profile.goal);
+  const mealTiming = calculateMealTiming(tdeeResult.targetCalories, profile.goal, profile.focusGoal);
 
   return {
     bmi,
@@ -692,9 +1008,39 @@ export function calculateRecommendations(
 function calculateMealTiming(
   targetCalories: number,
   goal: UserProfile['goal'],
+  focusGoal?: FocusGoal,
 ): MealTimingSuggestion[] {
+  // Focus goal overrides: metabolic-health → time-restricted eating
+  if (focusGoal === 'metabolic-health') {
+    return [
+      { meal: 'Meal 1', time: '12:00–1:00 PM', calories: Math.round(targetCalories * 0.35), focus: 'Break fast with protein + healthy fats — time-restricted eating (16:8) improves insulin sensitivity' },
+      { meal: 'Meal 2', time: '3:30–4:30 PM', calories: Math.round(targetCalories * 0.30), focus: 'Balanced meal with fiber-rich carbs and lean protein' },
+      { meal: 'Meal 3', time: '7:00–8:00 PM', calories: Math.round(targetCalories * 0.35), focus: 'Last meal before 8 PM — emphasize protein and vegetables' },
+    ];
+  }
+
+  // Focus goal: endurance → pre/post-workout fueling
+  if (focusGoal === 'endurance') {
+    return [
+      { meal: 'Breakfast', time: '7:00–8:00 AM', calories: Math.round(targetCalories * 0.25), focus: 'Carb-focused for glycogen loading' },
+      { meal: 'Pre-Workout', time: '10:30–11:00 AM', calories: Math.round(targetCalories * 0.15), focus: 'Easily digestible carbs (banana, toast, energy bar)' },
+      { meal: 'Post-Workout', time: '1:00–2:00 PM', calories: Math.round(targetCalories * 0.25), focus: 'Carbs + protein (3:1 ratio) within 30 min of training for glycogen replenishment' },
+      { meal: 'Dinner', time: '6:30–7:30 PM', calories: Math.round(targetCalories * 0.35), focus: 'Balanced meal — replenish micronutrients and protein' },
+    ];
+  }
+
+  // Focus goal: muscle-gain → 4+ meals for protein distribution
+  if (focusGoal === 'muscle-gain') {
+    return [
+      { meal: 'Breakfast', time: '7:00–8:00 AM', calories: Math.round(targetCalories * 0.25), focus: '30–40g protein + carbs — break overnight catabolic state' },
+      { meal: 'Lunch', time: '11:30 AM–12:30 PM', calories: Math.round(targetCalories * 0.25), focus: '30–40g protein + complex carbs for sustained energy' },
+      { meal: 'Post-Workout', time: '3:00–4:00 PM', calories: Math.round(targetCalories * 0.25), focus: '30–40g fast protein + simple carbs — maximize muscle protein synthesis window' },
+      { meal: 'Dinner', time: '7:00–8:00 PM', calories: Math.round(targetCalories * 0.25), focus: '30–40g protein + healthy fats — casein-rich foods (cottage cheese, Greek yogurt) before bed' },
+    ];
+  }
+
+  // Default: use caloric goal patterns
   if (goal.startsWith('lose')) {
-    // Front-loaded: 35% breakfast, 35% lunch, 10% snack, 20% dinner
     return [
       { meal: 'Breakfast', time: '7:00–8:00 AM', calories: Math.round(targetCalories * 0.35), focus: 'Protein + fiber to sustain satiety' },
       { meal: 'Lunch', time: '12:00–1:00 PM', calories: Math.round(targetCalories * 0.35), focus: 'Lean protein + complex carbs' },
@@ -704,7 +1050,6 @@ function calculateMealTiming(
   }
 
   if (goal.startsWith('gain')) {
-    // High-frequency: 25% each for 4 meals to maximize MPS
     return [
       { meal: 'Breakfast', time: '7:00–8:00 AM', calories: Math.round(targetCalories * 0.25), focus: 'Protein + carbs to break overnight fast' },
       { meal: 'Lunch', time: '11:30 AM–12:30 PM', calories: Math.round(targetCalories * 0.25), focus: 'Balanced macro-dense meal' },

@@ -1531,7 +1531,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
               <ActionPlanCard items={actionPlan} />
             </div>
             <div className="mt-8 anim-fade-up delay-3">
-              <RecommendationsPanel recs={recommendations} />
+              <RecommendationsPanel recs={recommendations} tdee={tdee} />
             </div>
             <div className="mt-8 grid grid-cols-1 xl:grid-cols-2 gap-5 anim-fade-up delay-4">
               <CalorieTiersCard

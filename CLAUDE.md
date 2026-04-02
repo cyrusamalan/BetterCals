@@ -18,8 +18,17 @@ Deployed on Vercel as a server-rendered Next.js app (App Router with API routes)
 - `npm run build` — production build (outputs to `.next/`)
 - `npm run lint` — ESLint (`eslint . --ext .js,.jsx,.ts,.tsx`)
 - `npm start` — start production server
+- `npx drizzle-kit generate` — generate SQL migrations from schema changes
+- `npx drizzle-kit push` — push schema changes directly to the database
 
 No test framework is configured; CI only runs the build.
+
+## Coding Style
+
+- 2-space indentation, semicolons, single quotes, trailing commas
+- PascalCase for React components and their filenames; camelCase for utility modules
+- Business logic belongs in `lib/`, not in page components
+- `@/*` path alias maps to the project root (use `@/components/...`, `@/lib/...`, `@/types/...`)
 
 ## Environment Variables
 
@@ -40,59 +49,15 @@ Basic profile + manual blood entry works without any env vars. Auth and history 
 
 ## Repository Structure
 
-```
-/
-├── app/                          # Next.js App Router
-│   ├── page.tsx                 # 3-step wizard (main entry point)
-│   ├── layout.tsx               # Root layout: Clerk provider, fonts, metadata
-│   ├── history/
-│   │   ├── page.tsx             # Analysis history with trend charts
-│   │   └── [id]/page.tsx        # Individual historical analysis view
-│   ├── api/
-│   │   ├── extract-blood-report/route.ts   # PDF/image → markers via LLM
-│   │   ├── profile/route.ts     # GET user profile (Clerk-protected)
-│   │   └── analyses/
-│   │       ├── route.ts         # GET (list), POST (save) analyses
-│   │       └── [id]/route.ts    # GET (fetch), DELETE individual analysis
-│   ├── sign-in/[[...sign-in]]/page.tsx
-│   ├── sign-up/[[...sign-up]]/page.tsx
-│   ├── sign-in/sso-callback/page.tsx
-│   └── sign-up/sso-callback/page.tsx
-├── components/
-│   ├── TDEEForm.tsx             # Step 1: profile form (react-hook-form)
-│   ├── BloodReportUploader.tsx  # Step 2a: drag-drop PDF/image upload
-│   ├── BloodValuesForm.tsx      # Step 2b: manual blood marker entry
-│   ├── BloodTestDashboard.tsx   # Step 3: full results dashboard
-│   ├── VitalsMark.tsx           # ECG-ring logo component
-│   ├── BetterCalsMark.tsx       # Donut chart logo component
-│   ├── AnatomySVG.tsx           # Anatomical illustration (organ highlights)
-│   └── dashboard/               # Dashboard sub-components
-│       ├── HealthRadarChart.tsx        # 6-axis Recharts radar
-│       ├── MacroDonutChart.tsx         # P/C/F donut chart
-│       ├── CalorieTiersCard.tsx        # Table of 6 calorie goal tiers
-│       ├── ASCVDRiskCard.tsx           # 10-year ASCVD risk display
-│       ├── MarkerComparisonChart.tsx   # Bar chart: user vs reference ranges
-│       └── RecommendationsPanel.tsx   # BMI, water, ratios, supplements, exercise
-├── lib/
-│   ├── calculations.ts          # All core business logic (TDEE, scores, insights)
-│   ├── bloodParser.ts           # Marker rules, reference ranges, regex parser
-│   ├── riskModels.ts            # ACC/AHA 2013 ASCVD Pooled Cohort Equations
-│   ├── markerMetadata.ts         # Centralized marker UI metadata (labels, units, hints, dietary info, retest frequency)
-│   ├── averageMarkers.ts        # Population medians by gender/age (fallback)
-│   └── db/
-│       ├── schema.ts            # Drizzle ORM: analyses table (JSONB)
-│       └── index.ts             # Neon DB singleton factory
-├── types/
-│   └── index.ts                 # All shared TypeScript interfaces
-├── proxy.ts                     # Clerk middleware (protects /api/analyses/*)
-├── drizzle.config.ts            # Drizzle ORM config
-├── next.config.js               # Next.js config (unoptimized images)
-├── tailwind.config.ts           # Custom colors: primary (green), blood (red)
-├── tsconfig.json                # Strict TS, @/* path alias → project root
-├── vercel.json                  # Vercel deployment config
-├── .coderabbit.yaml             # CodeRabbit PR review (assertive profile)
-└── .github/workflows/ci.yml    # Build on push to main + PRs (Node 20)
-```
+- `app/` — Next.js App Router: pages, layouts, and API routes
+  - `page.tsx` — main entry point (3-step wizard)
+  - `history/` — analysis history pages
+  - `api/` — server routes (`extract-blood-report/`, `analyses/`, `profile/`)
+- `components/` — React components (wizard steps, logo marks, `dashboard/` sub-components)
+- `lib/` — core business logic (`calculations.ts`, `bloodParser.ts`, `riskModels.ts`, `markerMetadata.ts`, `averageMarkers.ts`, `db/`)
+- `types/index.ts` — all shared TypeScript interfaces
+- `proxy.ts` — Clerk middleware (protects API routes)
+- `drizzle/` — auto-generated SQL migrations
 
 ## Architecture & Data Flow
 
@@ -158,41 +123,13 @@ DELETE /api/analyses/[id] → delete (ownership check)
 
 ## Key Calculations
 
-### TDEE (Mifflin-St Jeor)
-```
-BMR (male)   = 10×weight_kg + 6.25×height_cm − 5×age + 5
-BMR (female) = 10×weight_kg + 6.25×height_cm − 5×age − 161
+All formulas are in `lib/calculations.ts` unless noted. See the source for exact equations and constants.
 
-Activity multipliers: sedentary=1.2, light=1.375, moderate=1.55, active=1.725, very-active=1.9
-
-TDEE = round(BMR × multiplier)
-targetCalories = TDEE × { lose: 0.8, maintain: 1.0, gain: 1.1 }
-```
-
-### Health Score (0–100 per category)
-Each blood marker maps to a `MarkerStatus` → numeric score (0–100) via tiers in `lib/bloodParser.ts`. Category score = average of its markers. Overall = average of non-zero categories.
-
-| Category | Markers |
-|---|---|
-| metabolic | glucose, hba1c, fastingInsulin |
-| cardiovascular | totalCholesterol, ldl, hdl, triglycerides, nonHdl, apoB, hsCRP |
-| hormonal | tsh |
-| nutritional | vitaminD, vitaminB12, ferritin, iron |
-| hepatic | alt, ast, albumin |
-| renal | creatinine, uricAcid |
-
-### Macros by Goal
-| Goal | Protein | Carbs | Fat |
-|---|---|---|---|
-| lose | 40% | 30% | 30% |
-| maintain | 30% | 40% | 30% |
-| gain | 35% | 40% | 25% |
-
-### Calorie Tiers
-6 tiers from base TDEE: −750, −500, −250, 0, +250, +500 cal/day (min 1200 kcal floor applied to deficit tiers).
-
-### ASCVD Risk (ACC/AHA 2013 Pooled Cohort Equations)
-Race/sex-specific coefficients from `lib/riskModels.ts`. Inputs: age (40–79), sex, race (white/black), TC, HDL-C, SBP, smoker, diabetic. Returns 10-year risk %.
+- **TDEE** — Mifflin-St Jeor equation with 5 activity multipliers; goal-adjusted target calories (lose/maintain/gain)
+- **Health Score** — 0–100 per category (metabolic, cardiovascular, hormonal, nutritional, hepatic, renal); each marker maps to a `MarkerStatus` via tiers in `lib/bloodParser.ts`; overall = average of non-zero categories
+- **Macros** — goal-specific protein/carbs/fat percentage splits
+- **Calorie Tiers** — 6 tiers from TDEE (−750 to +500 cal/day, 1200 kcal floor)
+- **ASCVD Risk** — ACC/AHA 2013 Pooled Cohort Equations in `lib/riskModels.ts`; race/sex-specific; ages 40–79 only
 
 ## TypeScript Types (types/index.ts)
 
@@ -214,10 +151,6 @@ All shared interfaces live here. Key types:
 - **Icons**: `lucide-react`
 - **Form validation**: `react-hook-form` with inline error messages
 - **Responsive**: Tailwind grid layouts, mobile-first
-
-## Path Alias
-
-`@/*` maps to the project root. Use `@/components/...`, `@/lib/...`, `@/types/...` etc.
 
 ## Authentication (Clerk)
 

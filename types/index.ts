@@ -14,9 +14,47 @@ export interface UserProfile {
   waistInches?: number;
   hipInches?: number;
   bodyFatPercentage?: number; // optional; enables Katch-McArdle TDEE
+
+  // Advanced activity (overrides activityLevel for TDEE when enabled)
+  advancedActivity?: boolean;
+  dailySteps?: number;
+  occupationType?: OccupationType;
+  exerciseTemplate?: ExerciseTemplate;
+  exerciseSessions?: ExerciseSession[];
+
+  // Enhanced goals
+  focusGoal?: FocusGoal;
+
+  // Lifestyle context
+  sleepHoursAvg?: number;
+  stressLevel?: 'low' | 'moderate' | 'high' | 'very-high';
+  dietaryPattern?: DietaryPattern;
+  menstrualStatus?: MenstrualStatus;
+
+  // Medication context
+  takingStatins?: boolean;
+  takingThyroidMeds?: boolean;
 }
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active';
+
+export type OccupationType = 'desk' | 'standing' | 'light-labor' | 'heavy-labor';
+
+export type ExerciseType = 'strength' | 'cardio-low' | 'cardio-moderate' | 'cardio-high' | 'sports' | 'flexibility';
+
+export type ExerciseTemplate = 'strength-focused' | 'cardio-focused' | 'balanced' | 'light-recovery' | 'athlete' | 'custom';
+
+export interface ExerciseSession {
+  type: ExerciseType;
+  durationMinutes: number;
+  frequencyPerWeek: number;
+}
+
+export type FocusGoal = 'fat-loss' | 'muscle-gain' | 'metabolic-health' | 'endurance' | 'longevity' | 'general-wellness';
+
+export type DietaryPattern = 'omnivore' | 'vegetarian' | 'vegan' | 'pescatarian' | 'keto' | 'low-carb';
+
+export type MenstrualStatus = 'regular' | 'irregular' | 'postmenopausal' | 'not-applicable';
 
 export interface BloodMarkers {
   glucose?: number; // mg/dL (fasting)
@@ -76,6 +114,9 @@ export interface TDEEResult {
   tdee: number;
   targetCalories: number;
   activityMultiplier: number;
+  // Breakdown when advanced activity mode is used
+  neatCalories?: number;
+  exerciseCalories?: number;
 }
 
 export interface HealthScore {
