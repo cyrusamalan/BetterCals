@@ -1,4 +1,4 @@
-import { UserProfile, ActivityLevel, TDEEResult, BloodMarkers, HealthScore, Insight, CalorieTier, MacroBreakdown, PersonalizedRecs, MealTimingSuggestion, ExerciseSession, ExerciseType, ExerciseTemplate, FocusGoal, DietaryPattern } from '@/types';
+import { UserProfile, ActivityLevel, TDEEResult, BloodMarkers, HealthScore, Insight, CalorieTier, MacroBreakdown, PersonalizedRecs, MealTimingSuggestion, ExerciseSession, ExerciseType, ExerciseTemplate, FocusGoal, DietaryPattern, SupplementRec } from '@/types';
 import { getMarkerInterpretation } from '@/lib/bloodParser';
 import { calculateASCVDRisk, type ASCVDResult } from '@/lib/riskModels';
 
@@ -24,6 +24,46 @@ const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
   creatinine: 'Creatinine',
   uricAcid: 'Uric Acid',
   fastingInsulin: 'Fasting Insulin',
+};
+
+const CV_MARKERS: (keyof BloodMarkers)[] = [
+  'totalCholesterol', 'ldl', 'hdl', 'triglycerides', 'nonHdl', 'apoB', 'hsCRP',
+];
+
+/** Active focus goals (empty array if none). */
+export function focusGoalList(profile: Pick<UserProfile, 'focusGoal'>): FocusGoal[] {
+  return profile.focusGoal ?? [];
+}
+
+function hasFocusGoal(profile: Pick<UserProfile, 'focusGoal'>, g: FocusGoal): boolean {
+  return focusGoalList(profile).includes(g);
+}
+
+function isCardiovascularFamilyRiskStatus(
+  marker: keyof BloodMarkers,
+  status: ReturnType<typeof getMarkerInterpretation>['status'],
+): boolean {
+  if (status === 'borderline' || status === 'high' || status === 'critical') return true;
+  if (marker === 'hdl' && status === 'low') return true;
+  return false;
+}
+
+const FOCUS_PROTEIN_PER_LB: Record<FocusGoal, number> = {
+  'fat-loss': 1.0,
+  'muscle-gain': 0.9,
+  'metabolic-health': 0.85,
+  'endurance': 0.75,
+  'longevity': 0.8,
+  'general-wellness': 0.8,
+};
+
+const FOCUS_CARB_DELTA: Record<FocusGoal, number> = {
+  'fat-loss': -0.10,
+  'muscle-gain': 0.10,
+  'metabolic-health': -0.10,
+  'endurance': 0.15,
+  'longevity': -0.05,
+  'general-wellness': 0,
 };
 
 const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
@@ -259,18 +299,88 @@ export function generateInsights(profile: UserProfile, tdee: TDEEResult, markers
     const value = markers[marker];
     if (value === undefined) continue;
 
+    if (marker === 'creatinine' && profile.chronicKidneyDisease) {
+      const interp = getMarkerInterpretation(marker, value, profile.gender);
+      const isRisk =
+        interp.status === 'borderline' || interp.status === 'high' || interp.status === 'critical';
+      if (isRisk) {
+        const type = typeFromStatus(interp.status);
+        insights.push({
+          type,
+          title: `${MARKER_NAMES[marker]} — ${interp.label}`,
+          description:
+            'Creatinine is elevated, consistent with known CKD. Monitor eGFR trend rather than single values.',
+        });
+        continue;
+      }
+    }
+
     const interp = getMarkerInterpretation(marker, value, profile.gender);
-    const type = typeFromStatus(interp.status);
+    let type = typeFromStatus(interp.status);
+    if (
+      profile.familyHeartDisease &&
+      CV_MARKERS.includes(marker) &&
+      isCardiovascularFamilyRiskStatus(marker, interp.status)
+    ) {
+      if (type === 'warning') type = 'danger';
+    }
+
+    let description = getDescription(marker, value, interp.label);
+    if (
+      profile.familyHeartDisease &&
+      CV_MARKERS.includes(marker) &&
+      isCardiovascularFamilyRiskStatus(marker, interp.status)
+    ) {
+      description +=
+        ' Family history of premature heart disease increases your personal risk — treat borderline cardiovascular markers more aggressively.';
+    }
 
     insights.push({
       type,
       title: `${MARKER_NAMES[marker]} — ${interp.label}`,
-      description: getDescription(marker, value, interp.label),
+      description,
+    });
+  }
+
+  if (
+    profile.takingStatins &&
+    profile.alcoholDrinksPerWeek !== undefined &&
+    profile.alcoholDrinksPerWeek > 14 &&
+    markers.alt !== undefined &&
+    markers.alt > 40
+  ) {
+    insights.push({
+      type: 'warning',
+      title: 'Liver enzymes — statins and alcohol',
+      description:
+        'Both statin therapy and heavier alcohol use can contribute to ALT elevations. Discuss both with your clinician before retesting.',
     });
   }
 
   // Cross-marker pattern insights — detect systemic patterns, not just individual flags
   insights.push(...generateCrossMarkerInsights(profile, markers));
+
+  if (hasFocusGoal(profile, 'fat-loss') && hasFocusGoal(profile, 'muscle-gain')) {
+    insights.push({
+      type: 'info',
+      title: 'Body Recomposition Mode',
+      description:
+        'With both fat loss and muscle gain selected, focus on hitting your protein target daily and training stimulus rather than the calorie number. At maintenance or a slight deficit, body recomp is achievable for most people with untapped training potential.',
+    });
+  }
+
+  if (profile.chronicKidneyDisease) {
+    const macrosEst = calculateMacros(tdee.targetCalories, profile.goal, profile, markers);
+    const weightKg = lbsToKg(profile.weightLbs);
+    if (macrosEst.protein.grams / weightKg > 1.2) {
+      insights.push({
+        type: 'warning',
+        title: 'Protein intake with CKD',
+        description:
+          'High protein intake (>1.2 g/kg) may accelerate CKD progression — discuss protein targets with your nephrologist.',
+      });
+    }
+  }
 
   return insights;
 }
@@ -467,6 +577,58 @@ function generateCrossMarkerInsights(profile: UserProfile, markers: BloodMarkers
     });
   }
 
+  // Alcohol + liver enzymes / triglycerides
+  const alcohol = profile.alcoholDrinksPerWeek;
+  if (alcohol !== undefined && alcohol > 14) {
+    const altHigh = markers.alt !== undefined && markers.alt > 45;
+    const astHigh = markers.ast !== undefined && markers.ast > 40;
+    if (altHigh || astHigh) {
+      insights.push({
+        type: 'warning',
+        title: 'Alcohol and liver enzymes',
+        description:
+          'Heavy alcohol use is a likely contributor to elevated liver enzymes. Consider reducing intake before retesting.',
+      });
+    }
+  }
+  if (alcohol !== undefined && alcohol > 21 && markers.triglycerides !== undefined) {
+    const tgInterp = getMarkerInterpretation('triglycerides', markers.triglycerides, profile.gender);
+    if (tgInterp.status === 'borderline' || tgInterp.status === 'high' || tgInterp.status === 'critical') {
+      insights.push({
+        type: 'warning',
+        title: 'Alcohol and triglycerides',
+        description:
+          'Heavy alcohol intake can raise triglycerides — reducing alcohol often helps before other interventions.',
+      });
+    }
+  }
+
+  // HRT (female)
+  if (profile.takingHRT && profile.gender === 'female') {
+    if (markers.ldl !== undefined) {
+      const ldlInterp = getMarkerInterpretation('ldl', markers.ldl, profile.gender);
+      if (ldlInterp.status === 'normal' || ldlInterp.status === 'optimal') {
+        insights.push({
+          type: 'info',
+          title: 'LDL and HRT',
+          description:
+            'HRT may lower LDL — this is expected and not necessarily a sign of poor metabolic health.',
+        });
+      }
+    }
+    if (markers.triglycerides !== undefined) {
+      const tgInterp = getMarkerInterpretation('triglycerides', markers.triglycerides, profile.gender);
+      if (tgInterp.status === 'borderline' || tgInterp.status === 'high' || tgInterp.status === 'critical') {
+        insights.push({
+          type: 'info',
+          title: 'Triglycerides and HRT',
+          description:
+            'Oral estrogen can raise triglycerides — transdermal HRT has less effect on lipids.',
+        });
+      }
+    }
+  }
+
   return insights;
 }
 
@@ -591,29 +753,19 @@ export function calculateMacros(
     carbFraction = Math.max(0.30, carbFraction);
   }
 
-  // Focus goal adjustments
-  if (profile?.focusGoal) {
-    switch (profile.focusGoal) {
-      case 'fat-loss':
-        proteinGrams = Math.round(Math.max(proteinGrams, weightLbs * 1.0));
-        // Re-cap protein at 45%
-        proteinGrams = Math.min(proteinGrams, Math.round(calories * 0.45 / 4));
-        carbFraction -= 0.10;
-        break;
-      case 'muscle-gain':
-        carbFraction += 0.10;
-        break;
-      case 'metabolic-health':
-        carbFraction -= 0.10;
-        break;
-      case 'endurance':
-        carbFraction += 0.15;
-        break;
-      case 'longevity':
-        // Slight carb reduction, moderate fat emphasis
-        carbFraction -= 0.05;
-        break;
+  const fg = profile ? focusGoalList(profile) : [];
+  const recompMode =
+    Boolean(profile && hasFocusGoal(profile, 'fat-loss') && hasFocusGoal(profile, 'muscle-gain'));
+
+  // Focus goals: max protein per lb across selections; average carb deltas
+  if (fg.length > 0) {
+    for (const goal of fg) {
+      proteinGrams = Math.round(Math.max(proteinGrams, weightLbs * FOCUS_PROTEIN_PER_LB[goal]));
     }
+    proteinGrams = Math.min(proteinGrams, Math.round(calories * 0.45 / 4));
+
+    const avgCarbDelta = fg.reduce((sum, g) => sum + FOCUS_CARB_DELTA[g], 0) / fg.length;
+    carbFraction += avgCarbDelta;
     carbFraction = Math.max(0.20, Math.min(0.75, carbFraction));
   }
 
@@ -641,6 +793,7 @@ export function calculateMacros(
     carbs: { grams: carbGrams, pct: pctC },
     fat: { grams: fatGrams, pct: pctF },
     calories,
+    recompMode: recompMode || undefined,
   };
 }
 
@@ -753,7 +906,7 @@ export function calculateRecommendations(
   }
 
   // --- Supplements: severity-tiered dosing for deficiencies + marker-driven additions ---
-  const supplements: { name: string; dosage: string; reason: string }[] = [];
+  const supplements: SupplementRec[] = [];
 
   // Vitamin D — tiered by severity
   if (markers.vitaminD !== undefined) {
@@ -825,7 +978,7 @@ export function calculateRecommendations(
   // Creatine — for gain goals, muscle-gain focus, or active individuals
   if (
     profile.goal.startsWith('gain') ||
-    profile.focusGoal === 'muscle-gain' ||
+    hasFocusGoal(profile, 'muscle-gain') ||
     profile.activityLevel === 'active' ||
     profile.activityLevel === 'very-active'
   ) {
@@ -873,11 +1026,52 @@ export function calculateRecommendations(
   }
 
   // Focus goal: endurance → electrolytes; longevity → omega-3 if not already added
-  if (profile.focusGoal === 'endurance') {
-    supplements.push({ name: 'Electrolyte Mix', dosage: 'During and after training sessions', reason: 'Endurance training increases sodium, potassium, and magnesium losses through sweat' });
+  if (hasFocusGoal(profile, 'endurance')) {
+    supplements.push({
+      name: 'Electrolyte Mix',
+      dosage: 'During and after training sessions',
+      reason: 'Endurance training increases sodium, potassium, and magnesium losses through sweat',
+      ...(profile.chronicKidneyDisease
+        ? { warning: 'CKD: discuss electrolyte and potassium intake with your nephrologist — some mixes are high in potassium.' }
+        : {}),
+    });
   }
-  if (profile.focusGoal === 'longevity' && !supplements.some(s => s.name.includes('Omega-3'))) {
+  if (hasFocusGoal(profile, 'longevity') && !supplements.some((s) => s.name.includes('Omega-3'))) {
     supplements.push({ name: 'Omega-3 (EPA/DHA)', dosage: '1–2 g EPA+DHA daily', reason: 'Supports cardiovascular health, cognitive function, and healthy aging' });
+  }
+
+  if (profile.alcoholDrinksPerWeek !== undefined && profile.alcoholDrinksPerWeek > 14) {
+    if (!supplements.some((s) => s.name.includes('B-Complex'))) {
+      supplements.push({
+        name: 'B-Complex (B1, B6, B12)',
+        dosage: 'Per label (standard daily)',
+        reason: 'Heavy alcohol use depletes B vitamins, particularly thiamine (B1)',
+      });
+    }
+  }
+
+  if (
+    profile.familyHeartDisease &&
+    !supplements.some((s) => s.name.includes('Omega-3'))
+  ) {
+    supplements.push({
+      name: 'Omega-3 (EPA/DHA)',
+      dosage: '2–3 g EPA+DHA daily',
+      reason: 'Family history of premature heart disease — omega-3s support cardiovascular health',
+    });
+  }
+
+  if (profile.chronicKidneyDisease) {
+    for (let i = 0; i < supplements.length; i++) {
+      if (supplements[i].name.includes('Magnesium')) {
+        supplements[i] = {
+          ...supplements[i],
+          warning:
+            supplements[i].warning ??
+            'CKD: avoid high-dose magnesium supplements without clearance from your physician.',
+        };
+      }
+    }
   }
 
   // --- Exercise suggestions: activity-level baseline + marker-driven adjustments ---
@@ -918,22 +1112,77 @@ export function calculateRecommendations(
     exerciseSuggestions.push('Elevated hs-CRP indicates systemic inflammation — consider anti-inflammatory activities (yoga, swimming, walking) alongside strength training.');
   }
 
-  // Focus goal → exercise suggestions
-  if (profile.focusGoal === 'endurance') {
-    exerciseSuggestions.push('Build a zone 2 cardio base (60–70% max HR) for 80% of cardio volume — this builds aerobic capacity with minimal fatigue.');
-    exerciseSuggestions.push('Include 1–2 interval sessions per week to improve VO2max and lactate threshold.');
-  } else if (profile.focusGoal === 'muscle-gain') {
-    exerciseSuggestions.push('Prioritize 3–4 strength sessions per week, hitting each major muscle group 2x with progressive overload.');
-    exerciseSuggestions.push('Limit cardio to 2–3 short sessions (20 min) to preserve recovery capacity for hypertrophy.');
-  } else if (profile.focusGoal === 'fat-loss') {
-    exerciseSuggestions.push('Combine strength training (3x/week) with daily step targets (8000+) — NEAT is the biggest lever for fat loss.');
-    exerciseSuggestions.push('Add 1–2 HIIT sessions per week (20 min) to boost metabolic rate and preserve lean mass.');
-  } else if (profile.focusGoal === 'metabolic-health') {
-    exerciseSuggestions.push('Take 15-minute walks after each meal — post-meal movement is the most effective way to blunt glucose spikes.');
-    exerciseSuggestions.push('Aim for 3x strength training per week — muscle mass is the largest insulin-sensitive tissue in the body.');
-  } else if (profile.focusGoal === 'longevity') {
-    exerciseSuggestions.push('Build VO2max with 1–2 high-intensity sessions per week — VO2max is the strongest predictor of all-cause mortality.');
-    exerciseSuggestions.push('Include zone 2 cardio (3+ hours/week), strength training (2–3x/week), and daily mobility work.');
+  const pushUniqueExercise = (line: string) => {
+    if (!exerciseSuggestions.includes(line)) exerciseSuggestions.push(line);
+  };
+
+  if (profile.familyHeartDisease) {
+    pushUniqueExercise(
+      'Prioritize cardiorespiratory fitness (VO2max) — it is the most modifiable cardiovascular risk factor.',
+    );
+  }
+
+  const FOCUS_EXERCISE_ORDER: FocusGoal[] = [
+    'metabolic-health',
+    'endurance',
+    'muscle-gain',
+    'fat-loss',
+    'longevity',
+    'general-wellness',
+  ];
+  for (const g of FOCUS_EXERCISE_ORDER) {
+    if (!hasFocusGoal(profile, g)) continue;
+    switch (g) {
+      case 'endurance':
+        pushUniqueExercise(
+          'Build a zone 2 cardio base (60–70% max HR) for 80% of cardio volume — this builds aerobic capacity with minimal fatigue.',
+        );
+        pushUniqueExercise(
+          'Include 1–2 interval sessions per week to improve VO2max and lactate threshold.',
+        );
+        break;
+      case 'muscle-gain':
+        pushUniqueExercise(
+          'Prioritize 3–4 strength sessions per week, hitting each major muscle group 2x with progressive overload.',
+        );
+        pushUniqueExercise('Limit cardio to 2–3 short sessions (20 min) to preserve recovery capacity for hypertrophy.');
+        break;
+      case 'fat-loss':
+        pushUniqueExercise(
+          'Combine strength training (3x/week) with daily step targets (8000+) — NEAT is the biggest lever for fat loss.',
+        );
+        pushUniqueExercise('Add 1–2 HIIT sessions per week (20 min) to boost metabolic rate and preserve lean mass.');
+        break;
+      case 'metabolic-health':
+        pushUniqueExercise(
+          'Take 15-minute walks after each meal — post-meal movement is the most effective way to blunt glucose spikes.',
+        );
+        pushUniqueExercise(
+          'Aim for 3x strength training per week — muscle mass is the largest insulin-sensitive tissue in the body.',
+        );
+        break;
+      case 'longevity':
+        pushUniqueExercise(
+          'Build VO2max with 1–2 high-intensity sessions per week — VO2max is the strongest predictor of all-cause mortality.',
+        );
+        pushUniqueExercise(
+          'Include zone 2 cardio (3+ hours/week), strength training (2–3x/week), and daily mobility work.',
+        );
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (
+    profile.alcoholDrinksPerWeek !== undefined &&
+    profile.alcoholDrinksPerWeek > 7 &&
+    markers.uricAcid !== undefined &&
+    markers.uricAcid > 7.0
+  ) {
+    pushUniqueExercise(
+      'Stay well hydrated during exercise — alcohol and elevated uric acid both raise dehydration and gout flare risk.',
+    );
   }
 
   // Exercise gap detection from advanced activity sessions
@@ -974,7 +1223,7 @@ export function calculateRecommendations(
   // Goal-specific meal timing suggestions
   // Splits based on goal: lose (front-loaded), maintain (balanced), gain (high-frequency)
   const tdeeResult = calculateTDEE(profile);
-  const mealTiming = calculateMealTiming(tdeeResult.targetCalories, profile.goal, profile.focusGoal);
+  const mealTiming = calculateMealTiming(tdeeResult.targetCalories, profile.goal, focusGoalList(profile));
 
   return {
     bmi,
@@ -1008,10 +1257,12 @@ export function calculateRecommendations(
 function calculateMealTiming(
   targetCalories: number,
   goal: UserProfile['goal'],
-  focusGoal?: FocusGoal,
+  focusGoals: FocusGoal[],
 ): MealTimingSuggestion[] {
-  // Focus goal overrides: metabolic-health → time-restricted eating
-  if (focusGoal === 'metabolic-health') {
+  const fg = focusGoals;
+
+  // Priority: metabolic-health > endurance > muscle-gain > default goal-based
+  if (fg.includes('metabolic-health')) {
     return [
       { meal: 'Meal 1', time: '12:00–1:00 PM', calories: Math.round(targetCalories * 0.35), focus: 'Break fast with protein + healthy fats — time-restricted eating (16:8) improves insulin sensitivity' },
       { meal: 'Meal 2', time: '3:30–4:30 PM', calories: Math.round(targetCalories * 0.30), focus: 'Balanced meal with fiber-rich carbs and lean protein' },
@@ -1019,8 +1270,7 @@ function calculateMealTiming(
     ];
   }
 
-  // Focus goal: endurance → pre/post-workout fueling
-  if (focusGoal === 'endurance') {
+  if (fg.includes('endurance')) {
     return [
       { meal: 'Breakfast', time: '7:00–8:00 AM', calories: Math.round(targetCalories * 0.25), focus: 'Carb-focused for glycogen loading' },
       { meal: 'Pre-Workout', time: '10:30–11:00 AM', calories: Math.round(targetCalories * 0.15), focus: 'Easily digestible carbs (banana, toast, energy bar)' },
@@ -1029,8 +1279,7 @@ function calculateMealTiming(
     ];
   }
 
-  // Focus goal: muscle-gain → 4+ meals for protein distribution
-  if (focusGoal === 'muscle-gain') {
+  if (fg.includes('muscle-gain')) {
     return [
       { meal: 'Breakfast', time: '7:00–8:00 AM', calories: Math.round(targetCalories * 0.25), focus: '30–40g protein + carbs — break overnight catabolic state' },
       { meal: 'Lunch', time: '11:30 AM–12:30 PM', calories: Math.round(targetCalories * 0.25), focus: '30–40g protein + complex carbs for sustained energy' },

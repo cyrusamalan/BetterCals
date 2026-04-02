@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { UserProfile, ActivityLevel, OccupationType, ExerciseTemplate, FocusGoal, DietaryPattern, MenstrualStatus } from '@/types';
-import { ArrowRight, User, Ruler, Weight, Zap, Target, Activity, TrendingDown, Minus, TrendingUp, ChevronDown, Footprints, Briefcase, Dumbbell, Heart, Brain, Wind, Clock, Sparkles } from 'lucide-react';
+import { ArrowRight, User, Ruler, Weight, Zap, Target, Activity, TrendingDown, Minus, TrendingUp, ChevronDown, Footprints, Briefcase, Dumbbell, Heart, Brain, Wind, Clock, Sparkles, Wine } from 'lucide-react';
 
 interface TDEEFormProps {
   onSubmit: (profile: UserProfile) => void;
@@ -23,6 +23,10 @@ interface FormData {
   diabetic?: boolean;
   bloodPressureSystolic?: number;
   treatedForHypertension?: boolean;
+  alcoholDrinksPerWeek?: number;
+  familyHeartDisease?: boolean;
+  takingHRT?: boolean;
+  chronicKidneyDisease?: boolean;
   waistInches?: number;
   hipInches?: number;
   bodyFatPercentage?: number;
@@ -33,7 +37,7 @@ interface FormData {
   customExerciseDays?: number;
   customExerciseMinutes?: number;
   // Enhanced goals
-  focusGoal?: FocusGoal;
+  focusGoal?: FocusGoal[];
   // Lifestyle context
   sleepHoursAvg?: number;
   stressLevel?: 'low' | 'moderate' | 'high' | 'very-high';
@@ -41,6 +45,15 @@ interface FormData {
   menstrualStatus?: MenstrualStatus;
   takingStatins?: boolean;
   takingThyroidMeds?: boolean;
+}
+
+function coerceFocusGoals(
+  v: FocusGoal | FocusGoal[] | string | undefined,
+): FocusGoal[] {
+  if (v === undefined) return [];
+  if (typeof v === 'string') return [v as FocusGoal];
+  if (Array.isArray(v)) return v;
+  return [];
 }
 
 export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
@@ -61,13 +74,17 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       diabetic: initialValues.diabetic ?? false,
       bloodPressureSystolic: initialValues.bloodPressureSystolic,
       treatedForHypertension: initialValues.treatedForHypertension ?? false,
+      alcoholDrinksPerWeek: initialValues.alcoholDrinksPerWeek,
+      familyHeartDisease: initialValues.familyHeartDisease ?? false,
+      takingHRT: initialValues.takingHRT ?? false,
+      chronicKidneyDisease: initialValues.chronicKidneyDisease ?? false,
       waistInches: initialValues.waistInches,
       hipInches: initialValues.hipInches,
       bodyFatPercentage: initialValues.bodyFatPercentage,
       dailySteps: initialValues.dailySteps,
       occupationType: initialValues.occupationType,
       exerciseTemplate: initialValues.exerciseTemplate,
-      focusGoal: initialValues.focusGoal,
+      focusGoal: coerceFocusGoals(initialValues.focusGoal as FocusGoal | FocusGoal[] | string | undefined),
       sleepHoursAvg: initialValues.sleepHoursAvg,
       stressLevel: initialValues.stressLevel,
       dietaryPattern: initialValues.dietaryPattern,
@@ -83,6 +100,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       treatedForHypertension: false,
       takingStatins: false,
       takingThyroidMeds: false,
+      focusGoal: [],
     },
   });
 
@@ -111,6 +129,10 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       diabetic: data.diabetic,
       bloodPressureSystolic: optNum(data.bloodPressureSystolic),
       treatedForHypertension: data.treatedForHypertension,
+      alcoholDrinksPerWeek: optNum(data.alcoholDrinksPerWeek),
+      familyHeartDisease: data.familyHeartDisease,
+      takingHRT: data.takingHRT,
+      chronicKidneyDisease: data.chronicKidneyDisease,
       waistInches: optNum(data.waistInches),
       hipInches: optNum(data.hipInches),
       bodyFatPercentage: optNum(data.bodyFatPercentage),
@@ -121,7 +143,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       exerciseTemplate: advancedActivity ? (data.exerciseTemplate || undefined) : undefined,
       exerciseSessions: advancedActivity ? exerciseSessions : undefined,
       // Enhanced goals
-      focusGoal: data.focusGoal || undefined,
+      focusGoal: data.focusGoal && data.focusGoal.length > 0 ? data.focusGoal : undefined,
       // Lifestyle context
       sleepHoursAvg: optNum(data.sleepHoursAvg),
       stressLevel: data.stressLevel || undefined,
@@ -394,7 +416,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       <GoalSelector value={watch('goal')} onChange={(g) => setValue('goal', g)} />
 
       {/* Focus Goal Pills */}
-      <FocusGoalSelector value={watch('focusGoal')} onChange={(g) => setValue('focusGoal', g)} />
+      <FocusGoalSelector value={watch('focusGoal') ?? []} onChange={(goals) => setValue('focusGoal', goals)} />
 
       {/* Lifestyle Context (collapsible) */}
       <div
@@ -604,6 +626,63 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
               aria-label="Treated for hypertension"
             />
           </div>
+
+          <FieldGroup icon={Wine} label="Alcohol (drinks/week)">
+            <input
+              type="number"
+              min={0}
+              max={50}
+              {...register('alcoholDrinksPerWeek', { min: 0, max: 50, valueAsNumber: true })}
+              className="input-field"
+              placeholder="0"
+            />
+            <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
+              1 drink = 12oz beer, 5oz wine, 1.5oz spirits
+            </p>
+          </FieldGroup>
+
+          <div className="flex items-center justify-between gap-4 rounded-xl px-4 py-3" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-light)' }}>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Family history of heart disease</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                First-degree relative (parent/sibling) diagnosed before age 55 (male) or 65 (female)
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              {...register('familyHeartDisease')}
+              className="h-5 w-5 accent-[color:var(--accent)]"
+              aria-label="Family history of premature heart disease"
+            />
+          </div>
+
+          {selectedGender === 'female' && (
+            <div className="flex items-center justify-between gap-4 rounded-xl px-4 py-3 sm:col-span-2" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-light)' }}>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Hormone Replacement Therapy</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Estrogen or combined HRT</p>
+              </div>
+              <input
+                type="checkbox"
+                {...register('takingHRT')}
+                className="h-5 w-5 accent-[color:var(--accent)]"
+                aria-label="Taking hormone replacement therapy"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-4 rounded-xl px-4 py-3 sm:col-span-2" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-light)' }}>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Chronic Kidney Disease (CKD)</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Diagnosed by a physician</p>
+            </div>
+            <input
+              type="checkbox"
+              {...register('chronicKidneyDisease')}
+              className="h-5 w-5 accent-[color:var(--accent)]"
+              aria-label="Chronic kidney disease"
+            />
+          </div>
         </div>
       </div>
 
@@ -774,24 +853,30 @@ const STRESS_OPTIONS = [
   { value: 'very-high', label: 'Very High' },
 ];
 
-function FocusGoalSelector({ value, onChange }: { value?: FocusGoal; onChange: (g?: FocusGoal) => void }) {
+function FocusGoalSelector({ value, onChange }: { value: FocusGoal[]; onChange: (goals: FocusGoal[]) => void }) {
   return (
     <div>
       <label className="flex items-center gap-1.5 mb-2">
         <Sparkles className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-          What&apos;s Your Focus? <span className="font-normal normal-case">(optional)</span>
+          What&apos;s Your Focus? <span className="font-normal normal-case">(optional, multi-select)</span>
         </span>
       </label>
       <div className="flex gap-2 flex-wrap">
         {FOCUS_GOAL_OPTIONS.map((opt) => {
-          const selected = value === opt.value;
+          const selected = value.includes(opt.value);
           const Icon = opt.icon;
           return (
             <button
               key={opt.value}
               type="button"
-              onClick={() => onChange(selected ? undefined : opt.value)}
+              onClick={() => {
+                if (selected) {
+                  onChange(value.filter((g) => g !== opt.value));
+                } else {
+                  onChange([...value, opt.value]);
+                }
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer"
               style={{
                 backgroundColor: selected ? 'var(--accent)' : 'var(--surface)',

@@ -30,6 +30,7 @@ import {
   deriveMarkers,
 } from '@/lib/calculations';
 import { estimateAverageMarkers } from '@/lib/averageMarkers';
+import { normalizeUserProfile } from '@/lib/profileUtils';
 
 type Step = 'profile' | 'blood' | 'results';
 
@@ -97,7 +98,7 @@ export default function AnalyzePage() {
       const savedMarkers = localStorage.getItem('bettercals_markers');
       const savedResult = localStorage.getItem('bettercals_result');
 
-      const parsedProfile = savedProfile ? JSON.parse(savedProfile) as UserProfile : null;
+      const parsedProfile = savedProfile ? normalizeUserProfile(JSON.parse(savedProfile) as UserProfile) : null;
       const parsedMarkers = savedMarkers ? JSON.parse(savedMarkers) as BloodMarkers : {};
       const parsedResult = savedResult ? JSON.parse(savedResult) as AnalysisResult : null;
 
@@ -155,7 +156,7 @@ export default function AnalyzePage() {
       })
       .then((data) => {
         if (data?.profile) {
-          setProfile(data.profile);
+          setProfile(normalizeUserProfile(data.profile as UserProfile));
           if (step === 'profile') {
             setStep('blood');
           }

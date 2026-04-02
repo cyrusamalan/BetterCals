@@ -329,9 +329,9 @@ export default function RecommendationsPanel({ recs, tdee }: RecommendationsPane
               </span>
             </div>
             <div className="space-y-2">
-              {recs.supplements.map((sup) => (
+              {recs.supplements.map((sup, i) => (
                 <div
-                  key={sup.name}
+                  key={`${sup.name}-${i}`}
                   className="flex items-start gap-3 p-3 rounded-xl"
                   style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}
                 >
@@ -341,6 +341,11 @@ export default function RecommendationsPanel({ recs, tdee }: RecommendationsPane
                       <span className="text-xs" style={{ color: 'var(--accent)' }}>{sup.dosage}</span>
                     </div>
                     <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{sup.reason}</p>
+                    {sup.warning && (
+                      <p className="text-[11px] mt-1.5 font-medium" style={{ color: 'var(--status-warning)' }}>
+                        {sup.warning}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}

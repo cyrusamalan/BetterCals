@@ -6,12 +6,18 @@ export default function ASCVDRiskCard({
   age,
   hasLipids,
   race,
+  familyHistoryDisclaimer,
+  hrtDisclaimer,
 }: {
   ascvdRiskScore: number | undefined;
   ascvdRiskReason?: string;
   age: number;
   hasLipids: boolean;
   race?: 'white' | 'black' | 'other';
+  /** Show when ASCVD is computed and user reports premature family ASCVD */
+  familyHistoryDisclaimer?: boolean;
+  /** Show when ASCVD is computed and user is on HRT (not modeled in ACC/AHA) */
+  hrtDisclaimer?: boolean;
 }) {
   const tier = (() => {
     if (ascvdRiskScore === undefined) return null;
@@ -83,6 +89,16 @@ export default function ASCVDRiskCard({
               <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
                 This is an estimate (not a diagnosis). Discuss cardiovascular risk with your clinician.
               </p>
+              {familyHistoryDisclaimer && (
+                <p className="text-[11px] mt-2" style={{ color: 'var(--text-tertiary)' }}>
+                  Your family history is not captured in the ACC/AHA model but meaningfully increases your true risk.
+                </p>
+              )}
+              {hrtDisclaimer && (
+                <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
+                  Hormone replacement therapy is not accounted for in the pooled cohort equations — discuss risk with your clinician.
+                </p>
+              )}
               {race && race !== 'white' && race !== 'black' && (
                 <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
                   Note: This model was developed for White and African-American populations and may be less accurate for other groups.

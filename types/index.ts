@@ -11,6 +11,13 @@ export interface UserProfile {
   diabetic?: boolean;
   bloodPressureSystolic?: number;
   treatedForHypertension?: boolean;
+  /** Drinks per week (12oz beer / 5oz wine / 1.5oz spirits) */
+  alcoholDrinksPerWeek?: number;
+  /** First-degree relative with premature ASCVD */
+  familyHeartDisease?: boolean;
+  /** Female: estrogen or combined HRT */
+  takingHRT?: boolean;
+  chronicKidneyDisease?: boolean;
   waistInches?: number;
   hipInches?: number;
   bodyFatPercentage?: number; // optional; enables Katch-McArdle TDEE
@@ -22,8 +29,8 @@ export interface UserProfile {
   exerciseTemplate?: ExerciseTemplate;
   exerciseSessions?: ExerciseSession[];
 
-  // Enhanced goals
-  focusGoal?: FocusGoal;
+  // Enhanced goals (multi-select)
+  focusGoal?: FocusGoal[];
 
   // Lifestyle context
   sleepHoursAvg?: number;
@@ -157,12 +164,16 @@ export interface MacroBreakdown {
   carbs: { grams: number; pct: number };
   fat: { grams: number; pct: number };
   calories: number;
+  /** Both fat-loss and muscle-gain focus selected — prioritize protein and training */
+  recompMode?: boolean;
 }
 
 export interface SupplementRec {
   name: string;
   dosage: string;
   reason: string;
+  /** e.g. CKD caution for potassium-heavy supplements */
+  warning?: string;
 }
 
 export interface MealTimingSuggestion {

@@ -1539,7 +1539,21 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                 userGoal={profile.goal}
                 targetCalories={tdee.targetCalories}
               />
-              <MacroDonutChart macros={macros} />
+              <div className="space-y-3">
+                {macros.recompMode && (
+                  <div
+                    className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold"
+                    style={{
+                      backgroundColor: 'var(--status-info-bg)',
+                      border: '1px solid var(--status-info-border)',
+                      color: 'var(--status-info)',
+                    }}
+                  >
+                    Body recomposition — prioritize protein and training
+                  </div>
+                )}
+                <MacroDonutChart macros={macros} />
+              </div>
             </div>
             {foodFlags.length > 0 && (
               <div className="mt-8 anim-fade-up delay-5">
@@ -1606,6 +1620,14 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                 age={profile.age}
                 hasLipids={markers.totalCholesterol !== undefined && markers.hdl !== undefined}
                 race={profile.race}
+                familyHistoryDisclaimer={
+                  result.ascvdRiskScore !== undefined && profile.familyHeartDisease === true
+                }
+                hrtDisclaimer={
+                  result.ascvdRiskScore !== undefined &&
+                  profile.gender === 'female' &&
+                  profile.takingHRT === true
+                }
               />
             </div>
             <div className="md:col-span-2">

@@ -6,6 +6,7 @@ import { useAuth } from '@clerk/nextjs';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
 import type { AnalysisHistory } from '@/types';
+import { normalizeUserProfile } from '@/lib/profileUtils';
 
 export default function AnalysisDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,7 +25,12 @@ export default function AnalysisDetailPage() {
         if (!res.ok) throw new Error(res.status === 404 ? 'Analysis not found.' : 'Failed to load analysis.');
         return res.json();
       })
-      .then((data) => setAnalysis(data))
+      .then((data: AnalysisHistory) =>
+        setAnalysis({
+          ...data,
+          profile: normalizeUserProfile(data.profile),
+        }),
+      )
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id, isLoaded, isSignedIn]);
