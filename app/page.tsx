@@ -28,7 +28,7 @@ function FeatureCard({
 }) {
   return (
     <div
-      className="relative overflow-hidden rounded-2xl noise card-hover p-5"
+      className="relative overflow-hidden rounded-2xl noise card-hover p-5 select-none"
       style={{
         backgroundColor: 'var(--surface)',
         border: '1px solid var(--border)',
@@ -66,7 +66,7 @@ function StepCard({
 }) {
   return (
     <div
-      className="rounded-2xl p-5"
+      className="rounded-2xl p-5 select-none"
       style={{
         backgroundColor: 'var(--bg-warm)',
         border: '1px solid var(--border-light)',
@@ -191,7 +191,7 @@ export default function HomePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
           <div className="anim-fade-up">
             <div
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold select-none"
               style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent)', border: '1px solid rgba(107, 143, 113, 0.22)' }}
             >
               <Sparkles className="w-4 h-4" />
@@ -199,12 +199,12 @@ export default function HomePage() {
             </div>
 
             <h1
-              className="font-display text-4xl sm:text-5xl leading-[1.05] mt-4"
+              className="font-display text-4xl sm:text-5xl leading-[1.05] mt-4 select-none"
               style={{ color: 'var(--text-primary)' }}
             >
               Understand your bloodwork and calories in minutes.
             </h1>
-            <p className="text-base sm:text-lg mt-4 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            <p className="text-base sm:text-lg mt-4 leading-relaxed select-none" style={{ color: 'var(--text-secondary)' }}>
               BetterCals turns your profile and lab markers into a simple health score, targeted insights, and a clear calorie + macro plan you can follow this week.
             </p>
 
@@ -311,10 +311,10 @@ export default function HomePage() {
         <section className="mt-14">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <h2 className="font-display text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <h2 className="font-display text-2xl font-semibold select-none" style={{ color: 'var(--text-primary)' }}>
                 How it works
               </h2>
-              <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+              <p className="text-sm mt-1 select-none" style={{ color: 'var(--text-secondary)' }}>
                 Fast, private, and designed for action.
               </p>
             </div>
@@ -349,7 +349,7 @@ export default function HomePage() {
         {/* Trust */}
         <section className="mt-14">
           <div
-            className="rounded-3xl p-6 sm:p-8 noise"
+            className="rounded-3xl p-6 sm:p-8 noise select-none"
             style={{
               backgroundColor: 'var(--surface)',
               border: '1px solid var(--border)',
@@ -378,7 +378,7 @@ export default function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="py-10" style={{ borderTop: '1px solid var(--border-light)' }}>
+      <footer className="py-10 select-none" style={{ borderTop: '1px solid var(--border-light)' }}>
         <div className="max-w-6xl mx-auto px-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <VitalsMark sizePx={30} />
