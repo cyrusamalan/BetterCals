@@ -50,32 +50,45 @@ Basic profile + manual blood entry works without any env vars. Auth and history 
 ## Repository Structure
 
 - `app/` — Next.js App Router: pages, layouts, and API routes
-  - `page.tsx` — main entry point (3-step wizard)
-  - `history/` — analysis history pages
+  - `page.tsx` — marketing landing page (hero, features, CTAs)
+  - `analyze/page.tsx` — main analysis workflow (3-step wizard)
+  - `history/page.tsx` — trends dashboard with marker forecasts
+  - `history/[id]/page.tsx` — single past analysis detail view
   - `api/` — server routes (`extract-blood-report/`, `analyses/`, `profile/`)
 - `components/` — React components (wizard steps, logo marks, `dashboard/` sub-components)
-- `lib/` — core business logic (`calculations.ts`, `bloodParser.ts`, `riskModels.ts`, `markerMetadata.ts`, `averageMarkers.ts`, `db/`)
+  - `dashboard/` — result cards: `ActionPlanCard`, `ASCVDRiskCard`, `PopulationBenchmarksCard`, `MarkerEducationDrawer`, `CalorieTiersCard`, `MacroDonutChart`, `HealthRadarChart`, `RecommendationsPanel`, etc.
+- `lib/` — core business logic
+  - `calculations.ts` — TDEE, macros, health scores, insights, recommendations
+  - `bloodParser.ts` — marker reference ranges, status tiers, regex fallback parser
+  - `riskModels.ts` — ACC/AHA 2013 Pooled Cohort Equations (ASCVD)
+  - `derivedInsights.ts` — action plans, population benchmarks, marker forecasts (linear regression)
+  - `markerMetadata.ts` — marker labels, units, hints, optimal ranges (used by forms + education drawer)
+  - `averageMarkers.ts` — population median markers by gender × age band
+  - `profileUtils.ts` — legacy profile migration (string focusGoal → array)
+  - `db/` — Neon database singleton + Drizzle schema
 - `types/index.ts` — all shared TypeScript interfaces
 - `proxy.ts` — Clerk middleware (protects API routes)
 - `drizzle/` — auto-generated SQL migrations
 
 ## Architecture & Data Flow
 
-### 3-Step Wizard (app/page.tsx)
+### 3-Step Wizard (app/analyze/page.tsx)
 
-State is managed with `useState`/`useEffect` in `app/page.tsx` and persisted to `localStorage`.
+State is managed with `useState`/`useEffect` in `app/analyze/page.tsx` and persisted to `localStorage`.
 
 ```
 Step 1: Profile (TDEEForm)
   → UserProfile { age, gender, race, weight(lbs), height(ft+in), activityLevel, goal,
-                  optional: smoker, diabetic, systolicBP, waistInches, hipInches }
+                  focusGoal[] (multi-select), advancedActivity mode (steps, occupation,
+                  exercise sessions), lifestyle (sleep, stress, dietary pattern),
+                  CV risk factors (smoker, diabetic, BP, family history, HRT, CKD),
+                  body composition (waist, hip, bodyFatPercentage), medications }
 
 Step 2: Blood data (BloodReportUploader OR BloodValuesForm)
   → BloodMarkers { glucose?, hba1c?, totalCholesterol?, ldl?, hdl?, triglycerides?,
-                   tsh?, vitaminD?, vitaminB12?, ferritin?, iron?, alt?, ast?,
-                   albumin?, creatinine?, uricAcid?, insulin?, testosterone?,
-                   cortisol?, homocysteine? }
-  → Falls back to estimateAverageMarkers(gender, age) if no data provided
+                   apoB?, hsCRP?, tsh?, vitaminD?, vitaminB12?, ferritin?, iron?,
+                   alt?, ast?, albumin?, creatinine?, uricAcid?, fastingInsulin? }
+  → Falls back to population medians by gender × age band if no data provided
 
 Step 3: Results (BloodTestDashboard)
   → Runs full calculation pipeline → AnalysisResult
@@ -86,17 +99,25 @@ Step 3: Results (BloodTestDashboard)
 
 ```
 UserProfile + BloodMarkers
-  → calculateTDEE(profile)          → TDEEResult { bmr, tdee, targetCalories, activityMultiplier }
-  → calculateHealthScore(markers)   → HealthScore { overall, metabolic, cardiovascular,
-                                                    hormonal, nutritional, hepatic, renal }
-  → generateInsights(...)           → Insight[]
-  → identifyDeficiencies(markers)   → string[]
-  → identifyRisks(markers)          → string[]
-  → calculateCalorieTiers(tdee)     → CalorieTier[] (6 tiers: -1 to +1 lb/wk)
-  → calculateMacros(calories, goal) → MacroBreakdown { protein, carbs, fat }
-  → calculateRecommendations(...)   → PersonalizedRecs { bmi, waterIntakeOz, ratios,
-                                                         supplements[], exerciseSuggestions[] }
-  → calculateASCVDRiskScore(...)     → number | null (ages 40-79 only)
+  → calculateTDEE(profile)            → TDEEResult { bmr, tdee, targetCalories, activityMultiplier,
+                                                      neatCalories?, exerciseCalories? }
+                                         Mifflin-St Jeor (default) or Katch-McArdle (if body fat %)
+                                         Simple mode: BMR × multiplier
+                                         Advanced mode: BMR + NEAT (steps + occupation) + exercise (MET-based)
+  → calculateHealthScore(markers, profile) → HealthScore { overall, metabolic, cardiovascular,
+                                                            hormonal, nutritional, hepatic, renal }
+  → generateInsights(...)              → Insight[] (~50 rules)
+  → identifyDeficiencies(markers)      → string[]
+  → identifyRisks(markers)             → string[]
+  → calculateCalorieTiers(tdee)        → CalorieTier[] (3 tiers: deficit, maintain, surplus)
+  → calculateMacros(profile, tdee, markers) → MacroBreakdown { protein, carbs, fat }
+                                         Focus-goal-aware: protein 0.75–1.0g/lb, recomp mode if both fat-loss + muscle-gain
+  → calculateRecommendations(...)      → PersonalizedRecs { bmi, waterIntakeOz, ratios (HOMA-IR, TyG,
+                                                             waist-to-hip, LDL/HDL, TG/HDL),
+                                                             supplements[], exerciseSuggestions[], mealTiming }
+  → deriveMarkers(markers)             → { ldl?, nonHdl? } (Friedewald equation)
+  → deriveActionPlan(profile, markers) → ActionPlanItem[] (top 3 priorities) [lib/derivedInsights.ts]
+  → calculateASCVDRiskScore(...)       → number | null (ages 40-79 only)
 ```
 
 ### PDF Extraction Pipeline (app/api/extract-blood-report/route.ts)
@@ -125,21 +146,27 @@ DELETE /api/analyses/[id] → delete (ownership check)
 
 All formulas are in `lib/calculations.ts` unless noted. See the source for exact equations and constants.
 
-- **TDEE** — Mifflin-St Jeor equation with 5 activity multipliers; goal-adjusted target calories (lose/maintain/gain)
+- **TDEE** — Mifflin-St Jeor (default) or Katch-McArdle (if body fat %); simple mode uses 5 activity multipliers; advanced mode sums BMR + NEAT (steps + occupation) + exercise (MET-based); goal adjustment 0.7× (aggressive cut) to 1.2× (aggressive bulk)
 - **Health Score** — 0–100 per category (metabolic, cardiovascular, hormonal, nutritional, hepatic, renal); each marker maps to a `MarkerStatus` via tiers in `lib/bloodParser.ts`; overall = average of non-zero categories
-- **Macros** — goal-specific protein/carbs/fat percentage splits
-- **Calorie Tiers** — 6 tiers from TDEE (−750 to +500 cal/day, 1200 kcal floor)
-- **ASCVD Risk** — ACC/AHA 2013 Pooled Cohort Equations in `lib/riskModels.ts`; race/sex-specific; ages 40–79 only
+- **Macros** — focus-goal-aware splits; protein 0.75–1.0g/lb (highest for fat-loss); recomp mode when both fat-loss + muscle-gain selected
+- **Calorie Tiers** — 3 tiers (deficit, maintain, surplus) from TDEE, 1200 kcal floor
+- **ASCVD Risk** — ACC/AHA 2013 Pooled Cohort Equations in `lib/riskModels.ts`; 4 race×sex coefficient sets (white/black × male/female); ages 40–79 only
+- **Derived Markers** — LDL via Friedewald equation (TC − HDL − TG/5), Non-HDL (TC − HDL)
+- **Action Plan** — top 3 prioritized items from marker deviations (`lib/derivedInsights.ts`)
+- **Population Benchmarks** — user vs. age/gender medians from `lib/averageMarkers.ts`
+- **Marker Forecasts** — linear regression on historical values for 30/90-day projections (`lib/derivedInsights.ts`)
 
 ## TypeScript Types (types/index.ts)
 
 All shared interfaces live here. Key types:
-- `UserProfile` — form inputs including optional cardiovascular risk factors
-- `BloodMarkers` — 20 optional blood test values (all `number | undefined`)
+- `UserProfile` — demographics, activity (simple or advanced), goal + focusGoal[] (multi-select), CV risk factors, body composition, lifestyle context, medications
+- `BloodMarkers` — 20 optional blood test values (all `number | undefined`); includes apoB, hsCRP, fastingInsulin
 - `MarkerStatus` — `'low' | 'optimal' | 'normal' | 'borderline' | 'high' | 'critical' | 'unknown'`
 - `TDEEResult`, `HealthScore`, `Insight`, `CalorieTier`, `MacroBreakdown`, `PersonalizedRecs`
-- `AnalysisResult` — the full output containing all computed data
+- `AnalysisResult` — the full output containing all computed data (includes `derivedMarkers`, `ascvdRiskScore`, `actionPlan`, `usedAverageMarkers`)
 - `AnalysisHistory` — DB record shape (includes id, createdAt, profile, markers, result)
+- `ActionPlanItem`, `PopulationBenchmark`, `MarkerForecast` — derived insight types
+- `ExerciseSession`, `ExerciseTemplate`, `FocusGoal`, `DietaryPattern` — profile sub-types
 
 ## UI Conventions
 
@@ -157,7 +184,7 @@ All shared interfaces live here. Key types:
 - `ClerkProvider` wraps the app in `app/layout.tsx`
 - `proxy.ts` (middleware) protects `/api/analyses/*` and `/api/profile/*` — requires valid session
 - `useAuth()` hook used in components to conditionally show save/history features
-- Public routes: `/`, `/sign-in`, `/sign-up`
+- Public routes: `/`, `/analyze`, `/sign-in`, `/sign-up`
 
 ## Database (Neon + Drizzle)
 

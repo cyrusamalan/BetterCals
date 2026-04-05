@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import type { BloodMarkers } from '@/types';
 import pdfParse from 'pdf-parse';
 import { parseBloodReport } from '@/lib/bloodParser';
+import { checkRateLimit } from '@/lib/rateLimit';
+import Tesseract from 'tesseract.js';
 
 // Defaults to DeepSeek cloud API; override with LLM_BASE_URL for local models
 // e.g. Ollama: http://localhost:11434/v1    LM Studio: http://localhost:1234/v1
@@ -224,6 +226,20 @@ async function callLLMForExtraction(apiKey: string, reportText: string) {
 
 export async function POST(request: Request) {
   try {
+    // Rate limit: 10 extractions per minute per IP
+    const forwarded = request.headers.get('x-forwarded-for');
+    const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
+    const rl = checkRateLimit(`extract:${ip}`, 10, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(Math.ceil(rl.resetMs / 1000)) },
+        },
+      );
+    }
+
     const baseUrl = (process.env.LLM_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, '');
     const isLocal = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
     const apiKey = process.env.DEEPSEEK_API_KEY || '';
@@ -244,28 +260,36 @@ export async function POST(request: Request) {
       );
     }
 
+    // Reject files larger than 10 MB
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'File too large. Maximum size is 10 MB.' },
+        { status: 400 },
+      );
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const bytes = Buffer.from(arrayBuffer);
     const isPdf =
       file.type === 'application/pdf' ||
       file.name.toLowerCase().endsWith('.pdf');
 
-    if (!isPdf) {
-      return NextResponse.json(
-        {
-          error:
-            'Image extraction is not yet enabled server-side. Please upload a PDF.',
-        },
-        { status: 400 },
-      );
+    // Step 1: Extract raw text from PDF or image
+    let text: string;
+
+    if (isPdf) {
+      const pdfData = await pdfParse(bytes);
+      text = pdfData.text?.trim() ?? '';
+    } else {
+      // Image OCR via Tesseract.js
+      const { data } = await Tesseract.recognize(bytes, 'eng');
+      text = data.text?.trim() ?? '';
     }
 
-    // Step 1: Extract raw text from PDF
-    const pdfData = await pdfParse(bytes);
-    const text = pdfData.text?.trim();
     if (!text) {
       return NextResponse.json(
-        { error: 'Could not read text from PDF' },
+        { error: isPdf ? 'Could not read text from PDF' : 'Could not extract text from image (OCR returned no text)' },
         { status: 400 },
       );
     }

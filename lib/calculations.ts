@@ -2,8 +2,8 @@ import { UserProfile, ActivityLevel, TDEEResult, BloodMarkers, HealthScore, Insi
 import { getMarkerInterpretation } from '@/lib/bloodParser';
 import { calculateASCVDRisk, type ASCVDResult } from '@/lib/riskModels';
 
-/** Human-readable names for blood markers — shared across insight generation and risk identification. */
-const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
+/** Human-readable names for blood markers — shared across insight generation, risk identification, and UI. */
+export const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
   glucose: 'Glucose',
   hba1c: 'HbA1c',
   totalCholesterol: 'Total Cholesterol',
@@ -20,6 +20,30 @@ const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
   iron: 'Serum Iron',
   alt: 'ALT (Liver)',
   ast: 'AST (Liver)',
+  albumin: 'Albumin',
+  creatinine: 'Creatinine',
+  uricAcid: 'Uric Acid',
+  fastingInsulin: 'Fasting Insulin',
+};
+
+/** Shorter display labels for compact UI contexts (charts, trend tables). */
+export const MARKER_SHORT_NAMES: Record<keyof BloodMarkers, string> = {
+  glucose: 'Glucose',
+  hba1c: 'HbA1c',
+  totalCholesterol: 'Total Cholesterol',
+  nonHdl: 'Non-HDL',
+  ldl: 'LDL',
+  hdl: 'HDL',
+  triglycerides: 'Triglycerides',
+  apoB: 'ApoB',
+  hsCRP: 'hs-CRP',
+  tsh: 'TSH',
+  vitaminD: 'Vitamin D',
+  vitaminB12: 'Vitamin B12',
+  ferritin: 'Ferritin',
+  iron: 'Iron',
+  alt: 'ALT',
+  ast: 'AST',
   albumin: 'Albumin',
   creatinine: 'Creatinine',
   uricAcid: 'Uric Acid',

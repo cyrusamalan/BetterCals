@@ -32,30 +32,10 @@ import {
 } from '@/types';
 import { deriveMarkerForecasts } from '@/lib/derivedInsights';
 import { getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
+import { MARKER_SHORT_NAMES } from '@/lib/calculations';
 import MarkerEducationDrawer from '@/components/dashboard/MarkerEducationDrawer';
 
-const MARKER_LABELS: Record<keyof BloodMarkers, string> = {
-  glucose: 'Glucose',
-  hba1c: 'HbA1c',
-  totalCholesterol: 'Total Cholesterol',
-  nonHdl: 'Non-HDL',
-  ldl: 'LDL',
-  hdl: 'HDL',
-  triglycerides: 'Triglycerides',
-  apoB: 'ApoB',
-  hsCRP: 'hs-CRP',
-  tsh: 'TSH',
-  vitaminD: 'Vitamin D',
-  vitaminB12: 'Vitamin B12',
-  ferritin: 'Ferritin',
-  iron: 'Iron',
-  alt: 'ALT',
-  ast: 'AST',
-  albumin: 'Albumin',
-  creatinine: 'Creatinine',
-  uricAcid: 'Uric Acid',
-  fastingInsulin: 'Fasting Insulin',
-};
+const MARKER_LABELS = MARKER_SHORT_NAMES;
 
 type ComparisonDirection = 'improved' | 'worse' | 'unchanged';
 
