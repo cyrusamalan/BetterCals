@@ -50,6 +50,12 @@ export const MARKER_SHORT_NAMES: Record<keyof BloodMarkers, string> = {
   fastingInsulin: 'Fasting Insulin',
 };
 
+/** HOMA-IR: (fasting glucose × fasting insulin) / 405. Returns null if either input is missing. */
+function computeHOMAIR(glucose: number | undefined, insulin: number | undefined): number | null {
+  if (glucose === undefined || insulin === undefined) return null;
+  return (glucose * insulin) / 405;
+}
+
 const CV_MARKERS: (keyof BloodMarkers)[] = [
   'totalCholesterol', 'ldl', 'hdl', 'triglycerides', 'nonHdl', 'apoB', 'hsCRP',
 ];
@@ -475,9 +481,7 @@ function generateCrossMarkerInsights(profile: UserProfile, markers: BloodMarkers
   }
 
   // --- Insulin resistance convergence (HOMA-IR + TyG + TG/HDL all pointing same way) ---
-  const homaIR = (markers.glucose !== undefined && markers.fastingInsulin !== undefined)
-    ? (markers.glucose * markers.fastingInsulin) / 405
-    : null;
+  const homaIR = computeHOMAIR(markers.glucose, markers.fastingInsulin);
   const tgHdlRatio = (markers.triglycerides !== undefined && markers.hdl !== undefined && markers.hdl > 0)
     ? markers.triglycerides / markers.hdl
     : null;
@@ -764,9 +768,7 @@ export function calculateMacros(
 
   // Adjust for insulin resistance: reduce carbs, increase fat
   if (markers) {
-    const homaIR = (markers.glucose !== undefined && markers.fastingInsulin !== undefined)
-      ? (markers.glucose * markers.fastingInsulin) / 405
-      : null;
+    const homaIR = computeHOMAIR(markers.glucose, markers.fastingInsulin);
     if (homaIR !== null && homaIR > 2.0) {
       carbFraction -= 0.10; // shift 10% from carbs to fat for IR
     }
@@ -805,7 +807,7 @@ export function calculateMacros(
   const remaining2 = calories - proteinCal2;
 
   const carbGrams = Math.round((remaining2 * carbFraction) / 4);
-  const fatGrams = Math.round((remaining2 - carbGrams * 4) / 9);
+  const fatGrams = Math.max(0, Math.round((remaining2 - carbGrams * 4) / 9));
 
   // Compute actual percentages
   const pctP = Math.round((proteinCal2 / calories) * 100);
@@ -902,8 +904,9 @@ export function calculateRecommendations(
   // HOMA-IR
   let homaIR: number | null = null;
   let homaIRInterpretation: string | null = null;
-  if (markers.glucose !== undefined && markers.fastingInsulin !== undefined && markers.glucose > 0 && markers.fastingInsulin > 0) {
-    homaIR = Math.round(((markers.glucose * markers.fastingInsulin) / 405) * 10) / 10;
+  const rawHOMAIR = computeHOMAIR(markers.glucose, markers.fastingInsulin);
+  if (rawHOMAIR !== null && markers.glucose! > 0 && markers.fastingInsulin! > 0) {
+    homaIR = Math.round(rawHOMAIR * 10) / 10;
     if (homaIR < 1.0) homaIRInterpretation = 'Optimal';
     else if (homaIR < 2.0) homaIRInterpretation = 'Normal';
     else if (homaIR < 3.0) homaIRInterpretation = 'Early Insulin Resistance';
@@ -988,9 +991,7 @@ export function calculateRecommendations(
   }
 
   // Magnesium — broadly beneficial, recommended when metabolic markers are off
-  const homaIRVal = (markers.glucose !== undefined && markers.fastingInsulin !== undefined)
-    ? (markers.glucose * markers.fastingInsulin) / 405
-    : null;
+  const homaIRVal = computeHOMAIR(markers.glucose, markers.fastingInsulin);
   if (
     (homaIRVal !== null && homaIRVal > 1.5) ||
     (markers.glucose !== undefined && markers.glucose >= 100) ||

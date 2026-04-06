@@ -1,40 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { BloodMarkers } from '@/types';
 import pdfParse from 'pdf-parse';
-import { parseBloodReport } from '@/lib/bloodParser';
+import { parseBloodReport, PLAUSIBLE_RANGES } from '@/lib/bloodParser';
 import { checkRateLimit } from '@/lib/rateLimit';
 import Tesseract from 'tesseract.js';
 
 // Defaults to DeepSeek cloud API; override with LLM_BASE_URL for local models
 // e.g. Ollama: http://localhost:11434/v1    LM Studio: http://localhost:1234/v1
 const DEFAULT_BASE_URL = 'https://api.deepseek.com';
-
-/**
- * Physiological plausibility ranges — values outside these are almost certainly
- * extraction errors (grabbed a reference range, date fragment, or unrelated number).
- */
-const PLAUSIBLE_RANGES: Record<keyof BloodMarkers, { min: number; max: number }> = {
-  glucose: { min: 20, max: 600 },
-  hba1c: { min: 3, max: 20 },
-  totalCholesterol: { min: 50, max: 500 },
-  ldl: { min: 10, max: 400 },
-  hdl: { min: 5, max: 150 },
-  triglycerides: { min: 20, max: 2000 },
-  tsh: { min: 0.01, max: 100 },
-  vitaminD: { min: 3, max: 200 },
-  vitaminB12: { min: 50, max: 5000 },
-  ferritin: { min: 1, max: 3000 },
-  iron: { min: 5, max: 500 },
-  alt: { min: 1, max: 1000 },
-  ast: { min: 1, max: 1000 },
-  albumin: { min: 1, max: 7 },
-  creatinine: { min: 0.1, max: 20 },
-  uricAcid: { min: 0.5, max: 20 },
-  fastingInsulin: { min: 0.5, max: 300 },
-  apoB: { min: 10, max: 300 },
-  hsCRP: { min: 0.01, max: 50 },
-  nonHdl: { min: 20, max: 400 },
-};
 
 function sanitizeBloodMarkers(input: unknown): BloodMarkers {
   if (!input || typeof input !== 'object') return {};

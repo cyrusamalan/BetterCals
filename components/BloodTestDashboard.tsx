@@ -936,30 +936,9 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
   const handleDownloadJSON = () => {
     const data = {
       exportedAt: new Date().toISOString(),
-      profile: {
-        age: profile.age,
-        gender: profile.gender,
-        weightLbs: profile.weightLbs,
-        heightFeet: profile.heightFeet,
-        heightInches: profile.heightInches,
-        goal: profile.goal,
-      },
+      profile,
       markers,
-      result: {
-        tdee: result.tdee,
-        healthScore: result.healthScore,
-        macros: result.macros,
-        calorieTiers: result.calorieTiers,
-        deficiencies: result.deficiencies,
-        risks: result.risks,
-        recommendations: {
-          bmi: recommendations.bmi,
-          bmiCategory: recommendations.bmiCategory,
-          waterIntakeOz: recommendations.waterIntakeOz,
-          supplements: recommendations.supplements,
-        },
-        ascvdRiskScore: result.ascvdRiskScore,
-      },
+      result,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

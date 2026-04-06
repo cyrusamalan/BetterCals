@@ -6,7 +6,7 @@ export const MARKER_RULES: Record<keyof BloodMarkers, MarkerDefinition> = {
   glucose: {
     unit: 'mg/dL',
     universal: [
-      { min: 0, max: 69, status: 'low', label: 'Low', score: 55 },
+      { min: 0, max: 69, status: 'low', label: 'Low', score: 35 },
       { min: 70, max: 99, status: 'normal', label: 'Normal', score: 95 },
       { min: 100, max: 125, status: 'borderline', label: 'Pre-diabetes', score: 65 },
       { min: 126, max: 199, status: 'high', label: 'High', score: 40 },
@@ -234,9 +234,9 @@ export const MARKER_RULES: Record<keyof BloodMarkers, MarkerDefinition> = {
  * Values outside these ranges are likely data-entry errors or unit mismatches
  * (e.g. glucose in mmol/L instead of mg/dL) and should be rejected.
  */
-const PLAUSIBLE_RANGES: Partial<Record<keyof BloodMarkers, { min: number; max: number }>> = {
+export const PLAUSIBLE_RANGES: Partial<Record<keyof BloodMarkers, { min: number; max: number }>> = {
   glucose: { min: 20, max: 600 },         // mg/dL — 20 is severe hypoglycemia, 600+ is diabetic crisis
-  hba1c: { min: 2, max: 20 },             // % — below 2 is impossible, above 20 is extreme
+  hba1c: { min: 3, max: 20 },             // % — below 3 is extremely rare, above 20 is extreme
   totalCholesterol: { min: 50, max: 500 }, // mg/dL
   ldl: { min: 10, max: 400 },             // mg/dL
   hdl: { min: 5, max: 150 },              // mg/dL — above 150 is extremely rare

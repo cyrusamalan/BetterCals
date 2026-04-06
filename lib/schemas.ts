@@ -1,27 +1,35 @@
 import { z } from 'zod';
+import { PLAUSIBLE_RANGES } from '@/lib/bloodParser';
+
+// Helper: build a Zod number schema from a plausible range entry
+function rangeField(key: string) {
+  const r = PLAUSIBLE_RANGES[key as keyof typeof PLAUSIBLE_RANGES];
+  if (!r) return z.number().optional();
+  return z.number().min(r.min).max(r.max).optional();
+}
 
 // ── Blood Markers ──────────────────────────────────────────────────────────
 export const bloodMarkersSchema = z.object({
-  glucose: z.number().min(20).max(600).optional(),
-  hba1c: z.number().min(3).max(20).optional(),
-  totalCholesterol: z.number().min(50).max(500).optional(),
-  nonHdl: z.number().min(20).max(400).optional(),
-  ldl: z.number().min(10).max(400).optional(),
-  hdl: z.number().min(5).max(150).optional(),
-  triglycerides: z.number().min(20).max(2000).optional(),
-  apoB: z.number().min(10).max(300).optional(),
-  hsCRP: z.number().min(0.01).max(50).optional(),
-  tsh: z.number().min(0.01).max(100).optional(),
-  vitaminD: z.number().min(3).max(200).optional(),
-  vitaminB12: z.number().min(50).max(5000).optional(),
-  ferritin: z.number().min(1).max(3000).optional(),
-  iron: z.number().min(5).max(500).optional(),
-  alt: z.number().min(1).max(1000).optional(),
-  ast: z.number().min(1).max(1000).optional(),
-  albumin: z.number().min(1).max(7).optional(),
-  creatinine: z.number().min(0.1).max(20).optional(),
-  uricAcid: z.number().min(0.5).max(20).optional(),
-  fastingInsulin: z.number().min(0.5).max(300).optional(),
+  glucose: rangeField('glucose'),
+  hba1c: rangeField('hba1c'),
+  totalCholesterol: rangeField('totalCholesterol'),
+  nonHdl: rangeField('nonHdl'),
+  ldl: rangeField('ldl'),
+  hdl: rangeField('hdl'),
+  triglycerides: rangeField('triglycerides'),
+  apoB: rangeField('apoB'),
+  hsCRP: rangeField('hsCRP'),
+  tsh: rangeField('tsh'),
+  vitaminD: rangeField('vitaminD'),
+  vitaminB12: rangeField('vitaminB12'),
+  ferritin: rangeField('ferritin'),
+  iron: rangeField('iron'),
+  alt: rangeField('alt'),
+  ast: rangeField('ast'),
+  albumin: rangeField('albumin'),
+  creatinine: rangeField('creatinine'),
+  uricAcid: rangeField('uricAcid'),
+  fastingInsulin: rangeField('fastingInsulin'),
 }).strict();
 
 // ── User Profile ───────────────────────────────────────────────────────────
