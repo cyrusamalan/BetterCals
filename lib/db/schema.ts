@@ -1,4 +1,4 @@
-import { pgTable, serial, timestamp, jsonb, text } from 'drizzle-orm/pg-core';
+import { pgTable, serial, timestamp, jsonb, text, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const analyses = pgTable('analyses', {
   id: serial('id').primaryKey(),
@@ -7,7 +7,11 @@ export const analyses = pgTable('analyses', {
   profile: jsonb('profile').notNull(),
   markers: jsonb('markers').notNull(),
   result: jsonb('result').notNull(),
-});
+  shareToken: text('share_token'),
+}, (table) => [
+  index('analyses_user_id_created_at_idx').on(table.userId, table.createdAt),
+  uniqueIndex('analyses_share_token_idx').on(table.shareToken),
+]);
 
 export const profiles = pgTable('profiles', {
   id: serial('id').primaryKey(),

@@ -28,11 +28,14 @@ import {
   Rows3,
   Brain,
   LineChart,
+  FileSpreadsheet,
+  FileJson,
+  Share2,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import ProfileDropdown from '@/components/ProfileDropdown';
-import ThemeToggle from '@/components/ThemeToggle';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
 import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
@@ -40,46 +43,14 @@ import FoodSensitivityCard from '@/components/dashboard/FoodSensitivityCard';
 import ActionPlanCard from '@/components/dashboard/ActionPlanCard';
 import PopulationBenchmarksCard from '@/components/dashboard/PopulationBenchmarksCard';
 import { deriveActionPlan, derivePopulationBenchmarks } from '@/lib/derivedInsights';
+import { debugLog } from '@/lib/debugLog';
+import { MARKER_NAMES } from '@/lib/calculations';
 
-// #region debug log helper
-const DEBUG_ENDPOINT = 'http://127.0.0.1:7498/ingest/6f0bd25c-93a7-48e3-a88d-41621d1baedd';
-const DEBUG_SESSION_ID = 'dc8eb7';
-function debugLog({
-  hypothesisId,
-  location,
-  message,
-  data,
-}: {
-  hypothesisId: string;
-  location: string;
-  message: string;
-  data?: Record<string, unknown>;
-}) {
-  try {
-    fetch(DEBUG_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': DEBUG_SESSION_ID,
-      },
-      body: JSON.stringify({
-        sessionId: DEBUG_SESSION_ID,
-        location,
-        message,
-        hypothesisId,
-        data,
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  } catch {
-    // ignore
-  }
-}
-// #endregion
+import { SkeletonChart } from '@/components/dashboard/Skeleton';
 
-const MacroDonutChart = dynamic(() => import('@/components/dashboard/MacroDonutChart'), { ssr: false });
-const HealthRadarChart = dynamic(() => import('@/components/dashboard/HealthRadarChart'), { ssr: false });
-const MarkerComparisonChart = dynamic(() => import('@/components/dashboard/MarkerComparisonChart'), { ssr: false });
+const MacroDonutChart = dynamic(() => import('@/components/dashboard/MacroDonutChart'), { ssr: false, loading: () => <SkeletonChart /> });
+const HealthRadarChart = dynamic(() => import('@/components/dashboard/HealthRadarChart'), { ssr: false, loading: () => <SkeletonChart /> });
+const MarkerComparisonChart = dynamic(() => import('@/components/dashboard/MarkerComparisonChart'), { ssr: false, loading: () => <SkeletonChart /> });
 
 interface BloodTestDashboardProps {
   result: AnalysisResult;
@@ -89,29 +60,6 @@ interface BloodTestDashboardProps {
   onEditProfile?: () => void;
   resetLabel?: string;
 }
-
-const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
-  glucose: 'Glucose',
-  hba1c: 'HbA1c',
-  totalCholesterol: 'Total Cholesterol',
-  nonHdl: 'Non-HDL Cholesterol',
-  ldl: 'LDL Cholesterol',
-  hdl: 'HDL Cholesterol',
-  triglycerides: 'Triglycerides',
-  apoB: 'Apolipoprotein B (ApoB)',
-  hsCRP: 'hs-CRP',
-  tsh: 'TSH',
-  vitaminD: 'Vitamin D',
-  vitaminB12: 'Vitamin B12',
-  ferritin: 'Ferritin',
-  iron: 'Serum Iron',
-  alt: 'ALT (Liver)',
-  ast: 'AST (Liver)',
-  albumin: 'Albumin',
-  creatinine: 'Creatinine',
-  uricAcid: 'Uric Acid',
-  fastingInsulin: 'Fasting Insulin',
-};
 
 const CATEGORIES: {
   key: string;
@@ -787,6 +735,9 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [savedAnalysisId, setSavedAnalysisId] = useState<number | null>(null);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
   const foodFlags = computeFoodSensitivityFlags(markers, profile);
   const [activeMarker, setActiveMarker] = useState<{ key: keyof BloodMarkers; value: number } | null>(null);
   const [activeTab, setActiveTab] = useState<ResultsTab>('biomarkers');
@@ -944,6 +895,59 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
     }
   };
 
+  const handleDownloadCSV = () => {
+    const markerNames: Record<string, string> = {
+      glucose: 'Glucose (mg/dL)', hba1c: 'HbA1c (%)', totalCholesterol: 'Total Cholesterol (mg/dL)',
+      ldl: 'LDL (mg/dL)', hdl: 'HDL (mg/dL)', triglycerides: 'Triglycerides (mg/dL)',
+      apoB: 'ApoB (mg/dL)', hsCRP: 'hs-CRP (mg/L)', tsh: 'TSH (mIU/L)',
+      vitaminD: 'Vitamin D (ng/mL)', vitaminB12: 'Vitamin B12 (pg/mL)', ferritin: 'Ferritin (ng/mL)',
+      iron: 'Iron (mcg/dL)', alt: 'ALT (U/L)', ast: 'AST (U/L)', albumin: 'Albumin (g/dL)',
+      creatinine: 'Creatinine (mg/dL)', uricAcid: 'Uric Acid (mg/dL)', fastingInsulin: 'Fasting Insulin (mIU/L)',
+      nonHdl: 'Non-HDL (mg/dL)',
+    };
+    const rows: string[] = ['Marker,Value,Status'];
+    for (const [key, value] of Object.entries(markers)) {
+      if (value === undefined) continue;
+      const interp = getMarkerInterpretation(key as keyof BloodMarkers, value as number, profile.gender);
+      const name = markerNames[key] ?? key;
+      rows.push(`"${name}",${value},"${interp.label}"`);
+    }
+    rows.push('');
+    rows.push('Metric,Value');
+    rows.push(`BMR,${tdee.bmr}`);
+    rows.push(`TDEE,${tdee.tdee}`);
+    rows.push(`Target Calories,${tdee.targetCalories}`);
+    rows.push(`Overall Health Score,${healthScore.overall}`);
+    rows.push(`BMI,${recommendations.bmi}`);
+    rows.push(`Protein (g),${macros.protein.grams}`);
+    rows.push(`Carbs (g),${macros.carbs.grams}`);
+    rows.push(`Fat (g),${macros.fat.grams}`);
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'BetterCals_Report.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadJSON = () => {
+    const data = {
+      exportedAt: new Date().toISOString(),
+      profile,
+      markers,
+      result,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'BetterCals_Report.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleSaveToHistory = async () => {
     setSaving(true);
     try {
@@ -953,7 +957,9 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
         body: JSON.stringify({ profile, markers, result }),
       });
       if (res.ok) {
+        const data = await res.json();
         setSaved(true);
+        if (data?.id) setSavedAnalysisId(data.id);
       } else {
         console.error('Save failed:', await res.text());
       }
@@ -961,6 +967,26 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
       console.error('Save failed:', err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!savedAnalysisId) return;
+    setSharing(true);
+    try {
+      const res = await fetch(`/api/analyses/${savedAnalysisId}/share`, { method: 'POST' });
+      if (res.ok) {
+        const { shareToken } = await res.json();
+        const url = `${window.location.origin}/shared/${shareToken}`;
+        setShareUrl(url);
+        await navigator.clipboard.writeText(url);
+      } else {
+        console.error('Share failed:', await res.text());
+      }
+    } catch (err) {
+      console.error('Share failed:', err);
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -1034,9 +1060,36 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                   color: 'var(--text-primary)',
                   border: '1px solid var(--border)',
                 }}
+                title="Download PDF report"
               >
                 <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                <span className="hidden sm:inline">Download Report</span>
+                <span className="hidden sm:inline">PDF</span>
+              </button>
+              <button
+                onClick={handleDownloadCSV}
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press"
+                style={{
+                  backgroundColor: 'var(--border-light)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                }}
+                title="Download CSV spreadsheet"
+              >
+                <FileSpreadsheet className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                <span className="hidden sm:inline">CSV</span>
+              </button>
+              <button
+                onClick={handleDownloadJSON}
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press"
+                style={{
+                  backgroundColor: 'var(--border-light)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                }}
+                title="Download JSON data"
+              >
+                <FileJson className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                <span className="hidden sm:inline">JSON</span>
               </button>
 
               {isSignedIn ? (
@@ -1070,6 +1123,27 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                     )}
                     <span className="hidden sm:inline">{saving ? 'Saving...' : saved ? 'Saved' : 'Save to History'}</span>
                   </button>
+                  {saved && savedAnalysisId && (
+                    <button
+                      onClick={handleShare}
+                      disabled={sharing}
+                      className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press disabled:opacity-50"
+                      style={{
+                        backgroundColor: shareUrl ? 'var(--status-normal-bg)' : 'var(--border-light)',
+                        color: shareUrl ? 'var(--status-normal)' : 'var(--text-primary)',
+                        border: `1px solid ${shareUrl ? 'var(--status-normal-border)' : 'var(--border)'}`,
+                      }}
+                    >
+                      {shareUrl ? (
+                        <LinkIcon className="w-4 h-4" />
+                      ) : (
+                        <Share2 className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                      )}
+                      <span className="hidden sm:inline">
+                        {sharing ? 'Sharing...' : shareUrl ? 'Link Copied!' : 'Share'}
+                      </span>
+                    </button>
+                  )}
                   {onEditProfile && (
                     <ProfileDropdown profile={profile} onEditProfile={onEditProfile} />
                   )}
@@ -1090,7 +1164,6 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
               )}
 
               <div className="flex items-center gap-2 shrink-0">
-                <ThemeToggle />
                 <div
                   className="w-8 h-8 sm:w-9 sm:h-9 rounded-[14px] flex items-center justify-center"
                   style={{

@@ -29,7 +29,13 @@
       "Bash(xargs grep:*)",
       "Bash(grep -E \"\\\\.\\(ts|tsx|json\\)$|^d\")",
       "Bash(find C:UserscyruscamalanProjectsBloodWise \\\\\\(-name types.ts -o -name index.ts \\\\\\) -path */lib/* -o -path */types/*)",
-      "Bash(grep -r \"export.*type\\\\|export.*interface\" C:UserscyruscamalanProjectsBloodWise --include=*.ts --include=*.tsx --exclude-dir=node_modules --exclude-dir=.next)"
+      "Bash(grep -r \"export.*type\\\\|export.*interface\" C:UserscyruscamalanProjectsBloodWise --include=*.ts --include=*.tsx --exclude-dir=node_modules --exclude-dir=.next)",
+      "Bash(npx vitest:*)",
+      "Bash(grep -r theme /c/Users/cyrus/camalan/Projects/BloodWise/app --include=*.tsx --include=*.ts --include=*.jsx --include=*.js)",
+      "Bash(grep -r dark /c/Users/cyrus/camalan/Projects/BloodWise/app --include=*.tsx --include=*.ts --include=*.jsx --include=*.js)",
+      "Bash(grep -r theme /c/Users/cyrus/camalan/Projects/BloodWise/components --include=*.tsx --include=*.ts --include=*.jsx --include=*.js)",
+      "Bash(grep -r dark: /c/Users/cyrus/camalan/Projects/BloodWise/components --include=*.tsx --include=*.ts --include=*.jsx --include=*.js)",
+      "Bash(find /c/Users/cyrus/camalan/Projects/BloodWise/components -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\) ! -path */node_modules/*)"
     ]
   },
   "enabledPlugins": {

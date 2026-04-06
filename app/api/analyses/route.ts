@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getDb } from '@/lib/db';
 import { analyses } from '@/lib/db/schema';
 import { desc, eq } from 'drizzle-orm';
+import { saveAnalysisSchema } from '@/lib/schemas';
 
 export async function GET() {
   try {
@@ -33,11 +34,15 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { profile, markers, result } = body;
-
-    if (!profile || !markers || !result) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    const parsed = saveAnalysisSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
     }
+
+    const { profile, markers, result } = parsed.data;
 
     const db = getDb();
     const [inserted] = await db.insert(analyses).values({

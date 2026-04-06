@@ -24,7 +24,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import ThemeToggle from '@/components/ThemeToggle';
 import {
   AnalysisHistory,
   BloodMarkers,
@@ -32,30 +31,10 @@ import {
 } from '@/types';
 import { deriveMarkerForecasts } from '@/lib/derivedInsights';
 import { getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
+import { MARKER_SHORT_NAMES } from '@/lib/calculations';
 import MarkerEducationDrawer from '@/components/dashboard/MarkerEducationDrawer';
 
-const MARKER_LABELS: Record<keyof BloodMarkers, string> = {
-  glucose: 'Glucose',
-  hba1c: 'HbA1c',
-  totalCholesterol: 'Total Cholesterol',
-  nonHdl: 'Non-HDL',
-  ldl: 'LDL',
-  hdl: 'HDL',
-  triglycerides: 'Triglycerides',
-  apoB: 'ApoB',
-  hsCRP: 'hs-CRP',
-  tsh: 'TSH',
-  vitaminD: 'Vitamin D',
-  vitaminB12: 'Vitamin B12',
-  ferritin: 'Ferritin',
-  iron: 'Iron',
-  alt: 'ALT',
-  ast: 'AST',
-  albumin: 'Albumin',
-  creatinine: 'Creatinine',
-  uricAcid: 'Uric Acid',
-  fastingInsulin: 'Fasting Insulin',
-};
+const MARKER_LABELS = MARKER_SHORT_NAMES;
 
 type ComparisonDirection = 'improved' | 'worse' | 'unchanged';
 
@@ -323,7 +302,6 @@ export default function HistoryPage() {
               Track progress across {analyses.length} saved {analyses.length === 1 ? 'analysis' : 'analyses'} with forecasts and side-by-side comparisons.
             </p>
           </div>
-          <ThemeToggle />
         </div>
       </div>
 
@@ -468,7 +446,6 @@ export default function HistoryPage() {
                   Forecasts appear only for markers with at least 3 historical data points.
                 </p>
               </div>
-              <ThemeToggle />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
