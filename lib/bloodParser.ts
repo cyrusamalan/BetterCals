@@ -241,6 +241,7 @@ export const PLAUSIBLE_RANGES: Partial<Record<keyof BloodMarkers, { min: number;
   ldl: { min: 10, max: 400 },             // mg/dL
   hdl: { min: 5, max: 150 },              // mg/dL — above 150 is extremely rare
   triglycerides: { min: 10, max: 2000 },   // mg/dL — above 2000 is pancreatitis territory
+  nonHdl: { min: 10, max: 500 },          // mg/dL — derived (TC − HDL)
   apoB: { min: 10, max: 300 },            // mg/dL
   hsCRP: { min: 0.01, max: 100 },         // mg/L
   tsh: { min: 0.01, max: 100 },           // mIU/L
