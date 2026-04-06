@@ -9,7 +9,6 @@ import BloodValuesForm from '@/components/BloodValuesForm';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
 import VitalsMark from '@/components/VitalsMark';
 import ProfileDropdown from '@/components/ProfileDropdown';
-import ThemeToggle from '@/components/ThemeToggle';
 import Link from 'next/link';
 import {
   UserProfile,
@@ -376,7 +375,6 @@ export default function AnalyzePage() {
           {/* Right: Auth */}
           <div className="flex items-center justify-end">
             <div className="flex items-center gap-2">
-              <ThemeToggle />
               {!isSignedIn ? (
               <Link
                 href="/sign-in"

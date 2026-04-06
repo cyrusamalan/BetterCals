@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { DM_Serif_Display, DM_Sans } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
-import { ThemeProvider } from '@/components/ThemeProvider';
 import './globals.css';
 
 const dmSerif = DM_Serif_Display({
@@ -59,12 +58,10 @@ export default function RootLayout({
           >
             Skip to main content
           </a>
-          <ThemeProvider>
-            <main id="main-content">
-              {children}
-            </main>
-            <div aria-live="polite" aria-atomic="true" className="sr-only" id="a11y-announcer" />
-          </ThemeProvider>
+          <main id="main-content">
+            {children}
+          </main>
+          <div aria-live="polite" aria-atomic="true" className="sr-only" id="a11y-announcer" />
         </body>
       </html>
     </ClerkProvider>

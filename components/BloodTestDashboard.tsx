@@ -36,7 +36,6 @@ import {
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import ProfileDropdown from '@/components/ProfileDropdown';
-import ThemeToggle from '@/components/ThemeToggle';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
 import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
@@ -1165,7 +1164,6 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
               )}
 
               <div className="flex items-center gap-2 shrink-0">
-                <ThemeToggle />
                 <div
                   className="w-8 h-8 sm:w-9 sm:h-9 rounded-[14px] flex items-center justify-center"
                   style={{

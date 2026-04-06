@@ -24,7 +24,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import ThemeToggle from '@/components/ThemeToggle';
 import {
   AnalysisHistory,
   BloodMarkers,
@@ -303,7 +302,6 @@ export default function HistoryPage() {
               Track progress across {analyses.length} saved {analyses.length === 1 ? 'analysis' : 'analyses'} with forecasts and side-by-side comparisons.
             </p>
           </div>
-          <ThemeToggle />
         </div>
       </div>
 
@@ -448,7 +446,6 @@ export default function HistoryPage() {
                   Forecasts appear only for markers with at least 3 historical data points.
                 </p>
               </div>
-              <ThemeToggle />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
