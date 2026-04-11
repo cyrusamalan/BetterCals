@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 import { getDb } from '@/lib/db';
 import { profiles } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { saveProfileSchema } from '@/lib/schemas';
 
 export async function GET() {
   try {
@@ -37,11 +38,15 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { profile } = body;
-
-    if (!profile || !profile.age || !profile.gender || !profile.weightLbs) {
-      return NextResponse.json({ error: 'Missing required profile fields' }, { status: 400 });
+    const parsed = saveProfileSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid profile data', details: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
     }
+
+    const { profile } = parsed.data;
 
     const db = getDb();
     const [upserted] = await db

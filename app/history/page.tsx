@@ -30,31 +30,11 @@ import {
 } from '@/types';
 import { deriveMarkerForecasts } from '@/lib/derivedInsights';
 import { getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
+import { MARKER_SHORT_NAMES } from '@/lib/calculations';
 import MarkerEducationDrawer from '@/components/dashboard/MarkerEducationDrawer';
 import { HistoryPageSkeleton } from '@/components/Skeleton';
 
-const MARKER_LABELS: Record<keyof BloodMarkers, string> = {
-  glucose: 'Glucose',
-  hba1c: 'HbA1c',
-  totalCholesterol: 'Total Cholesterol',
-  nonHdl: 'Non-HDL',
-  ldl: 'LDL',
-  hdl: 'HDL',
-  triglycerides: 'Triglycerides',
-  apoB: 'ApoB',
-  hsCRP: 'hs-CRP',
-  tsh: 'TSH',
-  vitaminD: 'Vitamin D',
-  vitaminB12: 'Vitamin B12',
-  ferritin: 'Ferritin',
-  iron: 'Iron',
-  alt: 'ALT',
-  ast: 'AST',
-  albumin: 'Albumin',
-  creatinine: 'Creatinine',
-  uricAcid: 'Uric Acid',
-  fastingInsulin: 'Fasting Insulin',
-};
+const MARKER_LABELS = MARKER_SHORT_NAMES;
 
 type ComparisonDirection = 'improved' | 'worse' | 'unchanged';
 
@@ -448,13 +428,15 @@ export default function HistoryPage() {
 
         {markerTrends.length > 0 && (
           <section>
-            <div className="mb-3">
-              <h2 className="font-display text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Marker Trends & Forecasts
-              </h2>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-                Forecasts appear only for markers with at least 3 historical data points.
-              </p>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <h2 className="font-display text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Marker Trends & Forecasts
+                </h2>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                  Forecasts appear only for markers with at least 3 historical data points.
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

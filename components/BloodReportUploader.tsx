@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import type { BloodMarkers } from '@/types';
+import { announce } from '@/lib/announce';
 interface BloodReportUploaderProps {
   onMarkersExtracted: (markers: BloodMarkers) => void;
 }
@@ -58,15 +59,20 @@ export default function BloodReportUploader({ onMarkersExtracted }: BloodReportU
     try {
       const markers = await extractMarkersServerSide(file);
       if (Object.keys(markers).length === 0) {
-        setError('No marker values found in this report. Try another report or enter values manually.');
+        const msg = 'No marker values found in this report. Try another report or enter values manually.';
+        setError(msg);
+        announce(msg);
         return;
       }
 
       onMarkersExtracted(markers);
       setDone(true);
+      announce(`Successfully extracted ${Object.keys(markers).length} blood marker values.`);
     } catch (err) {
       console.error('Error processing file:', err);
-      setError('Error processing file. Please try again or enter values manually.');
+      const msg = 'Error processing file. Please try again or enter values manually.';
+      setError(msg);
+      announce(msg);
     } finally {
       setIsProcessing(false);
     }
@@ -85,9 +91,12 @@ export default function BloodReportUploader({ onMarkersExtracted }: BloodReportU
     <div className="space-y-4">
       <div
         {...getRootProps()}
+        role="button"
+        aria-label="Upload blood report file. Accepts PDF and image files."
+        tabIndex={0}
         className={`
           relative overflow-hidden rounded-xl border-2 border-dashed p-8 text-center cursor-pointer
-          transition-colors duration-200
+          transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2
           ${isDragActive ? '' : !fileName ? 'dropzone-idle' : ''}
         `}
         style={{

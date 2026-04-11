@@ -31,44 +31,9 @@ import {
 import { estimateAverageMarkers } from '@/lib/averageMarkers';
 import { normalizeUserProfile } from '@/lib/profileUtils';
 import { AnalyzeWizardSkeleton } from '@/components/Skeleton';
+import { debugLog } from '@/lib/debugLog';
 
 type Step = 'profile' | 'blood' | 'results';
-
-// #region debug log helper
-const DEBUG_ENDPOINT = 'http://127.0.0.1:7498/ingest/6f0bd25c-93a7-48e3-a88d-41621d1baedd';
-const DEBUG_SESSION_ID = 'dc8eb7';
-function debugLog({
-  hypothesisId,
-  location,
-  message,
-  data,
-}: {
-  hypothesisId: string;
-  location: string;
-  message: string;
-  data?: Record<string, unknown>;
-}) {
-  try {
-    fetch(DEBUG_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': DEBUG_SESSION_ID,
-      },
-      body: JSON.stringify({
-        sessionId: DEBUG_SESSION_ID,
-        location,
-        message,
-        hypothesisId,
-        data,
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  } catch {
-    // ignore
-  }
-}
-// #endregion
 
 function sanitizeBloodMarkers(input: BloodMarkers): BloodMarkers {
   const cleaned: BloodMarkers = {};
