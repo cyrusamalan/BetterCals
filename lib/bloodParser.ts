@@ -459,3 +459,36 @@ export function getMarkerDisplayRange(
   const maxLabel = ref.max >= VERY_HIGH ? `${ref.min}+` : `${ref.max}`;
   return { min: ref.min, max: ref.max, unit, maxLabel };
 }
+
+/** Value axis for the biomarker range bar — keep in sync with tier segment layout on the dashboard. */
+export function getMarkerBarScale(
+  marker: keyof BloodMarkers,
+  gender?: UserProfile['gender'],
+): { visualMin: number; visualMax: number } | null {
+  const reference = getMarkerDisplayRange(marker, gender);
+  if (!reference) return null;
+
+  const tiers = getMarkerTiers(marker, gender);
+  if (tiers.length === 0) {
+    const visualMin = Math.max(0, reference.min * 0.5);
+    const visualMax = reference.max * 1.5;
+    return { visualMin, visualMax };
+  }
+
+  const highestFiniteMax = tiers
+    .map((tier) => tier.max)
+    .filter((max) => Number.isFinite(max) && max < 9999)
+    .reduce((current, max) => Math.max(current, max), reference.max);
+  const visualMin = Math.max(0, Math.min(reference.min, tiers[0]?.min ?? reference.min));
+  const visualMax = Math.max(reference.max * 1.2, highestFiniteMax);
+  return { visualMin, visualMax };
+}
+
+export function markerValueToBarPercent(
+  value: number,
+  scale: { visualMin: number; visualMax: number },
+): number {
+  const span = Math.max(1e-9, scale.visualMax - scale.visualMin);
+  const pct = ((value - scale.visualMin) / span) * 100;
+  return Math.max(2, Math.min(98, pct));
+}

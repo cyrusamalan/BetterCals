@@ -7,7 +7,6 @@ import {
   AlertCircle,
   ArrowLeft,
   FolderOpen,
-  Loader2,
   Sparkles,
   TrendingUp,
   Activity,
@@ -24,7 +23,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import ThemeToggle from '@/components/ThemeToggle';
 import {
   AnalysisHistory,
   BloodMarkers,
@@ -33,6 +31,7 @@ import {
 import { deriveMarkerForecasts } from '@/lib/derivedInsights';
 import { getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
 import MarkerEducationDrawer from '@/components/dashboard/MarkerEducationDrawer';
+import { HistoryPageSkeleton } from '@/components/Skeleton';
 
 const MARKER_LABELS: Record<keyof BloodMarkers, string> = {
   glucose: 'Glucose',
@@ -255,16 +254,7 @@ export default function HistoryPage() {
   }, [comparisonRows]);
 
   if (!isLoaded || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-warm)' }}>
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} />
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Loading your history...
-          </p>
-        </div>
-      </div>
-    );
+    return <HistoryPageSkeleton />;
   }
 
   if (!isSignedIn) {
@@ -303,7 +293,7 @@ export default function HistoryPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-warm)' }}>
       <div className="max-w-6xl mx-auto px-4 pt-8 pb-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="flex flex-wrap items-center gap-3 mb-6">
           <div>
             <Link
               href="/"
@@ -323,7 +313,6 @@ export default function HistoryPage() {
               Track progress across {analyses.length} saved {analyses.length === 1 ? 'analysis' : 'analyses'} with forecasts and side-by-side comparisons.
             </p>
           </div>
-          <ThemeToggle />
         </div>
       </div>
 
@@ -459,16 +448,13 @@ export default function HistoryPage() {
 
         {markerTrends.length > 0 && (
           <section>
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div>
-                <h2 className="font-display text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Marker Trends & Forecasts
-                </h2>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-                  Forecasts appear only for markers with at least 3 historical data points.
-                </p>
-              </div>
-              <ThemeToggle />
+            <div className="mb-3">
+              <h2 className="font-display text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Marker Trends & Forecasts
+              </h2>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                Forecasts appear only for markers with at least 3 historical data points.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

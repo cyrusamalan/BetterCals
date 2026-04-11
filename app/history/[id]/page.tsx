@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, AlertCircle } from 'lucide-react';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
 import type { AnalysisHistory } from '@/types';
 import { normalizeUserProfile } from '@/lib/profileUtils';
+import { AnalysisDetailSkeleton } from '@/components/Skeleton';
 
 export default function AnalysisDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -64,14 +65,7 @@ export default function AnalysisDetailPage() {
   }
 
   if (loading || !isLoaded) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: 'linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%)' }}
-      >
-        <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--accent)' }} />
-      </div>
-    );
+    return <AnalysisDetailSkeleton />;
   }
 
   if (error || !analysis) {

@@ -9,7 +9,6 @@ import BloodValuesForm from '@/components/BloodValuesForm';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
 import VitalsMark from '@/components/VitalsMark';
 import ProfileDropdown from '@/components/ProfileDropdown';
-import ThemeToggle from '@/components/ThemeToggle';
 import Link from 'next/link';
 import {
   UserProfile,
@@ -31,6 +30,7 @@ import {
 } from '@/lib/calculations';
 import { estimateAverageMarkers } from '@/lib/averageMarkers';
 import { normalizeUserProfile } from '@/lib/profileUtils';
+import { AnalyzeWizardSkeleton } from '@/components/Skeleton';
 
 type Step = 'profile' | 'blood' | 'results';
 
@@ -290,15 +290,7 @@ export default function AnalyzePage() {
   };
 
   if (!isMounted || !serverProfileLoaded) {
-    return (
-      <div className="min-h-screen px-5 py-8" style={{ background: 'linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%)' }}>
-        <div className="max-w-3xl mx-auto space-y-5 animate-pulse">
-          <div className="h-10 w-48 rounded-xl" style={{ backgroundColor: 'var(--border-light)' }} />
-          <div className="h-24 rounded-2xl" style={{ backgroundColor: 'var(--surface)' }} />
-          <div className="h-56 rounded-3xl" style={{ backgroundColor: 'var(--surface)' }} />
-        </div>
-      </div>
-    );
+    return <AnalyzeWizardSkeleton />;
   }
 
   // ── Results: full-page dashboard takeover ──
@@ -411,7 +403,6 @@ export default function AnalyzePage() {
           {/* Right: Auth */}
           <div className="flex items-center justify-end">
             <div className="flex items-center gap-2">
-              <ThemeToggle />
               {!isSignedIn ? (
               <Link
                 href="/sign-in"

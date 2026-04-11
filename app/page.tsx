@@ -14,7 +14,6 @@ import {
   Play,
 } from 'lucide-react';
 import VitalsMark from '@/components/VitalsMark';
-import ThemeToggle from '@/components/ThemeToggle';
 import DemoModal from '@/components/DemoModal';
 
 function FeatureCard({
@@ -131,7 +130,6 @@ export default function HomePage() {
           </Link>
 
           <div className="flex items-center gap-2">
-            <ThemeToggle />
             {isSignedIn ? (
               <>
                 <Link

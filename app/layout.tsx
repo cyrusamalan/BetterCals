@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { DM_Serif_Display, DM_Sans } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
-import { ThemeProvider } from '@/components/ThemeProvider';
 import './globals.css';
 
 const dmSerif = DM_Serif_Display({
@@ -31,9 +30,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" className={`${dmSerif.variable} ${dmSans.variable}`} suppressHydrationWarning>
         <body className="min-h-screen font-body">
-          <ThemeProvider>
-            {children}
-          </ThemeProvider>
+          {children}
         </body>
       </html>
     </ClerkProvider>
