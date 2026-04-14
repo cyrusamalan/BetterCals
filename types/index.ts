@@ -1,7 +1,6 @@
 export interface UserProfile {
   age: number;
   gender: 'male' | 'female';
-  race?: 'white' | 'black' | 'other';
   weightLbs: number; // lbs - user input
   heightFeet: number; // feet - user input
   heightInches: number; // inches - user input

@@ -261,7 +261,7 @@ export default function HomePage() {
               </span>
               <span className="inline-flex items-center gap-2">
                 <HeartPulse className="w-4 h-4" />
-                ASCVD risk when eligible
+                Cardiovascular risk when eligible
               </span>
             </div>
           </div>
@@ -339,7 +339,7 @@ export default function HomePage() {
             <StepCard
               num={3}
               title="Get your results"
-              description="Health score, key drivers, recommendations, and (when eligible) ASCVD risk."
+              description="Health score, key drivers, recommendations, and (when eligible) cardiovascular risk."
             />
           </div>
         </section>

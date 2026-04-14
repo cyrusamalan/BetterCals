@@ -5,7 +5,6 @@ export default function ASCVDRiskCard({
   ascvdRiskReason,
   age,
   hasLipids,
-  race,
   familyHistoryDisclaimer,
   hrtDisclaimer,
 }: {
@@ -13,10 +12,9 @@ export default function ASCVDRiskCard({
   ascvdRiskReason?: string;
   age: number;
   hasLipids: boolean;
-  race?: 'white' | 'black' | 'other';
-  /** Show when ASCVD is computed and user reports premature family ASCVD */
+  /** Show when risk is computed and user reports premature family heart disease */
   familyHistoryDisclaimer?: boolean;
-  /** Show when ASCVD is computed and user is on HRT (not modeled in ACC/AHA) */
+  /** Show when risk is computed and user is on HRT (not modeled in Framingham) */
   hrtDisclaimer?: boolean;
 }) {
   const tier = (() => {
@@ -28,7 +26,7 @@ export default function ASCVDRiskCard({
   })();
 
   const helperText =
-    'ACC/AHA Pooled Cohort Equations estimate of 10-year risk for an ASCVD event.';
+    'Framingham General CVD Risk (D\u2019Agostino 2008) estimate of 10-year risk for a cardiovascular event.';
 
   // Use the reason from the calculation engine if available, otherwise fall back to generic messages
   const message = (() => {
@@ -54,7 +52,7 @@ export default function ASCVDRiskCard({
     >
       <div className="px-5 py-4 flex items-start justify-between" style={{ borderBottom: '1px solid var(--border-light)' }}>
         <div>
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>ASCVD 10-Year Risk</h3>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Cardiovascular 10-Year Risk</h3>
           <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{helperText}</p>
         </div>
 
@@ -91,17 +89,12 @@ export default function ASCVDRiskCard({
               </p>
               {familyHistoryDisclaimer && (
                 <p className="text-[11px] mt-2" style={{ color: 'var(--text-tertiary)' }}>
-                  Your family history is not captured in the ACC/AHA model but meaningfully increases your true risk.
+                  Your family history is not captured in the Framingham model but meaningfully increases your true risk.
                 </p>
               )}
               {hrtDisclaimer && (
                 <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
-                  Hormone replacement therapy is not accounted for in the pooled cohort equations — discuss risk with your clinician.
-                </p>
-              )}
-              {race && race !== 'white' && race !== 'black' && (
-                <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
-                  Note: This model was developed for White and African-American populations and may be less accurate for other groups.
+                  Hormone replacement therapy is not accounted for in the Framingham model — discuss risk with your clinician.
                 </p>
               )}
             </div>
@@ -132,7 +125,7 @@ export default function ASCVDRiskCard({
             }}
           >
             <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-              ASCVD risk unavailable
+              Cardiovascular risk unavailable
             </p>
             <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
               {message}

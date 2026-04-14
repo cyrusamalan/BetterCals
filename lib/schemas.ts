@@ -36,7 +36,6 @@ export const bloodMarkersSchema = z.object({
 export const userProfileSchema = z.object({
   age: z.number().int().min(13).max(120),
   gender: z.enum(['male', 'female']),
-  race: z.enum(['white', 'black', 'other']).optional(),
   weightLbs: z.number().min(40).max(700),
   heightFeet: z.number().int().min(3).max(8),
   heightInches: z.number().min(0).max(11.99),

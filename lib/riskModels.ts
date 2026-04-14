@@ -1,163 +1,134 @@
 import type { BloodMarkers, UserProfile } from '@/types';
 
 type Sex = UserProfile['gender'];
-type Race = 'white' | 'black';
 
-export interface ASCVDResult {
+export interface CVDRiskResult {
+  /** 10-year risk percentage (0-100), or null if the model cannot be computed. */
   risk: number | null;
   reason?: string;
 }
 
-interface PCECoefficients {
+/**
+ * Framingham General Cardiovascular Disease (CVD) Risk Profile (D'Agostino et al.,
+ * Circulation 2008;117:743-753, "General Cardiovascular Risk Profile for Use in
+ * Primary Care"). Predicts 10-year risk of total CVD (CHD, stroke, peripheral
+ * artery disease, and heart failure) in patients free of CVD at baseline.
+ *
+ * Race-free by design. Replaces the ACC/AHA 2013 Pooled Cohort Equations, which
+ * required race-specific coefficient tables (White/Black only) and fell back to
+ * White coefficients for everyone else — a known limitation that systematically
+ * over- or under-estimates risk for South Asian, East Asian, Hispanic, and other
+ * populations.
+ *
+ * Model form (Cox proportional hazards):
+ *   risk = 1 - S0(10) ^ exp(Σ βᵢ·Xᵢ - μ)
+ *
+ * Validated for ages 30-74. Outside that range we return null.
+ */
+interface FraminghamCoefficients {
   lnAge: number;
-  lnAgeSq: number;
   lnTC: number;
-  lnAge_lnTC: number;
   lnHDL: number;
-  lnAge_lnHDL: number;
   lnSBP_untreated: number;
   lnSBP_treated: number;
   smoker: number;
-  lnAge_smoker: number;
   diabetes: number;
+  /** Baseline 10-year survival. */
   s0_10: number;
-  meanX: number;
+  /** Mean of the linear predictor (sum of βᵢ·X̄ᵢ) in the derivation cohort. */
+  meanSum: number;
 }
 
-// ACC/AHA 2013 Pooled Cohort Equations — race×sex coefficient tables.
-const COEFFICIENTS: Record<`${Race}_${Sex}`, PCECoefficients> = {
-  black_male: {
-    lnAge: 2.469, lnAgeSq: 0,
-    lnTC: 0.302, lnAge_lnTC: 0,
-    lnHDL: -0.307, lnAge_lnHDL: 0,
-    lnSBP_untreated: 1.809, lnSBP_treated: 1.916,
-    smoker: 0.549, lnAge_smoker: 0,
-    diabetes: 0.645, s0_10: 0.8954, meanX: 19.54,
+const COEFFICIENTS: Record<Sex, FraminghamCoefficients> = {
+  // D'Agostino 2008, Table 2 — Women
+  female: {
+    lnAge: 2.32888,
+    lnTC: 1.20904,
+    lnHDL: -0.70833,
+    lnSBP_untreated: 2.76157,
+    lnSBP_treated: 2.82263,
+    smoker: 0.52873,
+    diabetes: 0.69154,
+    s0_10: 0.95012,
+    meanSum: 26.1931,
   },
-  black_female: {
-    lnAge: 17.114, lnAgeSq: 0,
-    lnTC: 0.940, lnAge_lnTC: 0,
-    lnHDL: -18.920, lnAge_lnHDL: 4.475,
-    lnSBP_untreated: 27.820, lnSBP_treated: 29.291,
-    smoker: 0.691, lnAge_smoker: 0,
-    diabetes: 0.874, s0_10: 0.9533, meanX: 86.61,
-  },
-  white_male: {
-    lnAge: 12.344, lnAgeSq: 0,
-    lnTC: 11.853, lnAge_lnTC: -2.664,
-    lnHDL: -7.990, lnAge_lnHDL: 1.769,
-    lnSBP_untreated: 1.764, lnSBP_treated: 1.797,
-    smoker: 7.837, lnAge_smoker: -1.795,
-    diabetes: 0.658, s0_10: 0.9144, meanX: 61.18,
-  },
-  white_female: {
-    lnAge: -29.799, lnAgeSq: 4.884,
-    lnTC: 13.540, lnAge_lnTC: -3.114,
-    lnHDL: -13.578, lnAge_lnHDL: 3.149,
-    lnSBP_untreated: 1.957, lnSBP_treated: 2.019,
-    smoker: 7.574, lnAge_smoker: -1.665,
-    diabetes: 0.661, s0_10: 0.9665, meanX: -29.18,
+  // D'Agostino 2008, Table 2 — Men
+  male: {
+    lnAge: 3.06117,
+    lnTC: 1.12370,
+    lnHDL: -0.93263,
+    lnSBP_untreated: 1.93303,
+    lnSBP_treated: 1.99881,
+    smoker: 0.65451,
+    diabetes: 0.57367,
+    s0_10: 0.88936,
+    meanSum: 23.9802,
   },
 };
 
-function ln(x: number) {
+function ln(x: number): number {
   return Math.log(x);
 }
 
-function clamp01(x: number) {
+function clamp01(x: number): number {
   return Math.max(0, Math.min(1, x));
 }
 
-interface PCEInputs {
-  lnAge: number;
-  lnTC: number;
-  lnHDL: number;
-  lnSBP: number;
-  treatedSbp: number;
-  smoker: number;
-  diabetes: number;
-}
-
-/** Compute the individual sum using PCE coefficients and log-transformed inputs. */
-function computePCESum(coef: PCECoefficients, inp: PCEInputs): number {
-  const { lnAge, lnTC, lnHDL, lnSBP, treatedSbp, smoker, diabetes } = inp;
-  return (
-    coef.lnAge * lnAge +
-    coef.lnAgeSq * (lnAge * lnAge) +
-    coef.lnTC * lnTC +
-    coef.lnAge_lnTC * (lnAge * lnTC) +
-    coef.lnHDL * lnHDL +
-    coef.lnAge_lnHDL * (lnAge * lnHDL) +
-    (treatedSbp ? coef.lnSBP_treated : coef.lnSBP_untreated) * lnSBP +
-    coef.smoker * smoker +
-    coef.lnAge_smoker * (lnAge * smoker) +
-    coef.diabetes * diabetes
-  );
-}
-
-/** Convert PCE sum to 10-year risk percentage, rounded to 1 decimal. */
-function pceRisk(coef: PCECoefficients, sum: number): number {
-  const risk = 1 - Math.pow(coef.s0_10, Math.exp(sum - coef.meanX));
-  return Math.round(clamp01(risk) * 1000) / 10;
-}
-
-/** Validate inputs and return null with reason if ASCVD cannot be computed. */
-function validateASCVDInputs(
+/** Validate inputs and return a null-with-reason result if risk cannot be computed. */
+function validateInputs(
   profile: UserProfile,
   markers: BloodMarkers,
 ): { reason: string } | null {
-  if (profile.age < 40 || profile.age > 79) {
-    return { reason: 'ASCVD risk modeling is validated only for ages 40–79.' };
+  if (profile.age < 30 || profile.age > 74) {
+    return { reason: 'Cardiovascular risk modeling is validated only for ages 30–74.' };
   }
   if (markers.totalCholesterol === undefined || markers.hdl === undefined) {
-    return { reason: 'Total Cholesterol and HDL are required to calculate ASCVD risk.' };
+    return { reason: 'Total Cholesterol and HDL are required to calculate cardiovascular risk.' };
   }
   if (!(markers.totalCholesterol > 0) || !(markers.hdl > 0)) {
     return { reason: 'Total Cholesterol and HDL must be positive values.' };
   }
   const sbp = profile.bloodPressureSystolic;
   if (sbp === undefined || sbp === null || !(sbp > 0)) {
-    return { reason: 'Systolic blood pressure is required to calculate ASCVD risk.' };
+    return { reason: 'Systolic blood pressure is required to calculate cardiovascular risk.' };
   }
   return null;
 }
 
 /**
- * ACC/AHA Pooled Cohort Equations (2013).
+ * Compute 10-year total CVD risk using the Framingham 2008 General CVD equation.
  *
- * Inputs:
- * - Official model is validated for ages 40–79; returns null with reason if out of bounds.
- * - Uses: age, sex, total cholesterol, HDL, systolic BP, smoker, diabetes, and BP treatment.
- * - If optional clinical fields are missing:
- *   - smoker defaults to false (conservative)
- *   - diabetic defaults to false (conservative)
- *   - treatedForHypertension defaults to false
- *   - bloodPressureSystolic: if missing, ASCVD cannot be computed → returns null
+ * Inputs used:
+ * - age, sex
+ * - total cholesterol, HDL (mg/dL)
+ * - systolic blood pressure (mmHg) + whether user is treated for hypertension
+ * - current smoker, diabetes status
  *
- * Notes:
- * - The full published model is race-specific (White/Black) and includes SBP treatment status.
- * - Non-White/non-Black races use White coefficients (model limitation).
- *
- * Returns:
- * - { risk, reason } — risk as percentage (0–100), or null with an explanation.
+ * Missing optional flags default to false (conservative). SBP and the two lipid
+ * values are required; if any is missing the function returns null with a reason.
  */
-export function calculateASCVDRisk(profile: UserProfile, markers: BloodMarkers): ASCVDResult {
-  const invalid = validateASCVDInputs(profile, markers);
+export function calculateCVDRisk(profile: UserProfile, markers: BloodMarkers): CVDRiskResult {
+  const invalid = validateInputs(profile, markers);
   if (invalid) return { risk: null, reason: invalid.reason };
 
-  const race: Race = profile.race === 'black' ? 'black' : 'white';
-  const coef = COEFFICIENTS[`${race}_${profile.gender}`];
+  const coef = COEFFICIENTS[profile.gender];
+  const treated = profile.treatedForHypertension === true;
 
-  const inputs: PCEInputs = {
-    lnAge: ln(profile.age),
-    lnTC: ln(markers.totalCholesterol!),
-    lnHDL: ln(markers.hdl!),
-    lnSBP: ln(profile.bloodPressureSystolic!),
-    smoker: profile.smoker ? 1 : 0,
-    diabetes: profile.diabetic ? 1 : 0,
-    treatedSbp: profile.treatedForHypertension ? 1 : 0,
-  };
+  const sum =
+    coef.lnAge * ln(profile.age) +
+    coef.lnTC * ln(markers.totalCholesterol!) +
+    coef.lnHDL * ln(markers.hdl!) +
+    (treated ? coef.lnSBP_treated : coef.lnSBP_untreated) * ln(profile.bloodPressureSystolic!) +
+    coef.smoker * (profile.smoker ? 1 : 0) +
+    coef.diabetes * (profile.diabetic ? 1 : 0);
 
-  const sum = computePCESum(coef, inputs);
-  return { risk: pceRisk(coef, sum) };
+  const risk = 1 - Math.pow(coef.s0_10, Math.exp(sum - coef.meanSum));
+  return { risk: Math.round(clamp01(risk) * 1000) / 10 };
 }
+
+// ── Backwards-compat re-exports ────────────────────────────────────────────
+// Older call sites and saved history use ASCVD-named fields. The underlying
+// model is now Framingham general CVD (total CVD), not ACC/AHA ASCVD, but the
+// result shape is identical so we preserve the old names for continuity.
+export type ASCVDResult = CVDRiskResult;
+export const calculateASCVDRisk = calculateCVDRisk;
