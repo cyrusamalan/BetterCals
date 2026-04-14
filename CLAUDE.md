@@ -16,12 +16,12 @@ Deployed on Vercel as a server-rendered Next.js app (App Router with API routes)
 
 - `npm run dev` — local dev server
 - `npm run build` — production build (outputs to `.next/`)
-- `npm run lint` — ESLint (`eslint . --ext .js,.jsx,.ts,.tsx`)
+- `npm run lint` — ESLint (ignores `dist/`, `.next/`, `out/`)
+- `npm test` — run Vitest suite once
+- `npm run test:watch` — Vitest in watch mode
 - `npm start` — start production server
 - `npx drizzle-kit generate` — generate SQL migrations from schema changes
 - `npx drizzle-kit push` — push schema changes directly to the database
-
-No test framework is configured; CI only runs the build.
 
 ## Coding Style
 
@@ -196,7 +196,7 @@ All shared interfaces live here. Key types:
 ## Development Notes
 
 - **OCR in production**: `BloodReportUploader` calls `/api/extract-blood-report` which uses LLM (DeepSeek default) for extraction; `lib/bloodParser.ts` provides a regex fallback. The old demo hardcoded data has been replaced.
-- **No test framework**: CI only runs `npm run build`. Validate changes manually with `npm run dev`.
+- **Tests**: Vitest suite in `__tests__/` covers `calculations`, `bloodParser`, `riskModels`, `rateLimit`, and `schemas`. Run with `npm test`. CI currently only runs `npm run build` — run tests locally before pushing.
 - **Deployment**: Server-rendered on Vercel (not static export). `vercel.json` points to `.next/` output. API routes, Clerk auth, and Neon DB require server-side rendering.
 - **Unit convention**: User inputs imperial (lbs, ft/in); calculations use metric internally; blood markers use standard lab units (mg/dL, ng/mL, mIU/L, etc.).
 - **Physiological validation**: `sanitizeBloodMarkers()` in the API route rejects implausible values; `NaN`/`Infinity` guards are applied to all optional numeric fields.

@@ -211,8 +211,10 @@ export function calculateTDEE(profile: UserProfile): TDEEResult {
   let exerciseCalories: number | undefined;
 
   if (profile.advancedActivity && profile.dailySteps !== undefined) {
+    // Clamp steps to a plausible range to prevent typos (e.g. 100000) from blowing up NEAT
+    const steps = Math.max(0, Math.min(50000, profile.dailySteps));
     // NEAT from steps: ~0.04 kcal per step, scaled by body weight relative to 70kg reference
-    const stepsNeat = Math.round(profile.dailySteps * 0.04 * (weightKg / 70));
+    const stepsNeat = Math.round(steps * 0.04 * (weightKg / 70));
 
     // NEAT from occupation
     const occupationNeat = OCCUPATION_NEAT[profile.occupationType ?? 'desk'] ?? 0;
@@ -240,7 +242,8 @@ export function calculateTDEE(profile: UserProfile): TDEEResult {
     'gain-lean': 1.1,
     'gain-aggressive': 1.2,
   };
-  const targetCalories = Math.round(tdee * goalMultipliers[profile.goal]);
+  // Apply 1200 kcal safety floor for aggressive-deficit goals on smaller frames
+  const targetCalories = Math.max(1200, Math.round(tdee * goalMultipliers[profile.goal]));
 
   return {
     bmr: Math.round(bmr),

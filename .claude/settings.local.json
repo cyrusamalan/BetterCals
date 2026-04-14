@@ -35,7 +35,8 @@
       "Bash(grep -r dark /c/Users/cyrus/camalan/Projects/BloodWise/app --include=*.tsx --include=*.ts --include=*.jsx --include=*.js)",
       "Bash(grep -r theme /c/Users/cyrus/camalan/Projects/BloodWise/components --include=*.tsx --include=*.ts --include=*.jsx --include=*.js)",
       "Bash(grep -r dark: /c/Users/cyrus/camalan/Projects/BloodWise/components --include=*.tsx --include=*.ts --include=*.jsx --include=*.js)",
-      "Bash(find /c/Users/cyrus/camalan/Projects/BloodWise/components -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\) ! -path */node_modules/*)"
+      "Bash(find /c/Users/cyrus/camalan/Projects/BloodWise/components -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\) ! -path */node_modules/*)",
+      "Bash(npm test:*)"
     ]
   },
   "enabledPlugins": {
