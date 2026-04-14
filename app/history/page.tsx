@@ -7,7 +7,6 @@ import {
   AlertCircle,
   ArrowLeft,
   FolderOpen,
-  Loader2,
   Sparkles,
   TrendingUp,
   Activity,
@@ -33,6 +32,7 @@ import { deriveMarkerForecasts } from '@/lib/derivedInsights';
 import { getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
 import { MARKER_SHORT_NAMES } from '@/lib/calculations';
 import MarkerEducationDrawer from '@/components/dashboard/MarkerEducationDrawer';
+import { HistoryPageSkeleton } from '@/components/Skeleton';
 
 const MARKER_LABELS = MARKER_SHORT_NAMES;
 
@@ -234,16 +234,7 @@ export default function HistoryPage() {
   }, [comparisonRows]);
 
   if (!isLoaded || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-warm)' }}>
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} />
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Loading your history...
-          </p>
-        </div>
-      </div>
-    );
+    return <HistoryPageSkeleton />;
   }
 
   if (!isSignedIn) {
@@ -282,7 +273,7 @@ export default function HistoryPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-warm)' }}>
       <div className="max-w-6xl mx-auto px-4 pt-8 pb-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="flex flex-wrap items-center gap-3 mb-6">
           <div>
             <Link
               href="/"

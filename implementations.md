@@ -103,5 +103,4 @@ On mobile, the two-column blood entry grid gets cramped. Consider a bottom sheet
 ---
 
 ## What I'd build first
-
 If I were you, I'd go: **HOMA-IR** (30 min, huge value) → **Non-HDL on manual entry** (5 min fix) → **Friedewald LDL** (20 min) → **Trend dashboard** (bigger project but the killer feature). Want me to start on any of these?

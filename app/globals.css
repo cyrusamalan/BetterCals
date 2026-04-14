@@ -15,6 +15,7 @@
   --text-primary: #1c1b19;
   --text-secondary: #5c5850;
   --text-tertiary: #948e84;
+  --text-muted: #a8a298;
   --text-inverse: #faf9f6;
 
   /* ── Brand ── */
@@ -40,7 +41,6 @@
   --shadow-soft: rgba(0, 0, 0, 0.06);
 }
 
-
 * {
   box-sizing: border-box;
   padding: 0;
@@ -58,7 +58,6 @@ body {
   background: var(--bg-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* ── Focus ring ── */

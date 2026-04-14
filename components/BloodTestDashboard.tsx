@@ -3,7 +3,14 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnalysisResult, BloodMarkers, FoodSensitivityFlag, Insight, MarkerStatus, UserProfile } from '@/types';
-import { getMarkerDisplayRange, getMarkerInterpretation, getMarkerTiers, getMarkerUnit } from '@/lib/bloodParser';
+import {
+  getMarkerBarScale,
+  getMarkerDisplayRange,
+  getMarkerInterpretation,
+  getMarkerTiers,
+  getMarkerUnit,
+  markerValueToBarPercent,
+} from '@/lib/bloodParser';
 import MarkerEducationDrawer from '@/components/dashboard/MarkerEducationDrawer';
 import VitalsMark from '@/components/VitalsMark';
 import {
@@ -195,31 +202,11 @@ function getStatusTone(status: MarkerStatus) {
   };
 }
 
-function getRangePercent(key: keyof BloodMarkers, value: number, gender?: UserProfile['gender']): number {
-  const range = getMarkerDisplayRange(key, gender);
-  if (!range) return 50;
-
-  const visualMin = Math.max(0, range.min * 0.5);
-  const visualMax = range.max * 1.5;
-  const pct = ((value - visualMin) / (visualMax - visualMin)) * 100;
-  return Math.max(2, Math.min(98, pct));
-}
-
-function getRangeNormalZone(key: keyof BloodMarkers, gender?: UserProfile['gender']): { left: number; width: number } {
-  const range = getMarkerDisplayRange(key, gender);
-  if (!range) return { left: 20, width: 60 };
-
-  const visualMin = Math.max(0, range.min * 0.5);
-  const visualMax = range.max * 1.5;
-  const left = ((range.min - visualMin) / (visualMax - visualMin)) * 100;
-  const right = ((range.max - visualMin) / (visualMax - visualMin)) * 100;
-  return { left, width: right - left };
-}
-
 function getRangeSegments(key: keyof BloodMarkers, gender?: UserProfile['gender']) {
   const tiers = getMarkerTiers(key, gender);
   const reference = getMarkerDisplayRange(key, gender);
-  if (!reference || tiers.length === 0) {
+  const scale = getMarkerBarScale(key, gender);
+  if (!reference || !scale || tiers.length === 0) {
     return [
       {
         left: 0,
@@ -230,12 +217,7 @@ function getRangeSegments(key: keyof BloodMarkers, gender?: UserProfile['gender'
     ];
   }
 
-  const highestFiniteMax = tiers
-    .map((tier) => tier.max)
-    .filter((max) => Number.isFinite(max) && max < 9999)
-    .reduce((current, max) => Math.max(current, max), reference.max);
-  const visualMin = Math.max(0, Math.min(reference.min, tiers[0]?.min ?? reference.min));
-  const visualMax = Math.max(reference.max * 1.2, highestFiniteMax);
+  const { visualMin, visualMax } = scale;
 
   return tiers.map((tier, index) => {
     const tierMin = Math.max(visualMin, tier.min);
@@ -250,6 +232,45 @@ function getRangeSegments(key: keyof BloodMarkers, gender?: UserProfile['gender'
       status: tier.status,
     };
   });
+}
+
+/** Decorative Gaussian on the bar axis — peak near optimal (or normal) tier center. */
+function bellDistributionPath(
+  visualMin: number,
+  visualMax: number,
+  tiers: ReturnType<typeof getMarkerTiers>,
+): string {
+  const span = visualMax - visualMin || 1;
+  const optimal = tiers.find((t) => t.status === 'optimal');
+  const normal = tiers.find((t) => t.status === 'normal');
+  let mu: number;
+  if (optimal) {
+    const hi = Number.isFinite(optimal.max) && optimal.max < 9999 ? optimal.max : visualMax;
+    mu = (optimal.min + Math.max(optimal.min, hi)) / 2;
+  } else if (normal) {
+    const hi = Number.isFinite(normal.max) && normal.max < 9999 ? normal.max : visualMax;
+    mu = (normal.min + Math.max(normal.min, hi)) / 2;
+  } else {
+    mu = (visualMin + visualMax) / 2;
+  }
+  const sigma = Math.max(span * 0.19, 1e-6);
+  const points = 56;
+  const ys: number[] = [];
+  for (let i = 0; i <= points; i++) {
+    const v = visualMin + (i / points) * span;
+    ys.push(Math.exp(-0.5 * Math.pow((v - mu) / sigma, 2)));
+  }
+  const peak = Math.max(...ys, 1e-9);
+  const baseY = 92;
+  const amp = 78;
+  let d = '';
+  for (let i = 0; i <= points; i++) {
+    const x = (i / points) * 100;
+    const py = baseY - (ys[i]! / peak) * amp;
+    d += `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${py.toFixed(2)} `;
+  }
+  d += `L 100 ${baseY} L 0 ${baseY} Z`;
+  return d.trim();
 }
 
 function computeFoodSensitivityFlags(markers: BloodMarkers, profile?: UserProfile) {
@@ -474,9 +495,34 @@ function RangeBar({
 }) {
   const interp = getMarkerInterpretation(markerKey, value, gender);
   const style = getStatusTone(interp.status);
-  const needlePos = getRangePercent(markerKey, value, gender);
   const range = getMarkerDisplayRange(markerKey, gender);
-  const segments = getRangeSegments(markerKey, gender);
+  const segments = useMemo(() => getRangeSegments(markerKey, gender), [markerKey, gender]);
+  const scale = useMemo(() => getMarkerBarScale(markerKey, gender), [markerKey, gender]);
+  const needlePos = scale ? markerValueToBarPercent(value, scale) : 50;
+  const tiers = useMemo(() => getMarkerTiers(markerKey, gender), [markerKey, gender]);
+
+  const zoneGradient = useMemo(() => {
+    const stops = segments.flatMap((seg) => {
+      const tone = getStatusTone(seg.status);
+      const lo = seg.left;
+      const hi = Math.min(100, seg.left + seg.width);
+      const mid = (lo + hi) / 2;
+      const em = seg.status === interp.status ? 1 : 0.62;
+      const edge = Math.round(em * 85);
+      const core = Math.round(em * 72);
+      return [
+        `color-mix(in srgb, ${tone.fill} ${edge}%, var(--border-light)) ${lo}%`,
+        `color-mix(in srgb, ${tone.fill} ${core}%, white) ${mid}%`,
+        `color-mix(in srgb, ${tone.fill} ${edge}%, var(--border-light)) ${hi}%`,
+      ];
+    });
+    return `linear-gradient(90deg, ${stops.join(', ')})`;
+  }, [segments, interp.status]);
+
+  const bellPath = useMemo(() => {
+    if (!scale || tiers.length === 0) return '';
+    return bellDistributionPath(scale.visualMin, scale.visualMax, tiers);
+  }, [scale, tiers]);
 
   return (
     <button
@@ -509,25 +555,38 @@ function RangeBar({
         </div>
       </div>
 
-      <div className="mt-2.5 relative h-3 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-light)' }}>
-        {segments.map((segment, index) => {
-          const segmentStyle = getStatusTone(segment.status);
-          return (
-            <div
-              key={`${segment.label}-${index}`}
-              className="absolute inset-y-0"
-              style={{
-                left: `${segment.left}%`,
-                width: `${segment.width}%`,
-                backgroundColor: segmentStyle.fill,
-                opacity: segment.status === interp.status ? 0.95 : 0.55,
-                borderRight: index < segments.length - 1 ? '1px solid rgba(255,255,255,0.55)' : 'none',
-              }}
-            />
-          );
-        })}
+      <div
+        className="mt-2.5 relative h-[18px] rounded-full overflow-hidden"
+        style={{
+          backgroundColor: 'var(--border-light)',
+          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
+        }}
+      >
         <div
-          className="absolute top-1/2 needle-pop"
+          className="absolute inset-0"
+          style={{ backgroundImage: zoneGradient, backgroundColor: 'var(--border-light)' }}
+        />
+        {bellPath ? (
+          <svg
+            className="absolute inset-0 h-full w-full pointer-events-none"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            aria-hidden
+          >
+            <path d={bellPath} fill="var(--text-primary)" opacity={0.09} />
+          </svg>
+        ) : null}
+        {segments.length > 1
+          ? segments.slice(1).map((seg) => (
+              <div
+                key={`div-${seg.left}-${seg.label}`}
+                className="absolute top-0 bottom-0 w-px pointer-events-none"
+                style={{ left: `${seg.left}%`, backgroundColor: 'rgba(255,255,255,0.72)' }}
+              />
+            ))
+          : null}
+        <div
+          className="absolute top-1/2 needle-pop z-[1]"
           style={{
             left: `${needlePos}%`,
             transform: 'translateX(-50%) translateY(-50%)',
@@ -548,7 +607,7 @@ function RangeBar({
       <div className="mt-1.5 flex items-center justify-between gap-2">
         <span className="text-[11px] font-medium" style={{ color: 'var(--text-tertiary)' }}>{range?.min}</span>
         <span className="text-[10px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--status-normal)' }}>
-          Optimal / Normal Range
+          Reference &amp; risk zones
         </span>
         <span className="text-[11px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
           {range ? `${range.maxLabel} ${range.unit}` : ''}
