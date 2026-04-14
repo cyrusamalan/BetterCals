@@ -36,6 +36,9 @@
       "Bash(grep -r theme /c/Users/cyrus/camalan/Projects/BloodWise/components --include=*.tsx --include=*.ts --include=*.jsx --include=*.js)",
       "Bash(grep -r dark: /c/Users/cyrus/camalan/Projects/BloodWise/components --include=*.tsx --include=*.ts --include=*.jsx --include=*.js)",
       "Bash(find /c/Users/cyrus/camalan/Projects/BloodWise/components -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\) ! -path */node_modules/*)",
+      "WebFetch(domain:www.ahajournals.org)",
+      "WebFetch(domain:professional.heart.org)",
+      "WebFetch(domain:github.com)",
       "Bash(npm test:*)"
     ]
   },

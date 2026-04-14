@@ -1,6 +1,6 @@
 import { UserProfile, ActivityLevel, TDEEResult, BloodMarkers, HealthScore, Insight, CalorieTier, MacroBreakdown, PersonalizedRecs, MealTimingSuggestion, ExerciseSession, ExerciseType, ExerciseTemplate, FocusGoal, DietaryPattern, SupplementRec } from '@/types';
 import { getMarkerInterpretation } from '@/lib/bloodParser';
-import { calculateASCVDRisk, type ASCVDResult } from '@/lib/riskModels';
+import { calculateCVDRisk, type CVDRiskResult } from '@/lib/riskModels';
 
 /** Human-readable names for blood markers — shared across insight generation, risk identification, and UI. */
 export const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
@@ -1391,6 +1391,11 @@ export function deriveMarkers(markers: BloodMarkers): { ldl?: number; nonHdl?: n
   return derived;
 }
 
-export function calculateASCVDRiskScore(profile: UserProfile, markers: BloodMarkers): ASCVDResult {
-  return calculateASCVDRisk(profile, markers);
+/**
+ * Compute 10-year cardiovascular-disease risk. Now backed by the Framingham 2008
+ * General CVD equation (race-free). The exported name is preserved for
+ * backwards-compatibility with saved analyses and existing call sites.
+ */
+export function calculateASCVDRiskScore(profile: UserProfile, markers: BloodMarkers): CVDRiskResult {
+  return calculateCVDRisk(profile, markers);
 }

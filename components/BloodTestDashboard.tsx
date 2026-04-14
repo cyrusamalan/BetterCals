@@ -1289,7 +1289,6 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
             <div style={{ fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
               Age: <b>{profile.age}</b><br />
               Sex: <b>{profile.gender}</b><br />
-              Race: <b>{profile.race ?? 'white'}</b><br />
               Weight: <b>{profile.weightLbs} lb</b><br />
               Height: <b>{`${profile.heightFeet}'${profile.heightInches}"`}</b><br />
               Goal: <b>{profile.goal}</b>
@@ -1751,7 +1750,6 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                 ascvdRiskReason={result.ascvdRiskReason}
                 age={profile.age}
                 hasLipids={markers.totalCholesterol !== undefined && markers.hdl !== undefined}
-                race={profile.race}
                 familyHistoryDisclaimer={
                   result.ascvdRiskScore !== undefined && profile.familyHeartDisease === true
                 }

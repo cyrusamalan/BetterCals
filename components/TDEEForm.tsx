@@ -13,7 +13,6 @@ interface TDEEFormProps {
 interface FormData {
   age: number;
   gender: 'male' | 'female';
-  race?: 'white' | 'black' | 'other';
   weightLbs: number;
   heightFeet: number;
   heightInches: number;
@@ -69,7 +68,6 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       heightInches: initialValues.heightInches,
       activityLevel: initialValues.activityLevel,
       goal: initialValues.goal,
-      race: initialValues.race,
       smoker: initialValues.smoker ?? false,
       diabetic: initialValues.diabetic ?? false,
       bloodPressureSystolic: initialValues.bloodPressureSystolic,
@@ -119,7 +117,6 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
     onSubmit({
       age: data.age,
       gender: data.gender,
-      race: data.race || undefined,
       weightLbs: data.weightLbs,
       heightFeet: data.heightFeet,
       heightInches: data.heightInches,
@@ -550,7 +547,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
         )}
       </div>
 
-      {/* Row 4: Clinical History (ASCVD) */}
+      {/* Row 4: Clinical History (Cardiovascular Risk) */}
       <div
         className="rounded-2xl p-5"
         style={{
@@ -561,24 +558,15 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
         <div className="flex items-baseline justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Clinical History (ASCVD)
+              Clinical History (Cardiovascular Risk)
             </p>
             <p className="text-[11px] mt-1" style={{ color: 'var(--text-tertiary)' }}>
-              Optional — improves 10-year ASCVD risk estimate.
+              Optional — improves 10-year cardiovascular risk estimate.
             </p>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <FieldGroup icon={User} label="Race">
-            <select {...register('race')} className="select-field">
-              <option value="">— Select (optional) —</option>
-              <option value="white">White</option>
-              <option value="black">Black / African American</option>
-              <option value="other">Other</option>
-            </select>
-          </FieldGroup>
-
           <div className="flex items-center justify-between gap-4 rounded-xl px-4 py-3" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border-light)' }}>
             <div className="min-w-0">
               <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Smoker</p>
