@@ -22,6 +22,7 @@ interface FormData {
   diabetic?: boolean;
   bloodPressureSystolic?: number;
   treatedForHypertension?: boolean;
+  restingHeartRate?: number;
   alcoholDrinksPerWeek?: number;
   familyHeartDisease?: boolean;
   takingHRT?: boolean;
@@ -72,6 +73,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       diabetic: initialValues.diabetic ?? false,
       bloodPressureSystolic: initialValues.bloodPressureSystolic,
       treatedForHypertension: initialValues.treatedForHypertension ?? false,
+      restingHeartRate: initialValues.restingHeartRate,
       alcoholDrinksPerWeek: initialValues.alcoholDrinksPerWeek,
       familyHeartDisease: initialValues.familyHeartDisease ?? false,
       takingHRT: initialValues.takingHRT ?? false,
@@ -126,6 +128,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
       diabetic: data.diabetic,
       bloodPressureSystolic: optNum(data.bloodPressureSystolic),
       treatedForHypertension: data.treatedForHypertension,
+      restingHeartRate: optNum(data.restingHeartRate),
       alcoholDrinksPerWeek: optNum(data.alcoholDrinksPerWeek),
       familyHeartDisease: data.familyHeartDisease,
       takingHRT: data.takingHRT,
@@ -614,6 +617,15 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
               aria-label="Treated for hypertension"
             />
           </div>
+
+          <FieldGroup icon={Heart} label="Resting Heart Rate" error={errors.restingHeartRate?.message}>
+            <input
+              type="number"
+              {...register('restingHeartRate', { min: 30, max: 220, valueAsNumber: true })}
+              className="input-field"
+              placeholder="e.g., 62 bpm"
+            />
+          </FieldGroup>
 
           <FieldGroup icon={Wine} label="Alcohol (drinks/week)">
             <input

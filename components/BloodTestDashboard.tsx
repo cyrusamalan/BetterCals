@@ -46,6 +46,7 @@ import ProfileDropdown from '@/components/ProfileDropdown';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
 import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
+import RestingHeartRateCard from '@/components/dashboard/RestingHeartRateCard';
 import FoodSensitivityCard from '@/components/dashboard/FoodSensitivityCard';
 import ActionPlanCard from '@/components/dashboard/ActionPlanCard';
 import PopulationBenchmarksCard from '@/components/dashboard/PopulationBenchmarksCard';
@@ -1740,7 +1741,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
         )}
 
         {displayedTab === 'trends' && hasMarkers && (
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-5 anim-fade-up delay-2">
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-5 anim-fade-up delay-2">
             <div className="md:col-span-1 h-full">
               <HealthRadarChart healthScore={healthScore} />
             </div>
@@ -1760,7 +1761,13 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                 }
               />
             </div>
-            <div className="md:col-span-2">
+            <div className="md:col-span-1 h-full">
+              <RestingHeartRateCard
+                restingHeartRate={profile.restingHeartRate}
+                activityLevel={profile.activityLevel}
+              />
+            </div>
+            <div className="md:col-span-3">
               <MarkerComparisonChart markers={markers} profile={{ age: profile.age, gender: profile.gender }} />
             </div>
           </div>

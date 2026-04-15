@@ -45,6 +45,7 @@ export const userProfileSchema = z.object({
   diabetic: z.boolean().optional(),
   bloodPressureSystolic: z.number().min(60).max(300).optional(),
   treatedForHypertension: z.boolean().optional(),
+  restingHeartRate: z.number().int().min(30).max(220).optional(),
   alcoholDrinksPerWeek: z.number().min(0).max(100).optional(),
   familyHeartDisease: z.boolean().optional(),
   takingHRT: z.boolean().optional(),
