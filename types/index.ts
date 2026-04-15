@@ -10,6 +10,8 @@ export interface UserProfile {
   diabetic?: boolean;
   bloodPressureSystolic?: number;
   treatedForHypertension?: boolean;
+  /** Average resting heart rate in bpm (wearable reading or first-thing-on-waking). */
+  restingHeartRate?: number;
   /** Drinks per week (12oz beer / 5oz wine / 1.5oz spirits) */
   alcoholDrinksPerWeek?: number;
   /** First-degree relative with premature ASCVD */
