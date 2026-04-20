@@ -83,7 +83,9 @@ export default function SignUpPage() {
   const { signUp, isLoaded, setActive } = useSignUp();
   const router = useRouter();
 
+  const usernamePattern = /^[a-z0-9_]{3,20}$/;
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [pendingVerification, setPendingVerification] = useState(false);
@@ -95,11 +97,18 @@ export default function SignUpPage() {
     e.preventDefault();
     if (!isLoaded || !signUp) return;
 
+    const normalizedUsername = username.trim().toLowerCase();
+    if (!usernamePattern.test(normalizedUsername)) {
+      setError('Username must be 3-20 characters and only use lowercase letters, numbers, or underscores.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
       await signUp.create({
+        username: normalizedUsername,
         emailAddress: email,
         password,
       });
@@ -287,6 +296,29 @@ export default function SignUpPage() {
 
                 {/* Email/password form */}
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label
+                      className="block text-xs font-semibold mb-1.5 transition-colors duration-200"
+                      style={{ color: focusedField === 'username' ? 'var(--accent)' : 'var(--text-secondary)' }}
+                    >
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      onFocus={() => setFocusedField('username')}
+                      onBlur={() => setFocusedField(null)}
+                      className="auth-input"
+                      placeholder="health_hustler"
+                      autoComplete="username"
+                    />
+                    <p className="mt-1 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                      3-20 chars, lowercase letters, numbers, underscores.
+                    </p>
+                  </div>
+
                   <div>
                     <label
                       className="block text-xs font-semibold mb-1.5 transition-colors duration-200"
