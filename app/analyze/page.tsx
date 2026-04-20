@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Heart, Activity, FileText, Droplets, ChevronRight, History } from 'lucide-react';
+import { Heart, Activity, FileText, Droplets, ChevronRight, History, Lock } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import TDEEForm from '@/components/TDEEForm';
-import BloodReportUploader from '@/components/BloodReportUploader';
 import BloodValuesForm from '@/components/BloodValuesForm';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
 import VitalsMark from '@/components/VitalsMark';
@@ -176,10 +175,6 @@ export default function AnalyzePage() {
       usedAverageMarkers: true,
     });
     setStep('results');
-  };
-
-  const handleMarkersExtracted = (extracted: BloodMarkers) => {
-    setMarkers(sanitizeBloodMarkers(extracted));
   };
 
   const handleBloodSubmit = (data: BloodMarkers) => {
@@ -522,7 +517,39 @@ export default function AnalyzePage() {
               }}
             >
               <div className="p-6 sm:p-8">
-                <BloodReportUploader onMarkersExtracted={handleMarkersExtracted} />
+                <div
+                  className="relative overflow-hidden rounded-xl border-2 border-dashed p-8 text-center"
+                  style={{
+                    borderColor: 'var(--border)',
+                    backgroundColor: 'var(--bg-warm)',
+                  }}
+                >
+                  <div
+                    className="mx-auto mb-3 w-14 h-14 rounded-2xl flex items-center justify-center"
+                    style={{ backgroundColor: 'var(--border-light)' }}
+                  >
+                    <Lock className="w-6 h-6" style={{ color: 'var(--text-tertiary)' }} />
+                  </div>
+
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Blood report upload is a Premium feature
+                  </p>
+                  <p className="text-xs mt-1.5 max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
+                    Upgrade to drop multiple blood reports, analyze trends over time, and unlock future-looking health projections.
+                  </p>
+
+                  <div
+                    className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-wider"
+                    style={{
+                      color: 'var(--text-tertiary)',
+                      backgroundColor: 'var(--border-light)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    Locked
+                  </div>
+                </div>
               </div>
             </div>
 
