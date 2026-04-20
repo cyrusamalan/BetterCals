@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import type { BloodMarkers } from '@/types';
+import type { BloodMarkers, BloodReportExtraction } from '@/types';
 import pdfParse from 'pdf-parse';
 import { parseBloodReport } from '@/lib/bloodParser';
 
@@ -118,6 +118,28 @@ function buildSystemPrompt(): string {
     '',
     'Never include commentary, markdown, or code fences.',
   ].join('\n');
+}
+
+function buildExtractionSummary(
+  markers: BloodMarkers,
+  modelUsed: string,
+  warning?: string,
+): BloodReportExtraction {
+  const extractedMarkerCount = Object.keys(markers).length;
+  const extractionConfidence = warning
+    ? 0.66
+    : extractedMarkerCount >= 8
+      ? 0.93
+      : extractedMarkerCount >= 4
+        ? 0.82
+        : 0.72;
+
+  return {
+    modelUsed,
+    extractedMarkerCount,
+    extractionConfidence,
+    warning,
+  };
 }
 
 async function callLLMForExtraction(apiKey: string, reportText: string) {
@@ -277,18 +299,24 @@ export async function POST(request: Request) {
     if (llmResult.ok) {
       const markers = llmResult.markers;
       if (Object.keys(markers).length > 0) {
-        return NextResponse.json({ markers, modelUsed: modelName });
+        return NextResponse.json({
+          markers,
+          extraction: buildExtractionSummary(markers, modelName),
+        });
       }
     }
 
     // Step 3: Fall back to local regex parser if LLM fails or returns empty
     const fallbackMarkers = sanitizeBloodMarkers(parseBloodReport(text));
     if (Object.keys(fallbackMarkers).length > 0) {
+      const warning = `${modelName} returned no results. Used local parser fallback.`;
       return NextResponse.json({
         markers: fallbackMarkers,
-        modelUsed: 'local-fallback-parser',
-        warning:
-          `${modelName} returned no results. Used local parser fallback.`,
+        extraction: buildExtractionSummary(
+          fallbackMarkers,
+          'local-fallback-parser',
+          warning,
+        ),
       });
     }
 

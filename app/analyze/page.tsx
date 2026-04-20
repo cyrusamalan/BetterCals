@@ -14,7 +14,9 @@ import Link from 'next/link';
 import {
   UserProfile,
   BloodMarkers,
-  AnalysisResult
+  AnalysisResult,
+  AnalysisSource,
+  BloodReportExtraction,
 } from '@/types';
 import { isPlausibleValue } from '@/lib/bloodParser';
 import {
@@ -30,6 +32,7 @@ import {
   deriveMarkers,
 } from '@/lib/calculations';
 import { estimateAverageMarkers } from '@/lib/averageMarkers';
+import { getCorrectedMarkers } from '@/lib/analysisSource';
 import { normalizeUserProfile } from '@/lib/profileUtils';
 
 type Step = 'profile' | 'blood' | 'results';
@@ -87,6 +90,12 @@ export default function AnalyzePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [markers, setMarkers] = useState<BloodMarkers>({});
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [uploadContext, setUploadContext] = useState<{
+    extractedMarkers: BloodMarkers;
+    extraction: BloodReportExtraction;
+    fileName: string;
+    fileType: 'pdf' | 'image';
+  } | null>(null);
   const { isSignedIn, isLoaded: isAuthLoaded, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [serverProfileLoaded, setServerProfileLoaded] = useState(false);
@@ -97,14 +106,24 @@ export default function AnalyzePage() {
       const savedProfile = localStorage.getItem('bettercals_profile');
       const savedMarkers = localStorage.getItem('bettercals_markers');
       const savedResult = localStorage.getItem('bettercals_result');
+      const savedUploadContext = localStorage.getItem('bettercals_upload_context');
 
       const parsedProfile = savedProfile ? normalizeUserProfile(JSON.parse(savedProfile) as UserProfile) : null;
       const parsedMarkers = savedMarkers ? JSON.parse(savedMarkers) as BloodMarkers : {};
       const parsedResult = savedResult ? JSON.parse(savedResult) as AnalysisResult : null;
+      const parsedUploadContext = savedUploadContext
+        ? JSON.parse(savedUploadContext) as {
+          extractedMarkers: BloodMarkers;
+          extraction: BloodReportExtraction;
+          fileName: string;
+          fileType: 'pdf' | 'image';
+        }
+        : null;
 
       if (parsedProfile) setProfile(parsedProfile);
       if (savedMarkers) setMarkers(parsedMarkers);
       if (parsedResult) setResult(parsedResult);
+      if (parsedUploadContext) setUploadContext(parsedUploadContext);
 
       // Validate state coherence: only restore step if the required data exists
       if (savedStep === 'results' && parsedProfile && parsedResult) {
@@ -121,6 +140,7 @@ export default function AnalyzePage() {
         localStorage.removeItem('bettercals_profile');
         localStorage.removeItem('bettercals_markers');
         localStorage.removeItem('bettercals_result');
+        localStorage.removeItem('bettercals_upload_context');
       } catch {
         // ignore
       }
@@ -136,10 +156,36 @@ export default function AnalyzePage() {
       localStorage.setItem('bettercals_profile', JSON.stringify(profile));
       localStorage.setItem('bettercals_markers', JSON.stringify(markers));
       localStorage.setItem('bettercals_result', JSON.stringify(result));
+      localStorage.setItem('bettercals_upload_context', JSON.stringify(uploadContext));
     } catch {
       // ignore (storage quota / blocked storage)
     }
-  }, [isMounted, step, profile, markers, result]);
+  }, [isMounted, step, profile, markers, result, uploadContext]);
+
+  const hasPremiumAccess = isSignedIn;
+
+  const buildSource = (mode: AnalysisSource['mode'], correctedMarkers: (keyof BloodMarkers)[] = []): AnalysisSource => {
+    if (mode === 'upload' && uploadContext) {
+      return {
+        mode,
+        premiumFeatureUsed: true,
+        fileName: uploadContext.fileName,
+        fileType: uploadContext.fileType,
+        modelUsed: uploadContext.extraction.modelUsed,
+        extractedMarkerCount: uploadContext.extraction.extractedMarkerCount,
+        extractionConfidence: uploadContext.extraction.extractionConfidence,
+        warning: uploadContext.extraction.warning,
+        extractedAt: new Date().toISOString(),
+        correctedMarkers,
+      };
+    }
+
+    return {
+      mode,
+      premiumFeatureUsed: false,
+      correctedMarkers,
+    };
+  };
 
   // Fetch server-saved profile for logged-in users → auto-skip to Step 2
   useEffect(() => {
@@ -196,6 +242,7 @@ export default function AnalyzePage() {
     const emptyMarkers: BloodMarkers = {};
     const healthScore = calculateHealthScore(emptyMarkers, { gender: profileData.gender });
 
+    setUploadContext(null);
     setMarkers(emptyMarkers);
     setResult({
       tdee,
@@ -209,12 +256,30 @@ export default function AnalyzePage() {
       ascvdRiskScore: undefined,
       ascvdRiskReason: 'Skipped blood markers',
       usedAverageMarkers: true,
+      source: buildSource('average'),
     });
     setStep('results');
   };
 
-  const handleMarkersExtracted = (extracted: BloodMarkers) => {
-    setMarkers(sanitizeBloodMarkers(extracted));
+  const handleMarkersExtracted = (payload: {
+    markers: BloodMarkers;
+    extraction: BloodReportExtraction;
+    fileName: string;
+    fileType: 'pdf' | 'image';
+  }) => {
+    const sanitized = sanitizeBloodMarkers(payload.markers);
+    setMarkers(sanitized);
+    setUploadContext({
+      extractedMarkers: sanitized,
+      extraction: payload.extraction,
+      fileName: payload.fileName,
+      fileType: payload.fileType,
+    });
+  };
+
+  const handleClearUploadedReport = () => {
+    setUploadContext(null);
+    setMarkers({});
   };
 
   const handleBloodSubmit = (data: BloodMarkers) => {
@@ -234,6 +299,14 @@ export default function AnalyzePage() {
     setMarkers(mergedMarkers);
 
     if (profile) {
+      const correctedMarkers = uploadContext
+        ? getCorrectedMarkers(uploadContext.extractedMarkers, normalizedSubmittedMarkers)
+        : [];
+      const sourceMode: AnalysisSource['mode'] = usedAverageMarkers
+        ? 'average'
+        : uploadContext
+          ? 'upload'
+          : 'manual';
       const tdee = calculateTDEE(profile);
       const healthScore = calculateHealthScore(mergedMarkers, { gender: profile.gender });
       const insights = usedAverageMarkers ? [] : generateInsights(profile, tdee, mergedMarkers);
@@ -253,6 +326,7 @@ export default function AnalyzePage() {
         ascvdRiskReason: ascvdResult.reason,
         usedAverageMarkers,
         derivedMarkers: derived,
+        source: buildSource(sourceMode, correctedMarkers),
       });
 
       setStep('results');
@@ -264,12 +338,14 @@ export default function AnalyzePage() {
     setProfile(null);
     setMarkers({});
     setResult(null);
+    setUploadContext(null);
 
     try {
       localStorage.removeItem('bettercals_step');
       localStorage.removeItem('bettercals_profile');
       localStorage.removeItem('bettercals_markers');
       localStorage.removeItem('bettercals_result');
+      localStorage.removeItem('bettercals_upload_context');
     } catch {
       // ignore
     }
@@ -538,6 +614,16 @@ export default function AnalyzePage() {
               <p className="mt-2 text-base" style={{ color: 'var(--text-secondary)' }}>
                 Upload a report for automatic extraction, or enter values manually.
               </p>
+              <div
+                className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-semibold uppercase tracking-[0.16em]"
+                style={{
+                  color: hasPremiumAccess ? 'var(--accent)' : 'var(--text-tertiary)',
+                  backgroundColor: hasPremiumAccess ? 'var(--accent-subtle)' : 'var(--border-light)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                {hasPremiumAccess ? 'Premium upload preview unlocked' : 'Premium upload'}
+              </div>
               {profile && (
                 <button
                   type="button"
@@ -566,7 +652,73 @@ export default function AnalyzePage() {
               }}
             >
               <div className="p-6 sm:p-8">
-                <BloodReportUploader onMarkersExtracted={handleMarkersExtracted} />
+                {hasPremiumAccess ? (
+                  <div className="space-y-4">
+                    <BloodReportUploader onMarkersExtracted={handleMarkersExtracted} />
+                    {uploadContext && (
+                      <div
+                        className="rounded-2xl p-4"
+                        style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                              Review extracted values before analysis
+                            </p>
+                            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                              {uploadContext.fileName} · {uploadContext.extraction.extractedMarkerCount} markers found · {Math.round(uploadContext.extraction.extractionConfidence * 100)}% confidence
+                            </p>
+                          </div>
+                          <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                            Model: {uploadContext.extraction.modelUsed}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleClearUploadedReport}
+                          className="mt-3 inline-flex px-3 py-1.5 rounded-lg text-xs font-semibold btn-press"
+                          style={{
+                            backgroundColor: 'var(--border-light)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--border)',
+                          }}
+                        >
+                          Clear uploaded values
+                        </button>
+                        {uploadContext.extraction.warning && (
+                          <p className="text-xs mt-3" style={{ color: 'var(--status-warning)' }}>
+                            {uploadContext.extraction.warning}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    className="relative overflow-hidden rounded-xl border-2 border-dashed p-8 text-center"
+                    style={{
+                      borderColor: 'var(--border)',
+                      backgroundColor: 'var(--bg-warm)',
+                    }}
+                  >
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      Upload is part of BetterCals Premium
+                    </p>
+                    <p className="text-xs mt-2 max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
+                      Sign in to preview the premium upload workflow, extraction review, and saved report provenance.
+                    </p>
+                    <Link
+                      href="/sign-in"
+                      className="inline-flex mt-4 px-4 py-2 rounded-xl text-xs font-semibold btn-press"
+                      style={{
+                        background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+                        color: 'var(--text-inverse)',
+                      }}
+                    >
+                      Sign in to unlock
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -600,6 +752,22 @@ export default function AnalyzePage() {
                     Manual Entry
                   </h3>
                 </div>
+                {uploadContext && (
+                  <div
+                    className="mb-5 rounded-xl px-4 py-3"
+                    style={{
+                      backgroundColor: 'var(--status-info-bg)',
+                      border: '1px solid var(--status-info-border)',
+                    }}
+                  >
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                      Extracted values are ready for review
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                      Edit any markers below. BetterCals will save which uploaded values you changed before analysis.
+                    </p>
+                  </div>
+                )}
                 <BloodValuesForm
                   onSubmit={handleBloodSubmit}
                   initialValues={markers}

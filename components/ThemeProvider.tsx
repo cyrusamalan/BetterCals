@@ -24,23 +24,21 @@ function applyTheme(theme: ResolvedTheme) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Hydration-safe defaults: render the same initial UI on server + first client paint,
-  // then load the persisted preference after mount.
-  const [mode, setModeState] = useState<ThemeMode>('system');
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>('light');
+  const [mode, setModeState] = useState<ThemeMode>(() => {
+    if (typeof window === 'undefined') return 'system';
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    return stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+  });
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => {
+    if (typeof window === 'undefined') return 'light';
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    const nextMode: ThemeMode = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+    return nextMode === 'system' ? getSystemTheme() : nextMode;
+  });
 
   useEffect(() => {
     applyTheme(resolvedTheme);
   }, [resolvedTheme]);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    const nextMode: ThemeMode = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
-    setModeState(nextMode);
-    const nextTheme = nextMode === 'system' ? getSystemTheme() : nextMode;
-    setResolvedTheme(nextTheme);
-    applyTheme(nextTheme);
-  }, []);
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');

@@ -3,12 +3,20 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
-import type { BloodMarkers } from '@/types';
+import type { BloodMarkers, BloodReportExtraction } from '@/types';
 interface BloodReportUploaderProps {
-  onMarkersExtracted: (markers: BloodMarkers) => void;
+  onMarkersExtracted: (payload: {
+    markers: BloodMarkers;
+    extraction: BloodReportExtraction;
+    fileName: string;
+    fileType: 'pdf' | 'image';
+  }) => void;
 }
 
-async function extractMarkersServerSide(file: File): Promise<BloodMarkers> {
+async function extractMarkersServerSide(file: File): Promise<{
+  markers: BloodMarkers;
+  extraction: BloodReportExtraction;
+}> {
   const body = new FormData();
   body.append('file', file);
 
@@ -22,8 +30,15 @@ async function extractMarkersServerSide(file: File): Promise<BloodMarkers> {
     throw new Error(err?.error || 'Extraction failed');
   }
 
-  const data = await res.json() as { markers?: BloodMarkers };
-  return data.markers ?? {};
+  const data = await res.json() as { markers?: BloodMarkers; extraction?: BloodReportExtraction };
+  return {
+    markers: data.markers ?? {},
+    extraction: data.extraction ?? {
+      modelUsed: 'unknown',
+      extractedMarkerCount: Object.keys(data.markers ?? {}).length,
+      extractionConfidence: 0.5,
+    },
+  };
 }
 
 function getDropzoneBorderColor(isDragActive: boolean, done: boolean, error: string | null): string {
@@ -56,13 +71,18 @@ export default function BloodReportUploader({ onMarkersExtracted }: BloodReportU
     setFileName(file.name);
 
     try {
-      const markers = await extractMarkersServerSide(file);
+      const { markers, extraction } = await extractMarkersServerSide(file);
       if (Object.keys(markers).length === 0) {
         setError('No marker values found in this report. Try another report or enter values manually.');
         return;
       }
 
-      onMarkersExtracted(markers);
+      onMarkersExtracted({
+        markers,
+        extraction,
+        fileName: file.name,
+        fileType: file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image',
+      });
       setDone(true);
     } catch (err) {
       console.error('Error processing file:', err);

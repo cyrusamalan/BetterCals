@@ -30,6 +30,7 @@ import {
   BloodMarkers,
   MarkerForecast,
 } from '@/types';
+import { getAnalysisSourceBadge, getAnalysisSourceLabel } from '@/lib/analysisSource';
 import { deriveMarkerForecasts } from '@/lib/derivedInsights';
 import { getMarkerInterpretation, getMarkerUnit } from '@/lib/bloodParser';
 import MarkerEducationDrawer from '@/components/dashboard/MarkerEducationDrawer';
@@ -155,6 +156,19 @@ export default function HistoryPage() {
       })),
     [chronological]
   );
+
+  const sourceSummary = useMemo(() => {
+    return analyses.reduce(
+      (acc, analysis) => {
+        const mode = analysis.result.source?.mode ?? (analysis.result.usedAverageMarkers ? 'average' : 'manual');
+        if (mode === 'upload') acc.upload += 1;
+        else if (mode === 'average') acc.average += 1;
+        else acc.manual += 1;
+        return acc;
+      },
+      { upload: 0, manual: 0, average: 0 },
+    );
+  }, [analyses]);
 
   const weightTrend = useMemo(() => {
     const points = chronological.map((analysis) => ({
@@ -328,6 +342,27 @@ export default function HistoryPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 pb-12 space-y-6">
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <SummaryCard
+            title="Uploaded reports"
+            value={sourceSummary.upload.toString()}
+            subtitle="saved analyses started from premium upload"
+            color="var(--accent)"
+          />
+          <SummaryCard
+            title="Manual entries"
+            value={sourceSummary.manual.toString()}
+            subtitle="analyses reviewed entirely by hand"
+            color="var(--status-info)"
+          />
+          <SummaryCard
+            title="Average-based"
+            value={sourceSummary.average.toString()}
+            subtitle="results created without real lab values"
+            color="var(--text-tertiary)"
+          />
+        </section>
+
         {analyses.length >= 2 && compareA && compareB && (
           <section
             className="relative overflow-hidden rounded-2xl noise"
@@ -557,6 +592,8 @@ export default function HistoryPage() {
             {analyses.map((analysis) => {
               const { result, profile } = analysis;
               const bmi = result.recommendations?.bmi;
+              const sourceBadge = getAnalysisSourceBadge(result.source);
+              const sourceLabel = getAnalysisSourceLabel(result.source);
               return (
                 <Link
                   key={analysis.id}
@@ -577,8 +614,24 @@ export default function HistoryPage() {
                         <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--text-primary)' }}>
                           {profile.gender === 'male' ? 'Male' : 'Female'}, {profile.age}y, {profile.weightLbs} lbs
                         </p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                          {sourceLabel}
+                          {result.source?.mode === 'upload' && result.source.correctedMarkers && result.source.correctedMarkers.length > 0
+                            ? ` · ${result.source.correctedMarkers.length} corrected`
+                            : ''}
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
+                        <div
+                          className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.14em]"
+                          style={{
+                            backgroundColor: 'var(--bg-warm)',
+                            color: 'var(--text-secondary)',
+                            border: '1px solid var(--border-light)',
+                          }}
+                        >
+                          {sourceBadge}
+                        </div>
                         <div
                           className="flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold"
                           style={{

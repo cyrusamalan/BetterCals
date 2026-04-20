@@ -39,6 +39,7 @@ import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
 import FoodSensitivityCard from '@/components/dashboard/FoodSensitivityCard';
 import ActionPlanCard from '@/components/dashboard/ActionPlanCard';
 import PopulationBenchmarksCard from '@/components/dashboard/PopulationBenchmarksCard';
+import { getAnalysisSourceBadge, getAnalysisSourceLabel } from '@/lib/analysisSource';
 import { deriveActionPlan, derivePopulationBenchmarks } from '@/lib/derivedInsights';
 
 // #region debug log helper
@@ -784,6 +785,9 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
   const grade = getScoreGrade(healthScore.overall);
   const hasMarkers = Object.keys(markers).length > 0;
   const usedAverageMarkers = result.usedAverageMarkers === true;
+  const source = result.source;
+  const sourceLabel = getAnalysisSourceLabel(source);
+  const sourceBadge = getAnalysisSourceBadge(source);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -1160,7 +1164,8 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
               Race: <b>{profile.race ?? 'white'}</b><br />
               Weight: <b>{profile.weightLbs} lb</b><br />
               Height: <b>{`${profile.heightFeet}'${profile.heightInches}"`}</b><br />
-              Goal: <b>{profile.goal}</b>
+              Goal: <b>{profile.goal}</b><br />
+              Source: <b>{sourceLabel}</b>
             </div>
           </div>
 
@@ -1406,6 +1411,52 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
                     <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
                       Enter your real blood values for accurate risks, deficiencies, and personalized insights.
                     </p>
+                  </div>
+                )}
+
+                {source && !usedAverageMarkers && (
+                  <div
+                    className="rounded-xl px-4 py-3"
+                    style={{
+                      backgroundColor: 'var(--bg-warm)',
+                      border: '1px solid var(--border-light)',
+                    }}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                          {sourceLabel}
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                          {source.mode === 'upload'
+                            ? `${source.extractedMarkerCount ?? Object.keys(markers).length} uploaded markers${source.modelUsed ? ` · ${source.modelUsed}` : ''}`
+                            : 'Entered manually before analysis'}
+                        </p>
+                      </div>
+                      <div
+                        className="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]"
+                        style={{
+                          backgroundColor: 'var(--accent-subtle)',
+                          color: 'var(--accent)',
+                          border: '1px solid var(--border-light)',
+                        }}
+                      >
+                        {sourceBadge}
+                      </div>
+                    </div>
+                    {source.mode === 'upload' && (
+                      <p className="text-xs mt-3" style={{ color: 'var(--text-tertiary)' }}>
+                        Confidence {Math.round((source.extractionConfidence ?? 0) * 100)}%
+                        {source.correctedMarkers && source.correctedMarkers.length > 0
+                          ? ` · ${source.correctedMarkers.length} corrected before saving`
+                          : ' · No corrections made'}
+                      </p>
+                    )}
+                    {source.warning && (
+                      <p className="text-xs mt-2" style={{ color: 'var(--status-warning)' }}>
+                        {source.warning}
+                      </p>
+                    )}
                   </div>
                 )}
 

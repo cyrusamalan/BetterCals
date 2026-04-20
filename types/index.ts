@@ -86,6 +86,26 @@ export interface BloodMarkers {
   fastingInsulin?: number; // mIU/L
 }
 
+export interface BloodReportExtraction {
+  modelUsed: string;
+  extractedMarkerCount: number;
+  extractionConfidence: number;
+  warning?: string;
+}
+
+export interface AnalysisSource {
+  mode: 'average' | 'manual' | 'upload';
+  premiumFeatureUsed?: boolean;
+  fileName?: string;
+  fileType?: 'pdf' | 'image';
+  modelUsed?: string;
+  extractedMarkerCount?: number;
+  extractionConfidence?: number;
+  warning?: string;
+  extractedAt?: string;
+  correctedMarkers?: (keyof BloodMarkers)[];
+}
+
 export type MarkerStatus =
   | 'low'
   | 'optimal'
@@ -216,6 +236,7 @@ export interface AnalysisResult {
   ascvdRiskReason?: string;
   usedAverageMarkers?: boolean;
   actionPlan?: ActionPlanItem[];
+  source?: AnalysisSource;
 }
 
 export interface ParsedBloodReport {
