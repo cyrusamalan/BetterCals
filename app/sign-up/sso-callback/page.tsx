@@ -22,7 +22,10 @@ export default function SSOCallback() {
           Completing sign up...
         </p>
       </div>
-      <AuthenticateWithRedirectCallback />
+      <AuthenticateWithRedirectCallback
+        continueSignUpUrl="/onboarding/username"
+        signUpForceRedirectUrl="/onboarding/username"
+      />
       <style jsx global>{`
         @keyframes spin {
           from { transform: rotate(0deg); }

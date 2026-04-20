@@ -3,33 +3,35 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
+import { useSignUp } from '@clerk/nextjs/legacy';
 import Link from 'next/link';
 
 const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 
 export default function UsernameOnboardingPage() {
   const router = useRouter();
-  const { user, isLoaded, isSignedIn } = useUser();
+  const { user, isLoaded: userLoaded, isSignedIn } = useUser();
+  const { signUp, isLoaded: signUpLoaded, setActive } = useSignUp();
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const usernameIsValid = useMemo(() => USERNAME_PATTERN.test(username.trim().toLowerCase()), [username]);
+  const hasPendingSignUp = Boolean(signUpLoaded && signUp && signUp.status && signUp.status !== 'complete');
 
   useEffect(() => {
-    if (!isLoaded) return;
-    if (!isSignedIn) {
-      router.replace('/sign-in');
+    if (!userLoaded || !signUpLoaded) return;
+    if (isSignedIn && user?.username) {
+      router.replace('/analyze');
       return;
     }
-    if (user?.username) {
-      router.replace('/analyze');
+    if (!isSignedIn && !hasPendingSignUp) {
+      router.replace('/sign-in');
     }
-  }, [isLoaded, isSignedIn, router, user?.username]);
+  }, [userLoaded, signUpLoaded, isSignedIn, user?.username, hasPendingSignUp, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
 
     const normalizedUsername = username.trim().toLowerCase();
     if (!USERNAME_PATTERN.test(normalizedUsername)) {
@@ -41,8 +43,20 @@ export default function UsernameOnboardingPage() {
     setError('');
 
     try {
-      await user.update({ username: normalizedUsername });
-      router.push('/analyze');
+      if (hasPendingSignUp && signUp && setActive) {
+        const result = await signUp.update({ username: normalizedUsername });
+        if (result.status === 'complete' && result.createdSessionId) {
+          await setActive({ session: result.createdSessionId });
+          router.push('/analyze');
+        } else {
+          setError('Sign up could not be completed. Please try again.');
+        }
+      } else if (user) {
+        await user.update({ username: normalizedUsername });
+        router.push('/analyze');
+      } else {
+        setError('No active sign up found. Please start over.');
+      }
     } catch (err: unknown) {
       const clerkError = err as { errors?: { longMessage?: string }[] };
       setError(clerkError.errors?.[0]?.longMessage || 'Could not save username. Please try another one.');
@@ -51,7 +65,11 @@ export default function UsernameOnboardingPage() {
     }
   };
 
-  if (!isLoaded || !isSignedIn) {
+  if (!userLoaded || !signUpLoaded) {
+    return null;
+  }
+
+  if (!isSignedIn && !hasPendingSignUp) {
     return null;
   }
 
