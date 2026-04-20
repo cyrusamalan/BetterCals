@@ -131,13 +131,16 @@ function MiniScoreRing({ animate, size = 100 }: { animate: boolean; size?: numbe
           style={{ transition: animate ? 'stroke-dashoffset 1.2s cubic-bezier(0.16, 1, 0.3, 1)' : 'none' }}
         />
       </svg>
-      <div style={{
-        position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center',
-        opacity: animate ? 1 : 0, transform: animate ? 'scale(1)' : 'scale(0.7)',
-        transition: 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.4s',
-      }}>
+      <div
+        role="img"
+        aria-label="Score 82 out of 100"
+        style={{
+          position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center',
+          opacity: animate ? 1 : 0, transform: animate ? 'scale(1)' : 'scale(0.7)',
+          transition: 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.4s',
+        }}
+      >
         <span style={{ fontSize: size > 80 ? '18px' : '16px', fontWeight: 700, color: 'var(--accent)' }}>82</span>
-        <span style={{ fontSize: size > 80 ? '8px' : '7px', fontWeight: 500, color: 'var(--text-tertiary)' }}>Health Score</span>
       </div>
     </div>
   );

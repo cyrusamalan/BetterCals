@@ -144,7 +144,7 @@ function DemoField({
   const filled = value.length > 0;
   return (
     <div
-      className="flex items-center justify-between rounded-lg px-2.5 py-2 min-h-[36px] transition-all duration-200"
+      className="flex items-center justify-between rounded-lg px-2 py-1.5 min-h-[30px] transition-all duration-200"
       style={{
         border: `1.5px solid ${
           active ? 'rgba(125, 200, 138, 0.65)' : filled ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'
@@ -153,11 +153,11 @@ function DemoField({
         boxShadow: active ? '0 0 0 2px rgba(125, 200, 138, 0.15)' : 'none',
       }}
     >
-      <span className="text-[10px] font-medium uppercase tracking-wide w-16 flex-shrink-0" style={{ color: 'rgba(148,163,184,0.95)' }}>
+      <span className="text-[9px] font-medium uppercase tracking-wide w-14 flex-shrink-0" style={{ color: 'rgba(148,163,184,0.95)' }}>
         {label}
       </span>
       <span
-        className="text-[11px] font-semibold tabular-nums text-right min-w-0 flex-1"
+        className="text-[10px] font-semibold tabular-nums text-right min-w-0 flex-1"
         style={{ color: filled ? 'rgba(241, 245, 249, 0.98)' : 'rgba(100,116,139,0.5)' }}
       >
         {filled ? (
@@ -198,7 +198,7 @@ function MarkerRow({
     info: { fg: '#7dd3fc', bg: 'rgba(56,189,248,0.12)', border: 'rgba(56,189,248,0.25)' },
   };
   const c = colors[m.tone];
-  const pad = compact ? 'px-2 py-1.5' : 'px-2.5 py-2';
+  const pad = compact ? 'px-2 py-1' : 'px-2 py-1.5';
   return (
     <div
       className={`flex items-center justify-between gap-2 rounded-lg ${pad}`}
@@ -206,32 +206,32 @@ function MarkerRow({
         background: 'rgba(0,0,0,0.25)',
         border: `1px solid ${show ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)'}`,
         opacity: show ? 1 : 0,
-        transform: show ? 'translateY(0)' : 'translateY(8px)',
-        transition: 'opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)',
+        transform: show ? 'translateY(0)' : 'translateY(6px)',
+        transition: 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
         transitionDelay: `${delay}s`,
       }}
     >
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-1.5 min-w-0">
         <div
           className="flex items-center justify-center rounded-md flex-shrink-0"
           style={{
-            width: compact ? 22 : 26,
-            height: compact ? 22 : 26,
+            width: compact ? 20 : 22,
+            height: compact ? 20 : 22,
             background: c.bg,
             border: `1px solid ${c.border}`,
           }}
         >
-          <Icon className={compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} style={{ color: c.fg }} aria-hidden />
+          <Icon className={compact ? 'w-2.5 h-2.5' : 'w-3 h-3'} style={{ color: c.fg }} aria-hidden />
         </div>
-        <span className={`font-medium truncate ${compact ? 'text-[10px]' : 'text-xs'}`} style={{ color: 'rgba(226,232,240,0.95)' }}>
+        <span className={`font-medium truncate ${compact ? 'text-[9px]' : 'text-[10px]'}`} style={{ color: 'rgba(226,232,240,0.95)' }}>
           {m.name}
         </span>
       </div>
-      <div className="flex items-baseline gap-1 flex-shrink-0">
-        <span className={`font-bold tabular-nums ${compact ? 'text-[11px]' : 'text-sm'}`} style={{ color: c.fg }}>
+      <div className="flex items-baseline gap-0.5 flex-shrink-0">
+        <span className={`font-bold tabular-nums ${compact ? 'text-[10px]' : 'text-xs'}`} style={{ color: c.fg }}>
           {m.val}
         </span>
-        <span className="text-[9px]" style={{ color: 'rgba(148,163,184,0.9)' }}>
+        <span className="text-[8px]" style={{ color: 'rgba(148,163,184,0.9)' }}>
           {m.unit}
         </span>
       </div>
@@ -239,16 +239,44 @@ function MarkerRow({
   );
 }
 
-function ResultsScoreRing({ animate, size = 88 }: { animate: boolean; size?: number }) {
+function ResultsScoreRing({
+  animate,
+  size = 72,
+  variant = 'default',
+}: {
+  animate: boolean;
+  size?: number;
+  variant?: 'default' | 'phone';
+}) {
   const gid = useId().replace(/:/g, '');
-  const stroke = 6;
+  const isPhone = variant === 'phone';
+  const stroke = isPhone ? Math.min(8, Math.max(6, Math.round(size / 12))) : Math.max(5, Math.round(size / 15));
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
   const progress = animate ? (82 / 100) * circ : 0;
+  const trackStroke = isPhone ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.08)';
+  const scoreSize = isPhone ? 'text-[1.65rem] leading-none sm:text-3xl' : 'text-xl';
+
   return (
-    <div className="relative flex items-center justify-center flex-shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90" aria-hidden>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
+    <div
+      className="relative flex items-center justify-center flex-shrink-0 rounded-full"
+      style={{
+        width: size,
+        height: size,
+        filter: isPhone ? 'drop-shadow(0 0 14px rgba(125, 200, 138, 0.32)) drop-shadow(0 0 28px rgba(90, 143, 101, 0.15))' : undefined,
+      }}
+    >
+      {isPhone ? (
+        <div
+          className="pointer-events-none absolute rounded-full"
+          style={{
+            inset: -6,
+            background: 'radial-gradient(ellipse at 50% 40%, rgba(125,200,138,0.22) 0%, rgba(15,25,20,0.4) 45%, transparent 70%)',
+          }}
+        />
+      ) : null}
+      <svg width={size} height={size} className="-rotate-90 relative z-[1]" aria-hidden>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={trackStroke} strokeWidth={stroke} />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -263,34 +291,34 @@ function ResultsScoreRing({ animate, size = 88 }: { animate: boolean; size?: num
         />
         <defs>
           <linearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#5a8f65" />
-            <stop offset="100%" stopColor="#a8e6b8" />
+            <stop offset="0%" stopColor="#4ade80" />
+            <stop offset="55%" stopColor="#7dc88a" />
+            <stop offset="100%" stopColor="#d1fae5" />
           </linearGradient>
         </defs>
       </svg>
       <div
-        className="absolute inset-0 flex flex-col items-center justify-center"
+        className="absolute inset-0 z-[2] flex flex-col items-center justify-center"
+        role="img"
+        aria-label="Score 82 out of 100"
         style={{
           opacity: animate ? 1 : 0,
           transform: animate ? 'scale(1)' : 'scale(0.85)',
           transition: 'all 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.35s',
         }}
       >
-        <span className="text-2xl font-bold tabular-nums" style={{ color: '#ecfdf5' }}>
+        <span className={`font-bold tabular-nums font-display ${scoreSize}`} style={{ color: '#f0fdf4', textShadow: isPhone ? '0 1px 18px rgba(0,0,0,0.45)' : undefined }}>
           82
-        </span>
-        <span className="text-[9px] font-medium uppercase tracking-wide" style={{ color: 'rgba(148,163,184,0.95)' }}>
-          Health score
         </span>
       </div>
     </div>
   );
 }
 
-function PulsingMetric({ label, value, sub }: { label: string; value: string; sub: string }) {
+function PulsingMetric({ label, value, sub, compact }: { label: string; value: string; sub: string; compact?: boolean }) {
   return (
     <motion.div
-      className="rounded-xl p-3 flex-1 min-w-0"
+      className={`rounded-lg flex-1 min-w-0 ${compact ? 'p-1.5' : 'p-2'}`}
       style={{
         background: 'rgba(0,0,0,0.35)',
         border: '1px solid rgba(255,255,255,0.1)',
@@ -298,19 +326,19 @@ function PulsingMetric({ label, value, sub }: { label: string; value: string; su
       animate={{
         boxShadow: [
           '0 0 0 0 rgba(125,200,138,0)',
-          '0 0 22px 0 rgba(125,200,138,0.2)',
+          '0 0 18px 0 rgba(125,200,138,0.2)',
           '0 0 0 0 rgba(125,200,138,0)',
         ],
       }}
       transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
     >
-      <p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: 'rgba(148,163,184,0.95)' }}>
+      <p className={`uppercase tracking-wide mb-0.5 ${compact ? 'text-[8px]' : 'text-[9px]'}`} style={{ color: 'rgba(148,163,184,0.95)' }}>
         {label}
       </p>
-      <p className="text-xl font-bold tabular-nums" style={{ color: '#e8fdf0' }}>
+      <p className={`font-bold tabular-nums ${compact ? 'text-sm' : 'text-base'}`} style={{ color: '#e8fdf0' }}>
         {value}
       </p>
-      <p className="text-[10px] mt-0.5 leading-tight" style={{ color: 'rgba(148,163,184,0.88)' }}>
+      <p className={`leading-tight ${compact ? 'text-[8px]' : 'text-[9px]'}`} style={{ color: 'rgba(148,163,184,0.88)' }}>
         {sub}
       </p>
     </motion.div>
@@ -332,7 +360,7 @@ export function TutorialDemoScene({ layout }: { layout: 'phone' | 'web' }) {
   const isWeb = layout === 'web';
 
   return (
-    <div className="relative w-full select-none">
+    <div className="relative w-full h-full select-none flex flex-col">
       <style>{`
         @keyframes tutorialDemoSpin { to { transform: rotate(360deg); } }
         @keyframes tutorialScanPulse {
@@ -341,21 +369,21 @@ export function TutorialDemoScene({ layout }: { layout: 'phone' | 'web' }) {
         }
       `}</style>
 
-      <div className={`relative overflow-hidden rounded-xl ${isWeb ? 'min-h-[340px] sm:min-h-[380px]' : 'min-h-[420px]'}`}>
+      <div className="relative flex-1 overflow-hidden rounded-lg min-h-0">
         {/* Form + flow */}
         <div
           className="absolute inset-0 overflow-y-auto pointer-events-none"
           style={{
             opacity: showResults ? 0 : 1,
-            transform: showResults ? 'translateY(-12px)' : 'translateY(0)',
+            transform: showResults ? 'translateY(-10px)' : 'translateY(0)',
             transition: 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
-            padding: isWeb ? '14px 18px' : '10px 12px',
+            padding: isWeb ? '10px 14px' : '8px 8px',
           }}
         >
-          <div className="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style={{ color: 'rgba(248,250,252,0.95)' }}>
+          <div className="text-[10px] font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'rgba(248,250,252,0.95)' }}>
             <span aria-hidden>📝</span> Your profile
           </div>
-          <div className={`grid gap-1.5 mb-4 ${isWeb ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
+          <div className={`grid gap-1 mb-3 ${isWeb ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
             <DemoField label="Age" value={age} unit="yrs" active={activeField === 'age'} />
             {isWeb ? (
               <>
@@ -372,48 +400,48 @@ export function TutorialDemoScene({ layout }: { layout: 'phone' | 'web' }) {
             )}
           </div>
 
-          <div className="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style={{ color: 'rgba(248,250,252,0.95)' }}>
+          <div className="text-[10px] font-semibold mb-1.5 flex items-center gap-1.5" style={{ color: 'rgba(248,250,252,0.95)' }}>
             <span aria-hidden>📄</span> Lab results
           </div>
           <motion.div
-            className="relative rounded-xl overflow-hidden mb-4"
+            className="relative rounded-xl overflow-hidden mb-3"
             style={{
               border: `1.5px dashed ${
                 uploadPulse || scanIntense ? 'rgba(125,200,138,0.55)' : 'rgba(255,255,255,0.12)'
               }`,
               background: uploadPulse || scanIntense ? 'rgba(125,200,138,0.08)' : 'rgba(0,0,0,0.2)',
-              minHeight: isWeb ? 100 : 88,
-              padding: fileVisible ? '10px 12px' : '14px 12px',
+              minHeight: isWeb ? 80 : 70,
+              padding: fileVisible ? '8px 10px' : '10px 10px',
             }}
             animate={
               uploadPulse || scanIntense
-                ? { boxShadow: ['0 0 0 0 rgba(125,200,138,0)', '0 0 28px 0 rgba(125,200,138,0.22)', '0 0 0 0 rgba(125,200,138,0)'] }
+                ? { boxShadow: ['0 0 0 0 rgba(125,200,138,0)', '0 0 24px 0 rgba(125,200,138,0.22)', '0 0 0 0 rgba(125,200,138,0)'] }
                 : {}
             }
             transition={{ duration: 1.8, repeat: uploadPulse || scanIntense ? Infinity : 0, ease: 'easeInOut' }}
           >
             {!fileVisible ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-2">
+              <div className="flex flex-col items-center justify-center gap-1.5 py-1">
                 <motion.div
                   animate={uploadPulse ? { y: [0, -3, 0] } : {}}
                   transition={{ duration: 2, repeat: uploadPulse ? Infinity : 0, ease: 'easeInOut' }}
                 >
-                  <FileText className="w-8 h-8" style={{ color: 'rgba(125,200,138,0.85)' }} aria-hidden />
+                  <FileText className="w-6 h-6" style={{ color: 'rgba(125,200,138,0.85)' }} aria-hidden />
                 </motion.div>
-                <span className="text-[10px]" style={{ color: 'rgba(148,163,184,0.95)' }}>
+                <span className="text-[9px]" style={{ color: 'rgba(148,163,184,0.95)' }}>
                   Drop PDF or tap to upload
                 </span>
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-center gap-2">
-                  <FileText className="w-4 h-4 flex-shrink-0" style={{ color: '#9fd9ae' }} aria-hidden />
-                  <span className="text-[10px] font-medium truncate" style={{ color: 'rgba(241,245,249,0.95)' }}>
+                  <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#9fd9ae' }} aria-hidden />
+                  <span className="text-[9px] font-medium truncate" style={{ color: 'rgba(241,245,249,0.95)' }}>
                     blood_panel_2026.pdf
                   </span>
-                  <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#86efac' }} aria-hidden />
+                  <Check className="w-3 h-3 flex-shrink-0" style={{ color: '#86efac' }} aria-hidden />
                 </div>
-                <div className="relative h-24 rounded-lg overflow-hidden mx-auto w-full max-w-[200px]" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="relative h-16 rounded-lg overflow-hidden mx-auto w-full max-w-[160px]" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
                   <div
                     className="absolute inset-0 opacity-30"
                     style={{
@@ -427,7 +455,7 @@ export function TutorialDemoScene({ layout }: { layout: 'phone' | 'web' }) {
                         className="absolute left-0 right-0 h-[2px] z-[1]"
                         style={{
                           background: 'linear-gradient(90deg, transparent, rgba(125,200,138,0.95), transparent)',
-                          boxShadow: '0 0 20px rgba(125,200,138,0.7)',
+                          boxShadow: '0 0 16px rgba(125,200,138,0.7)',
                         }}
                         initial={{ top: '8%' }}
                         animate={{ top: ['8%', '92%', '8%'] }}
@@ -457,12 +485,12 @@ export function TutorialDemoScene({ layout }: { layout: 'phone' | 'web' }) {
                     </>
                   ) : null}
                 </div>
-                <div className="h-1.5 rounded-full overflow-hidden mx-auto w-[70%]" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                <div className="h-1 rounded-full overflow-hidden mx-auto w-[65%]" style={{ background: 'rgba(255,255,255,0.08)' }}>
                   <motion.div
                     className="h-full rounded-full"
                     style={{
                       background: 'linear-gradient(90deg, #5a8f65, #7dc88a)',
-                      boxShadow: '0 0 12px rgba(125,200,138,0.45)',
+                      boxShadow: '0 0 10px rgba(125,200,138,0.45)',
                     }}
                     initial={{ width: '0%' }}
                     animate={{ width: scanComplete ? '100%' : fileVisible ? '35%' : '0%' }}
@@ -473,13 +501,13 @@ export function TutorialDemoScene({ layout }: { layout: 'phone' | 'web' }) {
             )}
           </motion.div>
 
-          <div className="flex justify-center pt-1">
+          <div className="flex justify-center pt-0.5">
             <div
-              className="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[11px] font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-[10px] font-semibold"
               style={{
                 color: '#0b120e',
                 background: 'linear-gradient(135deg, #5a8f65 0%, #7dc88a 100%)',
-                boxShadow: analyzeActive ? '0 6px 24px rgba(90, 143, 101, 0.45)' : '0 2px 12px rgba(90, 143, 101, 0.25)',
+                boxShadow: analyzeActive ? '0 4px 20px rgba(90, 143, 101, 0.45)' : '0 2px 10px rgba(90, 143, 101, 0.25)',
                 transform: phase === 10 ? 'scale(0.94)' : 'scale(1)',
                 transition: 'all 0.15s ease',
               }}
@@ -488,14 +516,14 @@ export function TutorialDemoScene({ layout }: { layout: 'phone' | 'web' }) {
                 <>
                   <span
                     className="inline-block rounded-full border-2 border-white/30 border-t-white"
-                    style={{ width: 13, height: 13, animation: 'tutorialDemoSpin 0.65s linear infinite' }}
+                    style={{ width: 11, height: 11, animation: 'tutorialDemoSpin 0.65s linear infinite' }}
                   />
                   Analyzing…
                 </>
               ) : (
                 <>
                   Analyze my health
-                  <ArrowRight className="w-3.5 h-3.5" aria-hidden />
+                  <ArrowRight className="w-3 h-3" aria-hidden />
                 </>
               )}
             </div>
@@ -504,61 +532,61 @@ export function TutorialDemoScene({ layout }: { layout: 'phone' | 'web' }) {
 
         {/* Results */}
         <div
-          className="absolute inset-0 overflow-y-auto pointer-events-none"
+          className="absolute inset-0 flex min-h-0 flex-col overflow-y-auto pointer-events-none"
           style={{
             opacity: showResults ? 1 : 0,
-            transform: showResults ? 'translateY(0)' : 'translateY(14px)',
+            transform: showResults ? 'translateY(0)' : 'translateY(12px)',
             transition: 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.12s',
-            padding: isWeb ? '14px 18px' : '10px 12px',
+            padding: isWeb ? '10px 14px' : '8px 8px',
           }}
         >
-          <div className="text-[11px] font-semibold mb-3 flex items-center gap-1.5" style={{ color: 'rgba(248,250,252,0.95)' }}>
-            <Sparkles className="w-3.5 h-3.5" style={{ color: '#c4f0cd' }} aria-hidden />
+          <div className="mb-2 flex shrink-0 items-center gap-1.5 text-[10px] font-semibold" style={{ color: 'rgba(248,250,252,0.95)' }}>
+            <Sparkles className="w-3 h-3" style={{ color: '#c4f0cd' }} aria-hidden />
             Your results
           </div>
 
           {isWeb ? (
-            <div className="grid lg:grid-cols-12 gap-5">
-              <div className="lg:col-span-5 flex flex-col items-center lg:items-start gap-3">
-                <ResultsScoreRing animate={showResults} size={100} />
-                <p className="text-[10px] text-center lg:text-left max-w-[200px]" style={{ color: 'rgba(148,163,184,0.95)' }}>
+            <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-12">
+              <div className="lg:col-span-5 flex flex-col items-center lg:items-start gap-2">
+                <ResultsScoreRing animate={showResults} size={80} />
+                <p className="text-[9px] text-center lg:text-left max-w-[180px]" style={{ color: 'rgba(148,163,184,0.95)' }}>
                   Lipids, metabolic markers, and calories — distilled into one view.
                 </p>
-                <div className="w-full grid grid-cols-2 gap-2">
+                <div className="w-full grid grid-cols-2 gap-1.5">
                   <PulsingMetric label="TDEE" value="2,340" sub="maintenance" />
                   <PulsingMetric label="Target" value="1,890" sub="deficit tier" />
                 </div>
               </div>
-              <div className="lg:col-span-7 min-w-0 space-y-2">
+              <div className="lg:col-span-7 min-w-0 space-y-1.5">
                 {MARKERS.map((m, i) => (
-                  <MarkerRow key={m.name} m={m} show={showResults} delay={0.35 + i * 0.1} />
+                  <MarkerRow key={m.name} m={m} show={showResults} delay={0.3 + i * 0.08} />
                 ))}
                 <motion.div
-                  className="rounded-xl p-3 mt-3"
+                  className="rounded-lg p-2.5 mt-2"
                   style={{
                     background: 'linear-gradient(135deg, rgba(125,200,138,0.1) 0%, rgba(96,165,250,0.06) 100%)',
                     border: '1px solid rgba(125,200,138,0.22)',
                   }}
-                  initial={{ opacity: 0, y: 8 }}
+                  initial={{ opacity: 0, y: 6 }}
                   animate={showResults ? { opacity: 1, y: 0 } : {}}
-                  transition={{ delay: 0.85, duration: 0.45, ease: easeOut }}
+                  transition={{ delay: 0.7, duration: 0.4, ease: easeOut }}
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    <Flame className="w-3.5 h-3.5" style={{ color: '#fbbf77' }} aria-hidden />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#d1fae5' }}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Flame className="w-3 h-3" style={{ color: '#fbbf77' }} aria-hidden />
+                    <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: '#d1fae5' }}>
                       Insights unlocked
                     </span>
                   </div>
-                  <p className="text-[10px] leading-relaxed mb-2" style={{ color: 'rgba(203,213,225,0.92)' }}>
+                  <p className="text-[9px] leading-relaxed" style={{ color: 'rgba(203,213,225,0.92)' }}>
                     Next: personalize macros and track how your score moves with each lab.
                   </p>
                 </motion.div>
                 <motion.ul
-                  className="grid sm:grid-cols-2 gap-2 pt-1"
+                  className="grid sm:grid-cols-2 gap-1.5 pt-0.5"
                   initial="hidden"
                   animate={showResults ? 'show' : 'hidden'}
                   variants={{
-                    show: { transition: { staggerChildren: 0.06, delayChildren: 1 } },
+                    show: { transition: { staggerChildren: 0.05, delayChildren: 0.85 } },
                     hidden: {},
                   }}
                 >
@@ -569,34 +597,38 @@ export function TutorialDemoScene({ layout }: { layout: 'phone' | 'web' }) {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col items-center gap-2">
-                <ResultsScoreRing animate={showResults} size={76} />
+            <div className="flex min-h-0 flex-1 flex-col gap-2 pb-1">
+              <div className="flex w-full shrink-0 justify-center pt-0.5">
+                <ResultsScoreRing animate={showResults} size={96} variant="phone" />
               </div>
-              <div className="space-y-1.5">
+              <div className="grid shrink-0 grid-cols-2 gap-1.5">
+                <PulsingMetric label="TDEE" value="2,340" sub="maintenance kcal" compact />
+                <PulsingMetric label="Target" value="1,890" sub="deficit tier" compact />
+              </div>
+              <div className="shrink-0 space-y-1">
                 {MARKERS.map((m, i) => (
-                  <MarkerRow key={m.name} m={m} show={showResults} delay={0.35 + i * 0.1} compact />
+                  <MarkerRow key={m.name} m={m} show={showResults} delay={0.28 + i * 0.07} compact />
                 ))}
               </div>
-              <motion.div
-                className="rounded-lg px-2.5 py-2 mt-1"
+              <div
+                className="flex min-h-0 flex-1 flex-col rounded-lg px-1.5 pb-1 pt-1.5"
                 style={{
-                  background: 'rgba(125,200,138,0.1)',
+                  background: 'linear-gradient(180deg, rgba(125,200,138,0.1) 0%, rgba(0,0,0,0.2) 100%)',
                   border: '1px solid rgba(125,200,138,0.2)',
                 }}
-                initial={{ opacity: 0 }}
-                animate={showResults ? { opacity: 1 } : {}}
-                transition={{ delay: 0.9, duration: 0.4 }}
               >
-                <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: '#c8f5d2' }}>
-                  Insights
-                </p>
+                <div className="mb-1.5 flex shrink-0 items-center gap-1 px-1">
+                  <Flame className="h-3 w-3" style={{ color: '#fbbf77' }} aria-hidden />
+                  <span className="text-[8px] font-semibold uppercase tracking-wider" style={{ color: '#d1fae5' }}>
+                    Insights unlocked
+                  </span>
+                </div>
                 <motion.ul
-                  className="space-y-1.5 max-h-[200px] overflow-y-auto pr-0.5"
+                  className="flex min-h-0 flex-1 list-none flex-col gap-1.5 overflow-y-auto overscroll-contain pr-0.5"
                   initial="hidden"
                   animate={showResults ? 'show' : 'hidden'}
                   variants={{
-                    show: { transition: { staggerChildren: 0.07, delayChildren: 1.05 } },
+                    show: { transition: { staggerChildren: 0.06, delayChildren: 0.72 } },
                     hidden: {},
                   }}
                 >
@@ -604,7 +636,7 @@ export function TutorialDemoScene({ layout }: { layout: 'phone' | 'web' }) {
                     <InsightCard key={item.headline} item={item} compact />
                   ))}
                 </motion.ul>
-              </motion.div>
+              </div>
             </div>
           )}
         </div>

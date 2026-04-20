@@ -5,7 +5,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://bettercals.com';
 const base = siteUrl.replace(/\/$/, '');
 const shareTitle = 'See how BetterCals transforms your health data.';
 const shareDescription =
-  'Mobile walkthrough: profile, lab upload, then Health Score and TDEE. Share this link or open the full analyzer.';
+  'Mobile walkthrough: profile, lab upload, then your score and TDEE. Share this link or open the full analyzer.';
 
 export const metadata: Metadata = {
   title: {
