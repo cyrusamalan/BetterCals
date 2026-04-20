@@ -280,16 +280,16 @@ export default function AnalyzePage() {
   return (
     <div
       className="min-h-screen"
-      style={{ background: 'linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%)' }}
+      style={{ background: 'var(--page-gradient-simple)' }}
     >
       {/* ── Header ── */}
       <header
         className="anim-fade-up sticky top-0 z-30"
         style={{
-          backgroundColor: 'rgba(246, 245, 241, 0.72)',
+          backgroundColor: 'var(--header-bg)',
           backdropFilter: 'blur(20px) saturate(1.3)',
           WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
-          borderBottom: '1px solid rgba(228, 226, 220, 0.5)',
+          borderBottom: '1px solid var(--header-border)',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
         }}
       >
@@ -449,11 +449,11 @@ export default function AnalyzePage() {
               <div
                 className="relative overflow-hidden rounded-3xl noise anim-fade-up delay-3"
                 style={{
-                  background: 'rgba(255, 255, 255, 0.72)',
+                  background: 'var(--card-bg)',
                   backdropFilter: 'blur(20px) saturate(1.3)',
                   WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
-                  border: '1px solid rgba(255, 255, 255, 0.5)',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.04), 0 12px 48px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.6)',
+                  border: '1px solid var(--card-border)',
+                  boxShadow: 'var(--card-shadow-heavy)',
                 }}
               >
                 <div className="p-6 sm:p-8">
@@ -509,11 +509,11 @@ export default function AnalyzePage() {
             <div
               className="relative overflow-hidden rounded-3xl noise anim-fade-up delay-3"
               style={{
-                background: 'rgba(255, 255, 255, 0.72)',
+                background: 'var(--card-bg)',
                 backdropFilter: 'blur(20px) saturate(1.3)',
                 WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
-                border: '1px solid rgba(255, 255, 255, 0.5)',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.04), 0 12px 48px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.6)',
+                border: '1px solid var(--card-border)',
+                boxShadow: 'var(--card-shadow-heavy)',
               }}
             >
               <div className="p-6 sm:p-8">
@@ -569,11 +569,11 @@ export default function AnalyzePage() {
             <div
               className="relative overflow-hidden rounded-3xl noise anim-fade-up delay-5"
               style={{
-                background: 'rgba(255, 255, 255, 0.72)',
+                background: 'var(--card-bg)',
                 backdropFilter: 'blur(20px) saturate(1.3)',
                 WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
-                border: '1px solid rgba(255, 255, 255, 0.5)',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.04), 0 12px 48px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.6)',
+                border: '1px solid var(--card-border)',
+                boxShadow: 'var(--card-shadow-heavy)',
               }}
             >
               <div className="p-6 sm:p-8">

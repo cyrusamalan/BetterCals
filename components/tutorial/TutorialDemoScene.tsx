@@ -30,7 +30,7 @@ function useProfileStrings(phase: number) {
 
   useEffect(() => {
     let alive = true;
-    const handles: Array<ReturnType<typeof setTimeout> | ReturnType<typeof setInterval>> = [];
+    const handles: number[] = [];
 
     const cancelAll = () => {
       alive = false;

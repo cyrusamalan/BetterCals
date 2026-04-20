@@ -40,7 +40,7 @@ export default function AnalysisDetailPage() {
     return (
       <div
         className="min-h-screen flex items-center justify-center px-5"
-        style={{ background: 'linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%)' }}
+        style={{ background: 'var(--page-gradient-simple)' }}
       >
         <div className="text-center max-w-sm">
           <AlertCircle className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-tertiary)' }} />
@@ -72,7 +72,7 @@ export default function AnalysisDetailPage() {
     return (
       <div
         className="min-h-screen flex items-center justify-center px-5"
-        style={{ background: 'linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%)' }}
+        style={{ background: 'var(--page-gradient-simple)' }}
       >
         <div className="text-center max-w-sm">
           <AlertCircle className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-tertiary)' }} />

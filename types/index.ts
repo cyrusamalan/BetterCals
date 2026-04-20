@@ -87,6 +87,12 @@ export interface BloodMarkers {
   fastingInsulin?: number; // mIU/L
 }
 
+/** Where blood marker values came from for labeling in the UI. */
+export type AnalysisSource =
+  | { mode: 'average' }
+  | { mode: 'upload'; fileName?: string }
+  | { mode: 'manual' };
+
 export type MarkerStatus =
   | 'low'
   | 'optimal'

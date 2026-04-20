@@ -20,16 +20,16 @@ function SectionCard({
   children: React.ReactNode;
   tone?: 'default' | 'danger';
 }) {
-  const borderColor = tone === 'danger' ? 'var(--status-danger-border)' : 'rgba(255, 255, 255, 0.5)';
+  const borderColor = tone === 'danger' ? 'var(--status-danger-border)' : 'var(--card-border)';
   return (
     <div
       className="rounded-2xl p-6 mb-5"
       style={{
-        background: 'rgba(255, 255, 255, 0.72)',
+        background: 'var(--card-bg)',
         backdropFilter: 'blur(24px) saturate(1.4)',
         WebkitBackdropFilter: 'blur(24px) saturate(1.4)',
         border: `1px solid ${borderColor}`,
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04), 0 12px 48px rgba(0, 0, 0, 0.06)',
+        boxShadow: 'var(--card-shadow)',
       }}
     >
       <h2

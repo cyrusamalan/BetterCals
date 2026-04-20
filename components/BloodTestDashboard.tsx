@@ -1101,14 +1101,14 @@ export default function BloodTestDashboard({
   return (
     <div
       className="min-h-screen pb-16"
-      style={{ background: 'linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%)' }}
+      style={{ background: 'var(--page-gradient-simple)' }}
     >
       {/* Top bar */}
       <div
         className="anim-fade-up sticky top-0 z-30"
         style={{
           borderBottom: '1px solid var(--border-light)',
-          backgroundColor: 'rgba(246, 245, 241, 0.8)',
+          backgroundColor: 'var(--header-bg)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
         }}
@@ -1239,9 +1239,9 @@ export default function BloodTestDashboard({
                 <div
                   className="w-8 h-8 sm:w-9 sm:h-9 rounded-[14px] flex items-center justify-center"
                   style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #d2d2cc',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
+                    backgroundColor: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    boxShadow: '0 2px 5px var(--shadow-soft)',
                   }}
                 >
                   <VitalsMark sizePx={22} />

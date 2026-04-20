@@ -39,6 +39,82 @@
   --status-info-bg: #eaeff5;
   --status-info-border: #cfd9e5;
   --shadow-soft: rgba(0, 0, 0, 0.06);
+
+  /* ── Semantic surfaces ── */
+  --card-bg: rgba(255, 255, 255, 0.72);
+  --card-border: rgba(255, 255, 255, 0.5);
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), 0 12px 48px rgba(0, 0, 0, 0.06);
+  --card-shadow-heavy: 0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.04), 0 12px 48px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.6);
+  --card-inset-highlight: rgba(255, 255, 255, 0.6);
+  --header-bg: rgba(246, 245, 241, 0.72);
+  --header-border: rgba(228, 226, 220, 0.5);
+  --page-gradient: linear-gradient(170deg, #f6f5f1 0%, #eceae4 40%, #f0eeea 70%, #f5f3ef 100%);
+  --page-gradient-simple: linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%);
+  --segmented-bg: var(--border-light);
+  --segmented-active-bg: rgba(255, 255, 255, 0.9);
+  --segmented-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --input-bg: rgba(250, 249, 246, 0.7);
+  --input-bg-focus: rgba(255, 255, 255, 0.9);
+  --input-bg-hover: rgba(250, 249, 246, 0.9);
+  --scrollbar-thumb: var(--border);
+  --scrollbar-thumb-hover: var(--text-tertiary);
+}
+
+/* ── Dark theme ── */
+[data-theme="dark"] {
+  --bg-primary: #0f1114;
+  --bg-warm: #161a1d;
+  --surface: #1c2024;
+  --surface-raised: #22272b;
+  --border: #2e3338;
+  --border-light: #252a2e;
+  --border-focus: #6b7280;
+
+  --text-primary: #eef0f2;
+  --text-secondary: #a0a7b0;
+  --text-tertiary: #6b7280;
+  --text-muted: #4b5563;
+  --text-inverse: #0f1114;
+
+  --accent: #7dba85;
+  --accent-hover: #6aab73;
+  --accent-subtle: rgba(125, 186, 133, 0.12);
+  --accent-warm: #d4a844;
+  --accent-rose: #c47070;
+
+  --status-normal: #7dba85;
+  --status-normal-bg: rgba(125, 186, 133, 0.1);
+  --status-normal-border: rgba(125, 186, 133, 0.2);
+  --status-warning: #d4a844;
+  --status-warning-bg: rgba(212, 168, 68, 0.1);
+  --status-warning-border: rgba(212, 168, 68, 0.2);
+  --status-danger: #e06060;
+  --status-danger-bg: rgba(224, 96, 96, 0.1);
+  --status-danger-border: rgba(224, 96, 96, 0.2);
+  --status-info: #6ba3d4;
+  --status-info-bg: rgba(107, 163, 212, 0.1);
+  --status-info-border: rgba(107, 163, 212, 0.2);
+  --shadow-soft: rgba(0, 0, 0, 0.3);
+
+  --card-bg: rgba(28, 32, 36, 0.8);
+  --card-border: rgba(46, 51, 56, 0.6);
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 12px 48px rgba(0, 0, 0, 0.15);
+  --card-shadow-heavy: 0 1px 2px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.2), 0 12px 48px rgba(0,0,0,0.18);
+  --card-inset-highlight: rgba(255, 255, 255, 0.04);
+  --header-bg: rgba(15, 17, 20, 0.8);
+  --header-border: rgba(46, 51, 56, 0.5);
+  --page-gradient: linear-gradient(170deg, #0f1114 0%, #131619 40%, #111418 70%, #0f1114 100%);
+  --page-gradient-simple: linear-gradient(170deg, #0f1114 0%, #131619 50%, #0f1114 100%);
+  --segmented-bg: var(--border-light);
+  --segmented-active-bg: rgba(255, 255, 255, 0.1);
+  --segmented-active-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --input-bg: rgba(22, 26, 29, 0.7);
+  --input-bg-focus: rgba(28, 32, 36, 0.95);
+  --input-bg-hover: rgba(22, 26, 29, 0.9);
+  --scrollbar-thumb: #2e3338;
+  --scrollbar-thumb-hover: #4b5563;
+
+  color-scheme: dark;
 }
 
 * {
@@ -366,7 +442,7 @@ button, a, [role="button"], .btn-press {
 .auth-bg {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(170deg, #f6f5f1 0%, #eceae4 40%, #f0eeea 70%, #f5f3ef 100%);
+  background: var(--page-gradient);
 }
 
 .auth-bg::before {
@@ -413,16 +489,12 @@ button, a, [role="button"], .btn-press {
 /* Glassmorphic auth card */
 .auth-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--card-bg);
   backdrop-filter: blur(24px) saturate(1.4);
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--card-border);
   border-radius: 24px;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    0 4px 16px rgba(0, 0, 0, 0.04),
-    0 12px 48px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow: var(--card-shadow), inset 0 1px 0 var(--card-inset-highlight);
   animation: authCardEnter 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
 }
 
@@ -449,7 +521,7 @@ button, a, [role="button"], .btn-press {
 .auth-input {
   width: 100%;
   padding: 0.7rem 0.875rem;
-  background: rgba(250, 249, 246, 0.7);
+  background: var(--input-bg);
   border: 1.5px solid var(--border);
   border-radius: 14px;
   font-family: inherit;
@@ -465,13 +537,13 @@ button, a, [role="button"], .btn-press {
 
 .auth-input:focus {
   border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--input-bg-focus);
   box-shadow: 0 0 0 3px rgba(107, 143, 113, 0.12), 0 2px 8px rgba(107, 143, 113, 0.06);
 }
 
 .auth-input:hover:not(:focus) {
   border-color: var(--border-focus);
-  background: rgba(250, 249, 246, 0.9);
+  background: var(--input-bg-hover);
 }
 
 /* Auth primary button */
@@ -519,7 +591,7 @@ button, a, [role="button"], .btn-press {
   justify-content: center;
   gap: 0.625rem;
   padding: 0.7rem 1rem;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--card-bg);
   border: 1.5px solid var(--border);
   border-radius: 14px;
   font-family: inherit;
@@ -531,10 +603,10 @@ button, a, [role="button"], .btn-press {
 }
 
 .auth-btn-social:hover {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--surface-raised);
   border-color: var(--border-focus);
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 16px var(--shadow-soft);
 }
 
 .auth-btn-social:active {
@@ -744,7 +816,7 @@ button, a, [role="button"], .btn-press {
   align-items: center;
   justify-content: center;
   padding: 2rem 1.5rem;
-  background: linear-gradient(170deg, #f6f5f1 0%, #eceae4 40%, #f0eeea 70%, #f5f3ef 100%);
+  background: var(--page-gradient);
   position: relative;
   overflow: hidden;
 }
@@ -765,7 +837,7 @@ button, a, [role="button"], .btn-press {
 /* ── Single-column Auth Layout (custom) ── */
 .auth-single-page {
   min-height: 100vh;
-  background: linear-gradient(170deg, #f6f5f1 0%, #eceae4 40%, #f0eeea 70%, #f5f3ef 100%);
+  background: var(--page-gradient);
   position: relative;
   overflow: hidden;
   display: flex;
@@ -808,10 +880,10 @@ button, a, [role="button"], .btn-press {
   justify-content: space-between;
   gap: 16px;
   padding: 18px 26px 10px;
-  background: rgba(246, 245, 241, 0.72);
+  background: var(--header-bg);
   backdrop-filter: blur(18px) saturate(1.3);
   -webkit-backdrop-filter: blur(18px) saturate(1.3);
-  border-bottom: 1px solid rgba(228, 226, 220, 0.5);
+  border-bottom: 1px solid var(--header-border);
 }
 
 .auth-topbar-left {

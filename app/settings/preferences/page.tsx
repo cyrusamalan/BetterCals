@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { Moon, Sun } from 'lucide-react';
+import { useTheme, type Theme } from '@/lib/theme';
 
 type WeightUnit = 'lbs' | 'kg';
 type HeightUnit = 'ftin' | 'cm';
@@ -62,14 +64,14 @@ function Segmented<T extends string>({
   value,
   onChange,
 }: {
-  options: { label: string; value: T }[];
+  options: { label: string; value: T; icon?: React.ReactNode }[];
   value: T;
   onChange: (v: T) => void;
 }) {
   return (
     <div
       className="inline-flex rounded-xl p-1"
-      style={{ background: 'var(--border-light)', border: '1px solid var(--border)' }}
+      style={{ background: 'var(--segmented-bg)', border: '1px solid var(--border)' }}
     >
       {options.map((opt) => {
         const active = opt.value === value;
@@ -78,13 +80,14 @@ function Segmented<T extends string>({
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors"
             style={{
-              background: active ? 'rgba(255, 255, 255, 0.9)' : 'transparent',
+              background: active ? 'var(--segmented-active-bg)' : 'transparent',
               color: active ? 'var(--accent)' : 'var(--text-secondary)',
-              boxShadow: active ? '0 1px 3px rgba(0, 0, 0, 0.06)' : 'none',
+              boxShadow: active ? 'var(--segmented-active-shadow)' : 'none',
             }}
           >
+            {opt.icon}
             {opt.label}
           </button>
         );
@@ -96,6 +99,7 @@ function Segmented<T extends string>({
 export default function PreferencesSettingsPage() {
   const raw = useSyncExternalStore(subscribePrefs, getPrefsSnapshot, getPrefsServerSnapshot);
   const prefs = useMemo(() => parsePrefs(raw), [raw]);
+  const { theme, setTheme } = useTheme();
 
   const setPrefs = useCallback((updater: (prev: Preferences) => Preferences) => {
     writePrefs(updater(parsePrefs(getPrefsSnapshot())));
@@ -103,14 +107,49 @@ export default function PreferencesSettingsPage() {
 
   return (
     <div>
+      {/* ── Appearance ── */}
       <div
         className="rounded-2xl p-6 mb-5"
         style={{
-          background: 'rgba(255, 255, 255, 0.72)',
+          background: 'var(--card-bg)',
           backdropFilter: 'blur(24px) saturate(1.4)',
           WebkitBackdropFilter: 'blur(24px) saturate(1.4)',
-          border: '1px solid rgba(255, 255, 255, 0.5)',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04), 0 12px 48px rgba(0, 0, 0, 0.06)',
+          border: '1px solid var(--card-border)',
+          boxShadow: 'var(--card-shadow)',
+        }}
+      >
+        <h2 className="font-display text-lg leading-tight mb-1" style={{ color: 'var(--text-primary)' }}>
+          Appearance
+        </h2>
+        <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
+          Choose how BetterCals looks.
+        </p>
+
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Theme</p>
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Light or dark mode</p>
+          </div>
+          <Segmented<Theme>
+            options={[
+              { label: 'Light', value: 'light', icon: <Sun className="w-3.5 h-3.5" /> },
+              { label: 'Dark', value: 'dark', icon: <Moon className="w-3.5 h-3.5" /> },
+            ]}
+            value={theme}
+            onChange={setTheme}
+          />
+        </div>
+      </div>
+
+      {/* ── Units ── */}
+      <div
+        className="rounded-2xl p-6 mb-5"
+        style={{
+          background: 'var(--card-bg)',
+          backdropFilter: 'blur(24px) saturate(1.4)',
+          WebkitBackdropFilter: 'blur(24px) saturate(1.4)',
+          border: '1px solid var(--card-border)',
+          boxShadow: 'var(--card-shadow)',
         }}
       >
         <h2 className="font-display text-lg leading-tight mb-1" style={{ color: 'var(--text-primary)' }}>

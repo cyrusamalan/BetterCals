@@ -22,7 +22,7 @@ export function AnalyzeWizardSkeleton() {
   return (
     <div
       className="min-h-screen px-5 py-8"
-      style={{ background: 'linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%)' }}
+      style={{ background: 'var(--page-gradient-simple)' }}
       aria-busy="true"
       aria-label="Loading"
     >
@@ -97,7 +97,7 @@ export function AnalysisDetailSkeleton() {
   return (
     <div
       className="min-h-screen px-4 py-6"
-      style={{ background: 'linear-gradient(170deg, #f6f5f1 0%, #f0eeea 50%, #f5f3ef 100%)' }}
+      style={{ background: 'var(--page-gradient-simple)' }}
       aria-busy="true"
       aria-label="Loading analysis"
     >

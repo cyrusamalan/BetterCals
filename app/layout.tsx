@@ -2,7 +2,18 @@ import type { Metadata } from 'next';
 import { DM_Serif_Display, DM_Sans } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
 import { Analytics } from '@vercel/analytics/next';
+import { ThemeProvider } from '@/lib/theme';
 import './globals.css';
+
+/* Inline script to set data-theme before first paint — prevents flash */
+const themeScript = `
+  (function() {
+    try {
+      var t = localStorage.getItem('bettercals_theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch(e) {}
+  })();
+`;
 
 const dmSerif = DM_Serif_Display({
   weight: '400',
@@ -53,15 +64,18 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" className={`${dmSerif.variable} ${dmSans.variable}`} suppressHydrationWarning>
         <body className="min-h-screen font-body">
+          <script dangerouslySetInnerHTML={{ __html: themeScript }} />
           <a
             href="#main-content"
             className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-primary-600 focus:text-white focus:text-sm focus:font-semibold"
           >
             Skip to main content
           </a>
-          <main id="main-content">
-            {children}
-          </main>
+          <ThemeProvider>
+            <main id="main-content">
+              {children}
+            </main>
+          </ThemeProvider>
           <Analytics />
           <div aria-live="polite" aria-atomic="true" className="sr-only" id="a11y-announcer" />
         </body>
