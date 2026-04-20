@@ -114,22 +114,22 @@ export default function HomePage() {
           borderBottom: '1px solid rgba(228, 226, 220, 0.5)',
         }}
       >
-        <div className="max-w-6xl mx-auto px-5 py-3.5 flex items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center">
-              <VitalsMark sizePx={34} />
+        <div className="max-w-6xl mx-auto px-4 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-3">
+          <Link href="/" className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
+              <VitalsMark sizePx={32} />
             </div>
-            <div className="leading-tight">
-              <div className="text-[20px] font-bold font-display" style={{ color: 'var(--text-primary)' }}>
+            <div className="leading-tight min-w-0">
+              <div className="text-[18px] sm:text-[20px] font-bold font-display" style={{ color: 'var(--text-primary)' }}>
                 BetterCals
               </div>
-              <div className="text-[10px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
+              <div className="hidden sm:block text-[10px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
                 Smart calories + blood marker insights
               </div>
             </div>
           </Link>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             {isSignedIn ? (
               <>
                 <Link
@@ -146,7 +146,7 @@ export default function HomePage() {
                 </Link>
                 <Link
                   href="/analyze"
-                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                  className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
                   style={{
                     background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
                     color: 'var(--text-inverse)',
@@ -161,14 +161,14 @@ export default function HomePage() {
               <>
                 <Link
                   href="/sign-in"
-                  className="inline-flex px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
-                  style={{ background: 'var(--border-light)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+                  className="inline-flex px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors"
+                  style={{ color: 'var(--text-secondary)' }}
                 >
                   Sign in
                 </Link>
                 <Link
                   href="/sign-up"
-                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                  className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
                   style={{
                     background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
                     color: 'var(--text-inverse)',
@@ -176,7 +176,7 @@ export default function HomePage() {
                   }}
                 >
                   Sign up
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="hidden sm:inline-block w-3.5 h-3.5" />
                 </Link>
               </>
             )}
