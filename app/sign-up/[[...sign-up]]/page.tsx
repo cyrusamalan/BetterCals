@@ -135,7 +135,7 @@ export default function SignUpPage() {
 
       if (result.status === 'complete' && setActive) {
         await setActive({ session: result.createdSessionId });
-        router.push('/analyze');
+        router.push('/onboarding/username');
       }
     } catch (err: unknown) {
       const clerkError = err as { errors?: { longMessage?: string }[] };
@@ -151,7 +151,7 @@ export default function SignUpPage() {
       await signUp.authenticateWithRedirect({
         strategy: 'oauth_google',
         redirectUrl: '/sign-up/sso-callback',
-        redirectUrlComplete: '/analyze',
+        redirectUrlComplete: '/onboarding/username',
       });
     } catch {
       setError('Could not start Google sign up. Please try again.');

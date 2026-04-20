@@ -120,7 +120,7 @@ export default function SignInPage() {
       await signIn.authenticateWithRedirect({
         strategy: 'oauth_google',
         redirectUrl: '/sign-in/sso-callback',
-        redirectUrlComplete: '/analyze',
+        redirectUrlComplete: '/onboarding/username',
       });
     } catch {
       setError('Could not start Google sign in. Please try again.');
