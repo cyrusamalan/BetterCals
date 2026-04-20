@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuth, useUser } from '@clerk/nextjs';
-import { UserCog, LogOut, ChevronDown } from 'lucide-react';
+import { UserCog, LogOut, ChevronDown, Settings } from 'lucide-react';
 import { UserProfile } from '@/types';
 
 interface ProfileDropdownProps {
@@ -136,6 +137,18 @@ export default function ProfileDropdown({ profile, onEditProfile }: ProfileDropd
             <UserCog className="w-3.5 h-3.5" />
             Edit Profile
           </button>
+
+          <Link
+            href="/settings"
+            onClick={() => setOpen(false)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold btn-press mb-1.5 transition-colors"
+            style={{ color: 'var(--accent)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--accent-subtle)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            <Settings className="w-3.5 h-3.5" />
+            Settings
+          </Link>
 
           <div className="border-t my-1.5" style={{ borderColor: 'var(--border)' }} />
 
