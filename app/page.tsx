@@ -385,8 +385,19 @@ export default function HomePage() {
               <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Smart calorie & lab insights</div>
             </div>
           </div>
-          <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            BetterCals provides estimates for informational purposes only. Always consult healthcare professionals for medical advice.
+          <div className="text-xs space-y-2 sm:text-right" style={{ color: 'var(--text-tertiary)' }}>
+            <p>BetterCals provides estimates for informational purposes only. Always consult healthcare professionals for medical advice.</p>
+            <p className="flex flex-wrap gap-x-3 gap-y-1 sm:justify-end">
+              <Link href="/privacy" className="underline underline-offset-2 hover:opacity-80" style={{ color: 'var(--accent-hover)' }}>
+                Privacy Policy
+              </Link>
+              <span aria-hidden className="hidden sm:inline">
+                ·
+              </span>
+              <Link href="/terms" className="underline underline-offset-2 hover:opacity-80" style={{ color: 'var(--accent-hover)' }}>
+                Terms of Service
+              </Link>
+            </p>
           </div>
         </div>
       </footer>

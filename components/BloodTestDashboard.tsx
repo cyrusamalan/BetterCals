@@ -55,6 +55,8 @@ import { debugLog } from '@/lib/debugLog';
 import { MARKER_NAMES } from '@/lib/calculations';
 
 import { SkeletonChart } from '@/components/dashboard/Skeleton';
+import TechnicalMethodology from '@/components/TechnicalMethodology';
+import MedicalDisclaimer from '@/components/MedicalDisclaimer';
 
 const MacroDonutChart = dynamic(() => import('@/components/dashboard/MacroDonutChart'), { ssr: false, loading: () => <SkeletonChart /> });
 const HealthRadarChart = dynamic(() => import('@/components/dashboard/HealthRadarChart'), { ssr: false, loading: () => <SkeletonChart /> });
@@ -67,6 +69,8 @@ interface BloodTestDashboardProps {
   onReset: () => void;
   onEditProfile?: () => void;
   resetLabel?: string;
+  /** Show the full medical disclaimer on this Result view. Set false to omit (e.g. embedded previews). */
+  showMedicalDisclaimer?: boolean;
 }
 
 const CATEGORIES: {
@@ -786,7 +790,15 @@ function TabButton({
 
 // ── Main Dashboard ──
 
-export default function BloodTestDashboard({ result, markers, profile, onReset, onEditProfile, resetLabel = 'New Analysis' }: BloodTestDashboardProps) {
+export default function BloodTestDashboard({
+  result,
+  markers,
+  profile,
+  onReset,
+  onEditProfile,
+  resetLabel = 'New Analysis',
+  showMedicalDisclaimer = true,
+}: BloodTestDashboardProps) {
   const { isSignedIn } = useAuth();
   const { tdee, healthScore, insights, deficiencies, risks, calorieTiers, macros, recommendations } = result;
   const grade = getScoreGrade(healthScore.overall);
@@ -1355,7 +1367,7 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
             <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>ASCVD 10-Year Risk</div>
             <div style={{ fontSize: 18, fontWeight: 800, marginTop: 6 }}>{ascvdDisplay}</div>
             <div style={{ fontSize: 10, color: '#666', marginTop: 4 }}>
-              ACC/AHA Pooled Cohort Equations estimate (when eligible).
+              Framingham General CVD estimate; strata align with ACC/AHA-oriented prevention categories (when eligible).
             </div>
           </div>
 
@@ -1609,6 +1621,10 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
           </div>
         </div>
 
+        <div className="mt-6 anim-fade-up delay-2">
+          <TechnicalMethodology />
+        </div>
+
         {displayedTab === 'biomarkers' && hasMarkers && (
           <>
             {!usedAverageMarkers && populationBenchmarks.length > 0 && (
@@ -1773,13 +1789,12 @@ export default function BloodTestDashboard({ result, markers, profile, onReset, 
           </div>
         )}
 
-        {/* 11. Footer */}
-        <div className="mt-12 pt-6 text-center anim-fade-up" style={{ borderTop: '1px solid var(--border-light)' }}>
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            BetterCals provides estimates for informational purposes only.
-            Always consult healthcare professionals for medical advice.
-          </p>
-        </div>
+        {/* 11. Footer — medical disclaimer (omit section when showMedicalDisclaimer is false) */}
+        {showMedicalDisclaimer && (
+          <div className="mt-12 pt-6 anim-fade-up" style={{ borderTop: '1px solid var(--border-light)' }}>
+            <MedicalDisclaimer className="text-left" />
+          </div>
+        )}
       </div>
 
       <MarkerEducationDrawer
