@@ -209,9 +209,13 @@ export default function SignUpPage() {
                   </label>
                   <input
                     type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    autoComplete="one-time-code"
                     required
                     value={code}
-                    onChange={(e) => setCode(e.target.value)}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                     onFocus={() => setFocusedField('code')}
                     onBlur={() => setFocusedField(null)}
                     className="auth-input text-center tracking-[0.3em] font-mono"

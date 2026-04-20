@@ -225,6 +225,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
                     <div className="flex gap-2 items-center">
                       <input
                         type="number"
+                        inputMode="decimal"
                         step={field.step || 'any'}
                         {...register(field.key, numberField)}
                         className="input-field flex-1 text-sm"
@@ -387,11 +388,13 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
               </label>
               <input
                 type="number"
+                inputMode="decimal"
                 step={activeMobileField.step || 'any'}
                 value={formValues[activeMobileField.key] ?? ''}
                 onChange={(e) => setValue(activeMobileField.key, e.target.value === '' ? undefined : Number(e.target.value))}
                 className="input-field mt-1 text-2xl font-semibold tabular-nums"
                 placeholder={activeMobileField.placeholder}
+                autoFocus
               />
             </div>
 

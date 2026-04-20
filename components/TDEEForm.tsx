@@ -161,6 +161,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
         <FieldGroup icon={User} label="Age" error={errors.age?.message}>
           <input
             type="number"
+            inputMode="numeric"
             {...register('age', { required: 'Age is required', min: 13, max: 120, valueAsNumber: true })}
             className="input-field"
             placeholder="30"
@@ -184,6 +185,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
           <div className="relative">
             <input
               type="number"
+              inputMode="decimal"
               step="0.1"
               {...register('weightLbs', { required: 'Weight is required', min: 40, max: 700, valueAsNumber: true })}
               className="input-field pr-12"
@@ -203,6 +205,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
             <div className="relative flex-1">
               <input
                 type="number"
+                inputMode="numeric"
                 {...register('heightFeet', { required: true, min: 1, max: 8, valueAsNumber: true })}
                 className="input-field pr-8"
                 placeholder="5"
@@ -217,6 +220,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
             <div className="relative flex-1">
               <input
                 type="number"
+                inputMode="numeric"
                 {...register('heightInches', { required: true, min: 0, max: 11, valueAsNumber: true })}
                 className="input-field pr-8"
                 placeholder="7"
@@ -238,6 +242,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
           <div className="relative">
             <input
               type="number"
+              inputMode="decimal"
               step="0.5"
               {...register('waistInches', { min: 15, max: 80, valueAsNumber: true })}
               className="input-field pr-12"
@@ -256,6 +261,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
           <div className="relative">
             <input
               type="number"
+              inputMode="decimal"
               step="0.5"
               {...register('hipInches', { min: 20, max: 80, valueAsNumber: true })}
               className="input-field pr-12"
@@ -274,6 +280,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
           <div className="relative">
             <input
               type="number"
+              inputMode="decimal"
               step="0.1"
               {...register('bodyFatPercentage', { min: 3, max: 60, valueAsNumber: true })}
               className="input-field pr-12"
@@ -336,6 +343,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
               <FieldGroup icon={Footprints} label="Daily Steps">
                 <input
                   type="number"
+                  inputMode="numeric"
                   {...register('dailySteps', { min: 1000, max: 30000, valueAsNumber: true })}
                   className="input-field"
                   placeholder="8000"
@@ -392,6 +400,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
                   <FieldGroup icon={Activity} label="Days / Week">
                     <input
                       type="number"
+                      inputMode="numeric"
                       {...register('customExerciseDays', { min: 1, max: 7, valueAsNumber: true })}
                       className="input-field"
                       placeholder="4"
@@ -400,6 +409,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
                   <FieldGroup icon={Clock} label="Avg. Session (min)">
                     <input
                       type="number"
+                      inputMode="numeric"
                       {...register('customExerciseMinutes', { min: 10, max: 180, valueAsNumber: true })}
                       className="input-field"
                       placeholder="45"
@@ -466,6 +476,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
               <FieldGroup icon={Activity} label="Avg. Sleep (hours)">
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.5"
                   {...register('sleepHoursAvg', { min: 4, max: 12, valueAsNumber: true })}
                   className="input-field"
@@ -599,6 +610,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
           <FieldGroup icon={Activity} label="Systolic Blood Pressure" error={errors.bloodPressureSystolic?.message}>
             <input
               type="number"
+              inputMode="numeric"
               {...register('bloodPressureSystolic', { min: 70, max: 250, valueAsNumber: true })}
               className="input-field"
               placeholder="e.g., 120"
@@ -621,6 +633,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
           <FieldGroup icon={Heart} label="Resting Heart Rate" error={errors.restingHeartRate?.message}>
             <input
               type="number"
+              inputMode="numeric"
               {...register('restingHeartRate', { min: 30, max: 220, valueAsNumber: true })}
               className="input-field"
               placeholder="e.g., 62 bpm"
@@ -630,6 +643,7 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
           <FieldGroup icon={Wine} label="Alcohol (drinks/week)">
             <input
               type="number"
+              inputMode="numeric"
               min={0}
               max={50}
               {...register('alcoholDrinksPerWeek', { min: 0, max: 50, valueAsNumber: true })}

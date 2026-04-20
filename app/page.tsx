@@ -161,13 +161,13 @@ export default function HomePage() {
               <>
                 <Link
                   href="/sign-in"
-                  className="hidden sm:inline-flex px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                  className="inline-flex px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
                   style={{ background: 'var(--border-light)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
                 >
                   Sign in
                 </Link>
                 <Link
-                  href="/analyze"
+                  href="/sign-up"
                   className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
                   style={{
                     background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
@@ -175,7 +175,7 @@ export default function HomePage() {
                     boxShadow: '0 2px 6px rgba(107, 143, 113, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)',
                   }}
                 >
-                  Start free analysis
+                  Sign up
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </>
