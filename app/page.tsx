@@ -388,6 +388,18 @@ export default function HomePage() {
           <div className="text-xs space-y-2 sm:text-right" style={{ color: 'var(--text-tertiary)' }}>
             <p>BetterCals provides estimates for informational purposes only. Always consult healthcare professionals for medical advice.</p>
             <p className="flex flex-wrap gap-x-3 gap-y-1 sm:justify-end">
+              <Link href="/about" className="underline underline-offset-2 hover:opacity-80" style={{ color: 'var(--accent-hover)' }}>
+                About
+              </Link>
+              <span aria-hidden className="hidden sm:inline">
+                ·
+              </span>
+              <Link href="/contact" className="underline underline-offset-2 hover:opacity-80" style={{ color: 'var(--accent-hover)' }}>
+                Contact
+              </Link>
+              <span aria-hidden className="hidden sm:inline">
+                ·
+              </span>
               <Link href="/privacy" className="underline underline-offset-2 hover:opacity-80" style={{ color: 'var(--accent-hover)' }}>
                 Privacy Policy
               </Link>
