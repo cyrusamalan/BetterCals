@@ -6,15 +6,51 @@ import type { AnalysisResult, BloodMarkers, CoachMessage, CoachPlan, UserProfile
 
 const MAX_TOTAL_CHARS = 18_000;
 
-function buildFallbackMessage(question: string): string {
+function buildFallbackMessage(
+  question: string,
+  context: {
+    result: AnalysisResult;
+    coachPlan: CoachPlan;
+  },
+): string {
   const lower = question.toLowerCase();
+  const calorieTarget =
+    context.result.macros?.calories ??
+    context.result.calorieTiers?.[0]?.dailyCalories ??
+    null;
+  const firstPriority = context.coachPlan.priorities[0];
+  const secondPriority = context.coachPlan.priorities[1];
+  const topRisks = context.result.risks.slice(0, 2).map((risk) => risk.replace(/_/g, ' ').toLowerCase());
+
   if (lower.includes('why')) {
-    return 'The coach plan prioritizes your highest-impact risks first and keeps week-one actions simple so adherence stays high. I can break down any specific priority if you want.';
+    return [
+      `Your plan is personalized for fat loss${calorieTarget ? `: ${calorieTarget} kcal/day` : ''} with focus on ${firstPriority?.title ?? 'your top priority'}.`,
+      topRisks.length > 0
+        ? `Your highest-impact risks right now are ${topRisks.join(' and ')}, so progress depends on consistency before adding more complexity.`
+        : 'Your analysis suggests consistency is more important than adding new tactics right now.',
+      `For this week, stick to "${firstPriority?.title ?? 'priority one'}"${secondPriority ? ` and "${secondPriority.title}"` : ''} every day, then reassess trend weight after 7 days.`,
+    ].join(' ');
   }
   if (lower.includes('what should i do') || lower.includes('next')) {
-    return 'Start with the first two weekly actions in your coach plan and keep them consistent for 7 days. Then reassess markers and adherence before changing targets.';
+    return `Start with your current${calorieTarget ? ` ${calorieTarget} kcal/day` : ''} target and run the first two coach priorities (${firstPriority?.title ?? 'priority one'}${secondPriority ? `, ${secondPriority.title}` : ''}) for 7 straight days. Then reassess adherence and trend weight before changing targets.`;
   }
-  return 'I could not generate a model response right now. Use the coach priorities and weekly actions as your source of truth, and ask a narrower follow-up question.';
+  return `I could not generate a model response right now. Use your plan anchors (${calorieTarget ? `${calorieTarget} kcal/day and ` : ''}"${firstPriority?.title ?? 'priority one'}") as source of truth, and ask a narrower follow-up like "audit why my scale is flat this week."`;
+}
+
+function isLikelyGenericReply(text: string): boolean {
+  const genericPatterns = [
+    'everyone is different',
+    'be patient',
+    'consistency is key',
+    'eat less and move more',
+    'calorie deficit',
+    'sleep and stress',
+  ];
+  const lower = text.toLowerCase();
+  const genericHits = genericPatterns.filter((pattern) => lower.includes(pattern)).length;
+  const hasNumericAnchor = /\b\d+(?:\.\d+)?%?\b/.test(text);
+  const hasListLikeStructure = /(^|\n)\s*[-*]\s+/m.test(text) || /\b1\./.test(text);
+  return genericHits >= 2 && (!hasNumericAnchor || !hasListLikeStructure);
 }
 
 export async function POST(request: Request) {
@@ -60,11 +96,19 @@ export async function POST(request: Request) {
       console.warn('[coach/chat] fallback firing: empty LLM text (check GEMINI_API_KEY or gemini.ts error log above)');
     } else if (!grounded) {
       console.warn('[coach/chat] fallback firing: grounding check rejected LLM reply. Reply was:\n', gemini.text);
+    } else if (isLikelyGenericReply(gemini.text)) {
+      console.warn('[coach/chat] fallback firing: generic LLM reply detected. Reply was:\n', gemini.text);
     } else {
       console.log('[coach/chat] LLM reply accepted, length:', gemini.text.length);
     }
 
-    const responseText = gemini.text && grounded ? gemini.text : buildFallbackMessage(userQuestion);
+    const generic = gemini.text ? isLikelyGenericReply(gemini.text) : false;
+    const responseText = gemini.text && grounded && !generic
+      ? gemini.text
+      : buildFallbackMessage(userQuestion, {
+          result: analysisSnapshot.result as unknown as AnalysisResult,
+          coachPlan: coachPlan as CoachPlan,
+        });
     const message: CoachMessage = {
       id: `coach-llm-${Date.now()}`,
       role: 'assistant',
@@ -77,8 +121,8 @@ export async function POST(request: Request) {
       message,
       telemetry: {
         ...gemini.telemetry,
-        safetyState: gemini.text && !grounded ? 'blocked' : gemini.telemetry.safetyState,
-        fallbackUsed: gemini.telemetry.fallbackUsed || !gemini.text || !grounded,
+        safetyState: gemini.text && (!grounded || generic) ? 'blocked' : gemini.telemetry.safetyState,
+        fallbackUsed: gemini.telemetry.fallbackUsed || !gemini.text || !grounded || generic,
       },
     });
   } catch (error) {

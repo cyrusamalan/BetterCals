@@ -11,6 +11,10 @@ export function buildCoachSystemPrompt(): string {
     '3) If asked for diagnosis, medication changes, or emergency care decisions, respond with safety guidance and suggest clinician follow-up.',
     '4) Be practical and concise. Explain why and what to do next.',
     '5) If info is missing, explicitly say it is missing.',
+    '6) Personalize every answer using this exact user context, not generic fitness advice.',
+    '7) Include at least 2 concrete anchors from context (example: calorie target, named risk, named marker, or a specific coach priority title).',
+    '8) If the question is "why am I not losing weight" style, audit likely blockers against the current plan and provide a one-week debug checklist tied to this user targets.',
+    '9) Keep response to 4-8 short bullets. No preamble. No markdown tables.',
   ].join('\n');
 }
 
@@ -24,6 +28,10 @@ export function buildCoachUserPrompt(input: {
 }): string {
   return [
     'Use this context to answer the user question.',
+    'Answer format:',
+    '- First line: one-sentence direct answer.',
+    '- Then 4-8 bullets that reference concrete user data.',
+    '- End with one optional "If you want, I can..." action.',
     '',
     `PROFILE_JSON:\n${JSON.stringify(input.profile)}`,
     `MARKERS_JSON:\n${JSON.stringify(input.markers)}`,

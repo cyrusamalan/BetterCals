@@ -854,6 +854,7 @@ export default function BloodTestDashboard({
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachError, setCoachError] = useState<string | null>(null);
   const [coachOpen, setCoachOpen] = useState(false);
+  const [coachClosing, setCoachClosing] = useState(false);
   const [coachInitAttempted, setCoachInitAttempted] = useState(Boolean(result.coach?.plan));
   const typedMessageIdsRef = useRef<Set<string>>(new Set());
   const animatedOverallScore = useCountUp(healthScore.overall, 1100);
@@ -1229,6 +1230,15 @@ export default function BloodTestDashboard({
   }, [hasMarkers, usedAverageMarkers, prioritizedInsights.length, deficiencies.length, risks.length]);
   const displayedTab = availableTabs.includes(activeTab) ? activeTab : (availableTabs[0] ?? 'biomarkers');
 
+  const closeCoachPanels = () => {
+    if (coachClosing) return;
+    setCoachClosing(true);
+    window.setTimeout(() => {
+      setCoachOpen(false);
+      setCoachClosing(false);
+    }, 260);
+  };
+
   return (
     <div
       className="min-h-screen pb-16"
@@ -1244,7 +1254,7 @@ export default function BloodTestDashboard({
           WebkitBackdropFilter: 'blur(16px)',
         }}
       >
-        <div className="max-w-5xl mx-auto px-4 sm:px-5 py-3 sm:py-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-5 py-3 sm:py-4 xl:relative xl:-translate-x-5">
           <div className="flex items-center justify-between gap-2">
             <button
               onClick={onReset}
@@ -1588,7 +1598,7 @@ export default function BloodTestDashboard({
       </div>
 
       {/* Screen UI */}
-      <div id="screen-content" className="max-w-5xl mx-auto px-4 sm:px-5 pt-6 sm:pt-8">
+      <div id="screen-content" className="max-w-5xl mx-auto px-4 sm:px-5 pt-6 sm:pt-8 xl:relative xl:-translate-x-5">
         {/* 1. Hero: Score + BMR/TDEE inline + BMI badge */}
         <div className="anim-fade-up delay-1">
           <div
@@ -1937,7 +1947,10 @@ export default function BloodTestDashboard({
 
       <button
         type="button"
-        onClick={() => setCoachOpen(true)}
+        onClick={() => {
+          setCoachClosing(false);
+          setCoachOpen(true);
+        }}
         className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full px-4 py-3 text-sm font-semibold btn-press"
         style={{
           background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
@@ -1962,15 +1975,45 @@ export default function BloodTestDashboard({
                 transform: translateX(0);
               }
             }
-            @keyframes coachBackdropFade {
-              from { opacity: 0; }
-              to   { opacity: 1; }
+            @keyframes coachSlideOut {
+              from {
+                opacity: 1;
+                transform: translateX(0);
+              }
+              to {
+                opacity: 0;
+                transform: translateX(calc(100% + 24px));
+              }
+            }
+            @keyframes coachSlideInLeft {
+              from {
+                opacity: 0;
+                transform: translateX(calc(-100% - 24px));
+              }
+              to {
+                opacity: 1;
+                transform: translateX(0);
+              }
+            }
+            @keyframes coachSlideOutLeft {
+              from {
+                opacity: 1;
+                transform: translateX(0);
+              }
+              to {
+                opacity: 0;
+                transform: translateX(calc(-100% - 24px));
+              }
             }
             @keyframes coachPriorityPop {
               0%   { opacity: 0; transform: scale(0.78) translateY(8px); }
               55%  { opacity: 1; transform: scale(1.06) translateY(-2px); }
               80%  { transform: scale(0.98) translateY(0.5px); }
               100% { opacity: 1; transform: scale(1) translateY(0); }
+            }
+            @keyframes coachBackdropFade {
+              from { opacity: 0; }
+              to   { opacity: 1; }
             }
             @keyframes coachCaretBlink {
               0%, 45%   { opacity: 1; }
@@ -1988,7 +2031,7 @@ export default function BloodTestDashboard({
           <button
             type="button"
             aria-label="Close coach panel backdrop"
-            onClick={() => setCoachOpen(false)}
+            onClick={closeCoachPanels}
             className="fixed inset-0 z-40"
             style={{
               backgroundColor: 'transparent',
@@ -1996,19 +2039,73 @@ export default function BloodTestDashboard({
             }}
           />
           <aside
+            className="hidden xl:block fixed left-10 top-28 w-[360px] z-50"
+            style={{
+              animation: coachClosing
+                ? 'coachSlideOutLeft 0.26s ease both'
+                : 'coachSlideInLeft 0.48s cubic-bezier(0.22, 1.12, 0.36, 1) both',
+              willChange: 'transform, opacity',
+            }}
+          >
+            <div className="rounded-2xl p-4" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
+              <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Personalized Plan
+              </h3>
+              {coachPlan ? (
+                <>
+                  <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
+                    {coachPlan.summary}
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {coachPlan.priorities.slice(0, 3).map((priority, idx) => (
+                      <div
+                        key={`left-pop-plan-${priority.title}-${idx}`}
+                        className="rounded-xl p-3"
+                        style={{
+                          backgroundColor: 'rgba(255,255,255,0.42)',
+                          border: 'none',
+                          boxShadow: '0 1px 6px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.65)',
+                          animation: 'coachPriorityPop 0.55s cubic-bezier(0.34, 1.6, 0.5, 1) both',
+                          animationDelay: `${140 + idx * 140}ms`,
+                          transformOrigin: 'left center',
+                          willChange: 'transform, opacity',
+                        }}
+                      >
+                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {idx + 1}. {priority.title}
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                          {priority.reason}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm mt-2" style={{ color: coachError ? 'var(--status-danger)' : 'var(--text-secondary)' }}>
+                  {coachLoading
+                    ? 'Creating your personalized plan...'
+                    : coachError ?? 'Your personalized plan is not ready yet.'}
+                </p>
+              )}
+            </div>
+          </aside>
+          <aside
             className="fixed right-3 sm:right-4 top-3 sm:top-4 h-[calc(100%-1.5rem)] sm:h-[calc(100%-2rem)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-y-auto rounded-3xl"
             style={{
-              animation: 'coachSlideIn 0.48s cubic-bezier(0.22, 1.12, 0.36, 1) both',
+              animation: coachClosing
+                ? 'coachSlideOut 0.26s ease both'
+                : 'coachSlideIn 0.48s cubic-bezier(0.22, 1.12, 0.36, 1) both',
               willChange: 'transform, opacity',
-              background: 'linear-gradient(165deg, rgba(255,255,255,0.70) 0%, rgba(255,255,255,0.58) 55%, rgba(255,255,255,0.48) 100%)',
-              border: '1px solid rgba(255,255,255,0.55)',
-              backdropFilter: 'blur(28px) saturate(1.7)',
-              WebkitBackdropFilter: 'blur(28px) saturate(1.7)',
+              background: 'linear-gradient(165deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.02) 55%, rgba(255,255,255,0.008) 100%)',
+              border: '1px solid rgba(255,255,255,0.09)',
+              backdropFilter: 'blur(2px) saturate(1.01)',
+              WebkitBackdropFilter: 'blur(2px) saturate(1.01)',
               boxShadow: [
-                '0 28px 72px rgba(8, 12, 22, 0.18)',
-                '0 8px 24px rgba(8, 12, 22, 0.08)',
-                'inset 0 1.5px 0 rgba(255,255,255,0.85)',
-                'inset 0 -1px 0 rgba(255,255,255,0.18)',
+                '0 10px 18px rgba(8, 12, 22, 0.05)',
+                '0 2px 8px rgba(8, 12, 22, 0.02)',
+                'inset 0 1px 0 rgba(255,255,255,0.26)',
+                'inset 0 -1px 0 rgba(255,255,255,0.05)',
               ].join(', '),
             }}
           >
@@ -2029,14 +2126,14 @@ export default function BloodTestDashboard({
                   'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.85) 20%, rgba(255,255,255,0.95) 50%, rgba(255,255,255,0.85) 80%, transparent 100%)',
               }}
             />
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-xl" style={{ color: 'var(--text-primary)' }}>
+            <div className="relative mb-4">
+              <h2 className="font-display text-xl text-center" style={{ color: 'var(--text-primary)' }}>
                 Coach
               </h2>
               <button
                 type="button"
-                onClick={() => setCoachOpen(false)}
-                className="rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
+                onClick={closeCoachPanels}
+                className="absolute right-0 top-1/2 -translate-y-1/2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
                 style={{
                   backgroundColor: 'rgba(255,255,255,0.45)',
                   border: 'none',
@@ -2049,56 +2146,7 @@ export default function BloodTestDashboard({
             </div>
 
             <div className="space-y-4 relative z-[1]">
-              {coachPlan ? (
-                <div
-                  className="rounded-2xl p-4"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}
-                >
-                  <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    Coach Plan
-                  </h3>
-                  <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
-                    {coachPlan.summary}
-                  </p>
-                  <div className="mt-3 space-y-2">
-                    {coachPlan.priorities.slice(0, 3).map((priority, idx) => (
-                      <div
-                        key={`${priority.title}-${idx}`}
-                        className="rounded-xl p-3"
-                        style={{
-                          backgroundColor: 'rgba(255,255,255,0.42)',
-                          border: 'none',
-                          boxShadow: '0 1px 6px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.65)',
-                          animation: 'coachPriorityPop 0.55s cubic-bezier(0.34, 1.6, 0.5, 1) both',
-                          animationDelay: `${150 + idx * 140}ms`,
-                          transformOrigin: 'left center',
-                          willChange: 'transform, opacity',
-                        }}
-                      >
-                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                          {idx + 1}. {priority.title}
-                        </p>
-                        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                          {priority.reason}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl p-4" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
-                  <p className="text-sm" style={{ color: coachError ? 'var(--status-danger)' : 'var(--text-secondary)' }}>
-                    {coachLoading
-                      ? 'Creating your initial coach plan...'
-                      : coachError ?? 'Coach plan is not ready yet.'}
-                  </p>
-                </div>
-              )}
-
               <div className="rounded-2xl p-4" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
-                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Ask the Coach
-                </h3>
                 <div className="mt-3 space-y-3 max-h-[360px] overflow-y-auto pr-1">
                   {visibleCoachMessages.length === 0 ? (
                     <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
