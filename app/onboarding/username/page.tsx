@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useSignUp } from '@clerk/nextjs/legacy';
 import Link from 'next/link';
+import VitalsMark from '@/components/VitalsMark';
 
 const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 
@@ -77,6 +78,7 @@ export default function UsernameOnboardingPage() {
     <div className="auth-single-page">
       <header className="auth-topbar">
         <div className="auth-topbar-left">
+          <VitalsMark sizePx={44} />
           <span className="text-[20px] font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             BetterCals
           </span>
