@@ -5,6 +5,8 @@ import { isCoachReplyGrounded } from '@/lib/ai/coachSafety';
 import type { AnalysisResult, BloodMarkers, CoachMessage, CoachPlan, UserProfile } from '@/types';
 
 const MAX_TOTAL_CHARS = 18_000;
+const MIN_REPLY_CHARS = 220;
+const MIN_BULLETS = 3;
 
 function buildFallbackMessage(
   question: string,
@@ -53,6 +55,21 @@ function isLikelyGenericReply(text: string): boolean {
   return genericHits >= 2 && (!hasNumericAnchor || !hasListLikeStructure);
 }
 
+function countBullets(text: string): number {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /^[-*]\s+/.test(line)).length;
+}
+
+function isLowQualityReply(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return true;
+  if (trimmed.length < MIN_REPLY_CHARS) return true;
+  if (countBullets(trimmed) < MIN_BULLETS) return true;
+  return false;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -74,7 +91,7 @@ export async function POST(request: Request) {
     }
 
     const recentMessages = messages.slice(-8).map((m) => ({ role: m.role, text: m.text }));
-    const gemini = await generateCoachReply({
+    let gemini = await generateCoachReply({
       profile: analysisSnapshot.profile as UserProfile,
       markers: analysisSnapshot.markers as BloodMarkers,
       result: analysisSnapshot.result as unknown as AnalysisResult,
@@ -82,6 +99,24 @@ export async function POST(request: Request) {
       recentMessages,
       userQuestion,
     });
+
+    if (!gemini.text || isLowQualityReply(gemini.text)) {
+      console.warn(
+        '[coach/chat] first LLM reply too short/low-quality, retrying once.',
+        gemini.text ? { chars: gemini.text.length, bullets: countBullets(gemini.text) } : { chars: 0, bullets: 0 },
+      );
+      const retry = await generateCoachReply({
+        profile: analysisSnapshot.profile as UserProfile,
+        markers: analysisSnapshot.markers as BloodMarkers,
+        result: analysisSnapshot.result as unknown as AnalysisResult,
+        coachPlan: coachPlan as CoachPlan,
+        recentMessages,
+        userQuestion,
+      });
+      if (retry.text && (!gemini.text || retry.text.length > gemini.text.length)) {
+        gemini = retry;
+      }
+    }
 
     const grounded = gemini.text
       ? isCoachReplyGrounded(gemini.text, {
@@ -96,6 +131,11 @@ export async function POST(request: Request) {
       console.warn('[coach/chat] fallback firing: empty LLM text (check GEMINI_API_KEY or gemini.ts error log above)');
     } else if (!grounded) {
       console.warn('[coach/chat] fallback firing: grounding check rejected LLM reply. Reply was:\n', gemini.text);
+    } else if (isLowQualityReply(gemini.text)) {
+      console.warn(
+        '[coach/chat] fallback firing: low-quality LLM reply detected. Reply was:\n',
+        gemini.text,
+      );
     } else if (isLikelyGenericReply(gemini.text)) {
       console.warn('[coach/chat] fallback firing: generic LLM reply detected. Reply was:\n', gemini.text);
     } else {
@@ -103,7 +143,8 @@ export async function POST(request: Request) {
     }
 
     const generic = gemini.text ? isLikelyGenericReply(gemini.text) : false;
-    const responseText = gemini.text && grounded && !generic
+    const lowQuality = gemini.text ? isLowQualityReply(gemini.text) : true;
+    const responseText = gemini.text && grounded && !generic && !lowQuality
       ? gemini.text
       : buildFallbackMessage(userQuestion, {
           result: analysisSnapshot.result as unknown as AnalysisResult,
@@ -121,8 +162,8 @@ export async function POST(request: Request) {
       message,
       telemetry: {
         ...gemini.telemetry,
-        safetyState: gemini.text && (!grounded || generic) ? 'blocked' : gemini.telemetry.safetyState,
-        fallbackUsed: gemini.telemetry.fallbackUsed || !gemini.text || !grounded || generic,
+        safetyState: gemini.text && (!grounded || generic || lowQuality) ? 'blocked' : gemini.telemetry.safetyState,
+        fallbackUsed: gemini.telemetry.fallbackUsed || !gemini.text || !grounded || generic || lowQuality,
       },
     });
   } catch (error) {
