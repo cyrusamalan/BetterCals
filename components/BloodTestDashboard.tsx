@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AnalysisResult, BloodMarkers, FoodSensitivityFlag, Insight, MarkerStatus, UserProfile } from '@/types';
+import { AnalysisResult, BloodMarkers, CoachMessage, CoachPlan, CoachProviderTelemetry, FoodSensitivityFlag, Insight, MarkerStatus, UserProfile } from '@/types';
 import {
   getMarkerBarScale,
   getMarkerDisplayRange,
@@ -11,7 +11,7 @@ import {
   getMarkerUnit,
   markerValueToBarPercent,
 } from '@/lib/bloodParser';
-import MarkerEducationDrawer from '@/components/dashboard/MarkerEducationDrawer';
+import MarkerHoverPopup from '@/components/dashboard/MarkerHoverPopup';
 import VitalsMark from '@/components/VitalsMark';
 import {
   Heart,
@@ -39,6 +39,7 @@ import {
   FileJson,
   Share2,
   Link as LinkIcon,
+  MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
@@ -61,6 +62,39 @@ import MedicalDisclaimer from '@/components/MedicalDisclaimer';
 const MacroDonutChart = dynamic(() => import('@/components/dashboard/MacroDonutChart'), { ssr: false, loading: () => <SkeletonChart /> });
 const HealthRadarChart = dynamic(() => import('@/components/dashboard/HealthRadarChart'), { ssr: false, loading: () => <SkeletonChart /> });
 const MarkerComparisonChart = dynamic(() => import('@/components/dashboard/MarkerComparisonChart'), { ssr: false, loading: () => <SkeletonChart /> });
+
+function TypewriterText({
+  text,
+  alreadyTyped,
+  speed = 16,
+  onDone,
+}: {
+  text: string;
+  alreadyTyped: boolean;
+  speed?: number;
+  onDone: () => void;
+}) {
+  const [idx, setIdx] = useState(alreadyTyped ? text.length : 0);
+
+  useEffect(() => {
+    if (alreadyTyped) return;
+    if (idx >= text.length) {
+      onDone();
+      return;
+    }
+    const step = /\s/.test(text[idx]) ? speed * 0.6 : speed;
+    const t = setTimeout(() => setIdx((i) => i + 1), step);
+    return () => clearTimeout(t);
+  }, [idx, text, speed, alreadyTyped, onDone]);
+
+  const typing = !alreadyTyped && idx < text.length;
+  return (
+    <>
+      {text.slice(0, idx)}
+      {typing && <span className="coach-typewriter-caret">▍</span>}
+    </>
+  );
+}
 
 interface BloodTestDashboardProps {
   result: AnalysisResult;
@@ -496,7 +530,7 @@ function RangeBar({
   value: number;
   delay: number;
   gender?: UserProfile['gender'];
-  onOpenDetails: (markerKey: keyof BloodMarkers, value: number) => void;
+  onOpenDetails: (markerKey: keyof BloodMarkers, value: number, rect: DOMRect | null) => void;
 }) {
   const interp = getMarkerInterpretation(markerKey, value, gender);
   const style = getStatusTone(interp.status);
@@ -505,6 +539,29 @@ function RangeBar({
   const scale = useMemo(() => getMarkerBarScale(markerKey, gender), [markerKey, gender]);
   const needlePos = scale ? markerValueToBarPercent(value, scale) : 50;
   const tiers = useMemo(() => getMarkerTiers(markerKey, gender), [markerKey, gender]);
+  const hoverTimerRef = useRef<number | null>(null);
+
+  const startHover = (el: HTMLElement) => {
+    if (hoverTimerRef.current !== null) window.clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = window.setTimeout(() => {
+      onOpenDetails(markerKey, value, el.getBoundingClientRect());
+      hoverTimerRef.current = null;
+    }, 1000);
+  };
+
+  const cancelHover = () => {
+    if (hoverTimerRef.current !== null) {
+      window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    onOpenDetails(markerKey, value, null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current !== null) window.clearTimeout(hoverTimerRef.current);
+    };
+  }, []);
 
   const zoneGradient = useMemo(() => {
     const stops = segments.flatMap((seg) => {
@@ -530,14 +587,20 @@ function RangeBar({
   }, [scale, tiers]);
 
   return (
-    <button
-      type="button"
-      className="w-full text-left rounded-lg p-2.5 transition-colors"
-      onClick={() => onOpenDetails(markerKey, value)}
+    <div
+      role="button"
+      tabIndex={0}
+      className="marker-hover w-full text-left rounded-lg p-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+      onMouseEnter={(e) => startHover(e.currentTarget)}
+      onMouseLeave={cancelHover}
+      onFocus={(e) => startHover(e.currentTarget)}
+      onBlur={cancelHover}
       style={{
+        ['--marker-hover-color' as string]: style.fill,
         backgroundColor: 'var(--bg-warm)',
         border: `1px solid ${style.fill}33`,
         boxShadow: `inset 0 0 0 1px ${style.fill}22`,
+        cursor: 'default',
       }}
     >
       <div className="flex items-start justify-between gap-3">
@@ -625,10 +688,10 @@ function RangeBar({
           <span className="font-semibold uppercase tracking-[0.1em]">Current Status</span>
         </div>
         <span style={{ color: 'var(--text-tertiary)' }}>
-          Tap for details
+          Hover for details
         </span>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -640,7 +703,7 @@ function CategoryCard({
   score: number;
   delayBase: number;
   gender?: UserProfile['gender'];
-  onOpenDetails: (markerKey: keyof BloodMarkers, value: number) => void;
+  onOpenDetails: (markerKey: keyof BloodMarkers, value: number, rect: DOMRect | null) => void;
 }) {
   const Icon = category.icon;
   const grade = getScoreGrade(score);
@@ -811,8 +874,18 @@ export default function BloodTestDashboard({
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const foodFlags = computeFoodSensitivityFlags(markers, profile);
-  const [activeMarker, setActiveMarker] = useState<{ key: keyof BloodMarkers; value: number } | null>(null);
+  const [activeMarker, setActiveMarker] = useState<{ key: keyof BloodMarkers; value: number; rect: DOMRect } | null>(null);
   const [activeTab, setActiveTab] = useState<ResultsTab>('biomarkers');
+  const [coachPlan, setCoachPlan] = useState<CoachPlan | null>(result.coach?.plan ?? null);
+  const [coachMessages, setCoachMessages] = useState<CoachMessage[]>(result.coach?.messages ?? []);
+  const [coachTelemetry, setCoachTelemetry] = useState<CoachProviderTelemetry[]>(result.coach?.telemetry ?? []);
+  const [coachInput, setCoachInput] = useState('');
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachError, setCoachError] = useState<string | null>(null);
+  const [coachOpen, setCoachOpen] = useState(false);
+  const [coachClosing, setCoachClosing] = useState(false);
+  const [coachInitAttempted, setCoachInitAttempted] = useState(Boolean(result.coach?.plan));
+  const typedMessageIdsRef = useRef<Set<string>>(new Set());
   const animatedOverallScore = useCountUp(healthScore.overall, 1100);
   const countUpDidLogRef = useRef(false);
 
@@ -909,14 +982,59 @@ export default function BloodTestDashboard({
   }, [prioritizedInsights.length, actionableInsights.length, informationalInsights.length]);
   // #endregion
 
-  const handleOpenMarkerDetails = (key: keyof BloodMarkers, value: number) => {
+  useEffect(() => {
+    if (coachPlan || coachInitAttempted) return;
+    let cancelled = false;
+
+    async function loadCoachInitial() {
+      setCoachLoading(true);
+      setCoachError(null);
+      try {
+        const res = await fetch('/api/coach/initial', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile, markers, result }),
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to create coach plan (${res.status})`);
+        }
+        const data = await res.json() as { plan: CoachPlan; initialMessage: CoachMessage };
+        if (cancelled) return;
+        setCoachPlan(data.plan);
+        setCoachMessages((prev) => (prev.length > 0 ? prev : [data.initialMessage]));
+      } catch (err) {
+        if (cancelled) return;
+        setCoachError(err instanceof Error ? err.message : 'Could not load coach');
+      } finally {
+        if (!cancelled) {
+          setCoachLoading(false);
+          setCoachInitAttempted(true);
+        }
+      }
+    }
+
+    loadCoachInitial();
+    return () => {
+      cancelled = true;
+    };
+  }, [coachPlan, coachInitAttempted, profile, markers, result]);
+
+  const handleOpenMarkerDetails = (
+    key: keyof BloodMarkers,
+    value: number,
+    rect: DOMRect | null,
+  ) => {
+    if (!rect) {
+      setActiveMarker(null);
+      return;
+    }
     debugLog({
       hypothesisId: 'Q12_marker_detail',
       location: 'components/BloodTestDashboard.tsx:open_marker_details',
-      message: 'Opened marker detail drawer',
+      message: 'Opened marker detail popup',
       data: { marker: key, value },
     });
-    setActiveMarker({ key, value });
+    setActiveMarker({ key, value, rect });
   };
 
   const handleDownloadPDF = async () => {
@@ -1026,7 +1144,7 @@ export default function BloodTestDashboard({
       const res = await fetch('/api/analyses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, markers, result }),
+        body: JSON.stringify({ profile, markers, result, coach: coachState }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -1061,6 +1179,57 @@ export default function BloodTestDashboard({
       setSharing(false);
     }
   };
+
+  const handleCoachSend = async () => {
+    const question = coachInput.trim();
+    if (!question || !coachPlan || coachLoading) return;
+
+    const userMessage: CoachMessage = {
+      id: `coach-user-${Date.now()}`,
+      role: 'user',
+      source: 'llm_chat',
+      text: question,
+      createdAt: new Date().toISOString(),
+    };
+
+    const nextMessages = [...coachMessages, userMessage];
+    setCoachMessages(nextMessages);
+    setCoachInput('');
+    setCoachLoading(true);
+    setCoachError(null);
+    try {
+      const res = await fetch('/api/coach/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          analysisSnapshot: { profile, markers, result },
+          coachPlan,
+          messages: nextMessages,
+          userQuestion: question,
+        }),
+      });
+      if (!res.ok) throw new Error(`Coach chat failed (${res.status})`);
+      const data = await res.json() as { message: CoachMessage; telemetry?: CoachProviderTelemetry };
+      setCoachMessages((prev) => [...prev, data.message]);
+      const telemetry = data.telemetry;
+      if (telemetry) {
+        setCoachTelemetry((prev) => [...prev, telemetry]);
+      }
+    } catch (err) {
+      setCoachError(err instanceof Error ? err.message : 'Coach response failed');
+    } finally {
+      setCoachLoading(false);
+    }
+  };
+
+  const coachState = coachPlan
+    ? {
+      plan: coachPlan,
+      messages: coachMessages,
+      telemetry: coachTelemetry,
+    }
+    : undefined;
+  const visibleCoachMessages = coachMessages.filter((message) => message.source !== 'coach_engine');
 
   const markerRows = (Object.keys(MARKER_NAMES) as (keyof BloodMarkers)[])
     .filter((k) => markers[k] !== undefined)
@@ -1098,6 +1267,15 @@ export default function BloodTestDashboard({
   }, [hasMarkers, usedAverageMarkers, prioritizedInsights.length, deficiencies.length, risks.length]);
   const displayedTab = availableTabs.includes(activeTab) ? activeTab : (availableTabs[0] ?? 'biomarkers');
 
+  const closeCoachPanels = () => {
+    if (coachClosing) return;
+    setCoachClosing(true);
+    window.setTimeout(() => {
+      setCoachOpen(false);
+      setCoachClosing(false);
+    }, 260);
+  };
+
   return (
     <div
       className="min-h-screen pb-16"
@@ -1113,7 +1291,7 @@ export default function BloodTestDashboard({
           WebkitBackdropFilter: 'blur(16px)',
         }}
       >
-        <div className="max-w-5xl mx-auto px-4 sm:px-5 py-3 sm:py-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-5 py-3 sm:py-4 xl:relative xl:-translate-x-5">
           <div className="flex items-center justify-between gap-2">
             <button
               onClick={onReset}
@@ -1457,7 +1635,7 @@ export default function BloodTestDashboard({
       </div>
 
       {/* Screen UI */}
-      <div id="screen-content" className="max-w-5xl mx-auto px-4 sm:px-5 pt-6 sm:pt-8">
+      <div id="screen-content" className="max-w-5xl mx-auto px-4 sm:px-5 pt-6 sm:pt-8 xl:relative xl:-translate-x-5">
         {/* 1. Hero: Score + BMR/TDEE inline + BMI badge */}
         <div className="anim-fade-up delay-1">
           <div
@@ -1797,12 +1975,299 @@ export default function BloodTestDashboard({
         )}
       </div>
 
-      <MarkerEducationDrawer
-        open={activeMarker !== null}
+      <MarkerHoverPopup
         markerKey={activeMarker?.key ?? null}
         value={activeMarker?.value ?? null}
-        onClose={() => setActiveMarker(null)}
+        rect={activeMarker?.rect ?? null}
+        onDismiss={() => setActiveMarker(null)}
       />
+
+      <button
+        type="button"
+        onClick={() => {
+          setCoachClosing(false);
+          setCoachOpen(true);
+        }}
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full px-4 py-3 text-sm font-semibold btn-press"
+        style={{
+          background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+          color: 'var(--text-inverse)',
+          boxShadow: '0 12px 28px rgba(0,0,0,0.22)',
+        }}
+      >
+        <MessageCircle className="w-4 h-4" />
+        Coach
+      </button>
+
+      {coachOpen && (
+        <>
+          <style>{`
+            @keyframes coachSlideIn {
+              from {
+                opacity: 0;
+                transform: translateX(calc(100% + 24px));
+              }
+              to {
+                opacity: 1;
+                transform: translateX(0);
+              }
+            }
+            @keyframes coachSlideOut {
+              from {
+                opacity: 1;
+                transform: translateX(0);
+              }
+              to {
+                opacity: 0;
+                transform: translateX(calc(100% + 24px));
+              }
+            }
+            @keyframes coachSlideInLeft {
+              from {
+                opacity: 0;
+                transform: translateX(calc(-100% - 24px));
+              }
+              to {
+                opacity: 1;
+                transform: translateX(0);
+              }
+            }
+            @keyframes coachSlideOutLeft {
+              from {
+                opacity: 1;
+                transform: translateX(0);
+              }
+              to {
+                opacity: 0;
+                transform: translateX(calc(-100% - 24px));
+              }
+            }
+            @keyframes coachPriorityPop {
+              0%   { opacity: 0; transform: scale(0.78) translateY(8px); }
+              55%  { opacity: 1; transform: scale(1.06) translateY(-2px); }
+              80%  { transform: scale(0.98) translateY(0.5px); }
+              100% { opacity: 1; transform: scale(1) translateY(0); }
+            }
+            @keyframes coachBackdropFade {
+              from { opacity: 0; }
+              to   { opacity: 1; }
+            }
+            @keyframes coachCaretBlink {
+              0%, 45%   { opacity: 1; }
+              50%, 95%  { opacity: 0; }
+              100%      { opacity: 1; }
+            }
+            .coach-typewriter-caret {
+              display: inline-block;
+              margin-left: 1px;
+              color: var(--accent);
+              font-weight: 600;
+              animation: coachCaretBlink 0.9s steps(1, end) infinite;
+            }
+          `}</style>
+          <button
+            type="button"
+            aria-label="Close coach panel backdrop"
+            onClick={closeCoachPanels}
+            className="fixed inset-0 z-40"
+            style={{
+              backgroundColor: 'transparent',
+              animation: 'coachBackdropFade 0.3s ease both',
+            }}
+          />
+          <aside
+            className="hidden xl:block fixed left-10 top-28 w-[360px] z-50"
+            style={{
+              animation: coachClosing
+                ? 'coachSlideOutLeft 0.26s ease both'
+                : 'coachSlideInLeft 0.48s cubic-bezier(0.22, 1.12, 0.36, 1) both',
+              willChange: 'transform, opacity',
+            }}
+          >
+            <div className="rounded-2xl p-4" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
+              <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Personalized Plan
+              </h3>
+              {coachPlan ? (
+                <>
+                  <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
+                    {coachPlan.summary}
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {coachPlan.priorities.slice(0, 3).map((priority, idx) => (
+                      <div
+                        key={`left-pop-plan-${priority.title}-${idx}`}
+                        className="rounded-xl p-3"
+                        style={{
+                          backgroundColor: 'rgba(255,255,255,0.42)',
+                          border: 'none',
+                          boxShadow: '0 1px 6px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.65)',
+                          animation: 'coachPriorityPop 0.55s cubic-bezier(0.34, 1.6, 0.5, 1) both',
+                          animationDelay: `${140 + idx * 140}ms`,
+                          transformOrigin: 'left center',
+                          willChange: 'transform, opacity',
+                        }}
+                      >
+                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {idx + 1}. {priority.title}
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                          {priority.reason}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm mt-2" style={{ color: coachError ? 'var(--status-danger)' : 'var(--text-secondary)' }}>
+                  {coachLoading
+                    ? 'Creating your personalized plan...'
+                    : coachError ?? 'Your personalized plan is not ready yet.'}
+                </p>
+              )}
+            </div>
+          </aside>
+          <aside
+            className="fixed right-3 sm:right-4 top-3 sm:top-4 h-[calc(100%-1.5rem)] sm:h-[calc(100%-2rem)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-y-auto rounded-3xl"
+            style={{
+              animation: coachClosing
+                ? 'coachSlideOut 0.26s ease both'
+                : 'coachSlideIn 0.48s cubic-bezier(0.22, 1.12, 0.36, 1) both',
+              willChange: 'transform, opacity',
+              background: 'linear-gradient(165deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.02) 55%, rgba(255,255,255,0.008) 100%)',
+              border: '1px solid rgba(255,255,255,0.09)',
+              backdropFilter: 'blur(2px) saturate(1.01)',
+              WebkitBackdropFilter: 'blur(2px) saturate(1.01)',
+              boxShadow: [
+                '0 10px 18px rgba(8, 12, 22, 0.05)',
+                '0 2px 8px rgba(8, 12, 22, 0.02)',
+                'inset 0 1px 0 rgba(255,255,255,0.26)',
+                'inset 0 -1px 0 rgba(255,255,255,0.05)',
+              ].join(', '),
+            }}
+          >
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-3xl"
+              style={{
+                background:
+                  'radial-gradient(160% 80% at 8% -18%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.10) 38%, transparent 68%), radial-gradient(110% 70% at 100% 110%, rgba(125, 186, 133, 0.22) 0%, transparent 62%)',
+                mixBlendMode: 'screen',
+              }}
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-3xl"
+              style={{
+                background:
+                  'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.85) 20%, rgba(255,255,255,0.95) 50%, rgba(255,255,255,0.85) 80%, transparent 100%)',
+              }}
+            />
+            <div className="relative mb-4">
+              <h2 className="font-display text-xl text-center" style={{ color: 'var(--text-primary)' }}>
+                Coach
+              </h2>
+              <button
+                type="button"
+                onClick={closeCoachPanels}
+                className="absolute right-0 top-1/2 -translate-y-1/2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.45)',
+                  border: 'none',
+                  color: 'var(--text-primary)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)',
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="space-y-4 relative z-[1]">
+              <div className="rounded-2xl p-4" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
+                <div className="mt-3 space-y-3 max-h-[360px] overflow-y-auto pr-1">
+                  {visibleCoachMessages.length === 0 ? (
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      Ask a question to start the conversation.
+                    </p>
+                  ) : visibleCoachMessages.map((message) => {
+                    const isAssistant = message.role === 'assistant';
+                    const alreadyTyped =
+                      !isAssistant || typedMessageIdsRef.current.has(message.id);
+                    return (
+                      <div
+                        key={message.id}
+                        className="rounded-xl px-3 py-2"
+                        style={{
+                          backgroundColor: isAssistant ? 'rgba(255,255,255,0.45)' : 'rgba(107, 143, 113, 0.12)',
+                          border: 'none',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.65)',
+                        }}
+                      >
+                        <p className="text-[11px] uppercase tracking-[0.08em] font-semibold" style={{ color: 'var(--text-tertiary)' }}>
+                          {isAssistant ? 'Coach' : 'You'}
+                        </p>
+                        <p className="text-sm mt-1 whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
+                          {isAssistant ? (
+                            <TypewriterText
+                              text={message.text}
+                              alreadyTyped={alreadyTyped}
+                              onDone={() => {
+                                typedMessageIdsRef.current.add(message.id);
+                              }}
+                            />
+                          ) : (
+                            message.text
+                          )}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <input
+                    type="text"
+                    value={coachInput}
+                    onChange={(e) => setCoachInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void handleCoachSend();
+                      }
+                    }}
+                    placeholder="Ask a follow-up about your plan..."
+                    className="flex-1 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                    style={{
+                      border: 'none',
+                      backgroundColor: 'rgba(255,255,255,0.55)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 1px 3px rgba(0,0,0,0.05)',
+                      color: 'var(--text-primary)',
+                    }}
+                    disabled={coachLoading || !coachPlan}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleCoachSend()}
+                    disabled={coachLoading || !coachPlan || coachInput.trim().length === 0}
+                    className="rounded-xl px-4 py-2 text-sm font-semibold btn-press disabled:opacity-50"
+                    style={{
+                      background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+                      color: 'var(--text-inverse)',
+                    }}
+                  >
+                    {coachLoading && coachPlan ? 'Sending...' : 'Send'}
+                  </button>
+                </div>
+                {coachError && (
+                  <p className="text-xs mt-2" style={{ color: 'var(--status-danger)' }}>
+                    {coachError}
+                  </p>
+                )}
+              </div>
+            </div>
+          </aside>
+        </>
+      )}
     </div>
   );
 }

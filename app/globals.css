@@ -274,6 +274,30 @@ body {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
 }
 
+/* ── Marker row hover ── */
+.marker-hover {
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.22s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+@media (hover: hover) {
+  .marker-hover:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--marker-hover-color, var(--accent)) 44%, var(--border-light));
+    background-color: color-mix(in srgb, var(--marker-hover-color, var(--accent)) 9%, var(--bg-warm));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--marker-hover-color, var(--accent)) 34%, white),
+      0 10px 22px color-mix(in srgb, var(--marker-hover-color, var(--accent)) 18%, transparent);
+  }
+}
+
+.marker-hover:focus-visible {
+  transform: translateY(-1px);
+}
+
 /* ── Button press ── */
 .btn-press {
   transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease;

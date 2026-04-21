@@ -223,6 +223,54 @@ export interface AnalysisResult {
   ascvdRiskReason?: string;
   usedAverageMarkers?: boolean;
   actionPlan?: ActionPlanItem[];
+  coach?: CoachState;
+}
+
+export interface CoachPriority {
+  title: string;
+  reason: string;
+  relatedMarkers: (keyof BloodMarkers)[];
+}
+
+export interface CoachWeeklyAction {
+  title: string;
+  details: string;
+}
+
+export interface CoachPlan {
+  summary: string;
+  priorities: CoachPriority[];
+  weeklyActions: CoachWeeklyAction[];
+  whyItMatters: string[];
+  guardrails: string[];
+}
+
+export type CoachMessageSource = 'coach_engine' | 'llm_chat';
+
+export interface CoachMessage {
+  id: string;
+  role: 'assistant' | 'user';
+  source: CoachMessageSource;
+  text: string;
+  createdAt: string;
+}
+
+export interface CoachProviderTelemetry {
+  model: string;
+  latencyMs: number;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
+  safetyState?: 'safe' | 'blocked' | 'unknown';
+  fallbackUsed: boolean;
+}
+
+export interface CoachState {
+  plan: CoachPlan;
+  messages: CoachMessage[];
+  telemetry?: CoachProviderTelemetry[];
 }
 
 export interface ParsedBloodReport {
