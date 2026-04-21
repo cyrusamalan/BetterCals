@@ -590,12 +590,13 @@ function RangeBar({
     <div
       role="button"
       tabIndex={0}
-      className="w-full text-left rounded-lg p-2.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+      className="marker-hover w-full text-left rounded-lg p-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
       onMouseEnter={(e) => startHover(e.currentTarget)}
       onMouseLeave={cancelHover}
       onFocus={(e) => startHover(e.currentTarget)}
       onBlur={cancelHover}
       style={{
+        ['--marker-hover-color' as string]: style.fill,
         backgroundColor: 'var(--bg-warm)',
         border: `1px solid ${style.fill}33`,
         boxShadow: `inset 0 0 0 1px ${style.fill}22`,
