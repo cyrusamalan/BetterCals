@@ -2247,84 +2247,127 @@ export default function BloodTestDashboard({
 
             <div className="space-y-4 relative z-[1]">
               <div className="rounded-2xl p-4" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
-                <div className="mt-3 space-y-3 max-h-[360px] overflow-y-auto pr-1">
-                  {visibleCoachMessages.length === 0 ? (
-                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      Ask a question to start the conversation.
-                    </p>
-                  ) : visibleCoachMessages.map((message) => {
-                    const isAssistant = message.role === 'assistant';
-                    const alreadyTyped =
-                      !isAssistant || typedMessageIdsRef.current.has(message.id);
-                    return (
-                      <div
-                        key={message.id}
-                        className="rounded-xl px-3 py-2"
+                {isSignedIn ? (
+                  <>
+                    <div className="mt-3 space-y-3 max-h-[360px] overflow-y-auto pr-1">
+                      {visibleCoachMessages.length === 0 ? (
+                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          Ask a question to start the conversation.
+                        </p>
+                      ) : visibleCoachMessages.map((message) => {
+                        const isAssistant = message.role === 'assistant';
+                        const alreadyTyped =
+                          !isAssistant || typedMessageIdsRef.current.has(message.id);
+                        return (
+                          <div
+                            key={message.id}
+                            className="rounded-xl px-3 py-2"
+                            style={{
+                              backgroundColor: isAssistant ? 'rgba(255,255,255,0.45)' : 'rgba(107, 143, 113, 0.12)',
+                              border: 'none',
+                              boxShadow: '0 1px 4px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.65)',
+                            }}
+                          >
+                            <p className="text-[11px] uppercase tracking-[0.08em] font-semibold" style={{ color: 'var(--text-tertiary)' }}>
+                              {isAssistant ? 'Coach' : 'You'}
+                            </p>
+                            <p className="text-sm mt-1 whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
+                              {isAssistant ? (
+                                <TypewriterText
+                                  text={message.text}
+                                  alreadyTyped={alreadyTyped}
+                                  onDone={() => {
+                                    typedMessageIdsRef.current.add(message.id);
+                                  }}
+                                />
+                              ) : (
+                                message.text
+                              )}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        type="text"
+                        value={coachInput}
+                        onChange={(e) => setCoachInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            void handleCoachSend();
+                          }
+                        }}
+                        placeholder="Ask a follow-up about your plan..."
+                        className="flex-1 rounded-xl px-3 py-2 text-sm focus:outline-none"
                         style={{
-                          backgroundColor: isAssistant ? 'rgba(255,255,255,0.45)' : 'rgba(107, 143, 113, 0.12)',
                           border: 'none',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.65)',
+                          backgroundColor: 'rgba(255,255,255,0.55)',
+                          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 1px 3px rgba(0,0,0,0.05)',
+                          color: 'var(--text-primary)',
+                        }}
+                        disabled={coachLoading || !coachPlan}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleCoachSend()}
+                        disabled={coachLoading || !coachPlan || coachInput.trim().length === 0}
+                        className="rounded-xl px-4 py-2 text-sm font-semibold btn-press disabled:opacity-50"
+                        style={{
+                          background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+                          color: 'var(--text-inverse)',
                         }}
                       >
-                        <p className="text-[11px] uppercase tracking-[0.08em] font-semibold" style={{ color: 'var(--text-tertiary)' }}>
-                          {isAssistant ? 'Coach' : 'You'}
-                        </p>
-                        <p className="text-sm mt-1 whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
-                          {isAssistant ? (
-                            <TypewriterText
-                              text={message.text}
-                              alreadyTyped={alreadyTyped}
-                              onDone={() => {
-                                typedMessageIdsRef.current.add(message.id);
-                              }}
-                            />
-                          ) : (
-                            message.text
-                          )}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  <input
-                    type="text"
-                    value={coachInput}
-                    onChange={(e) => setCoachInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        void handleCoachSend();
-                      }
-                    }}
-                    placeholder="Ask a follow-up about your plan..."
-                    className="flex-1 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                        {coachLoading && coachPlan ? 'Sending...' : 'Send'}
+                      </button>
+                    </div>
+                    {coachError && (
+                      <p className="text-xs mt-2" style={{ color: 'var(--status-danger)' }}>
+                        {coachError}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div
+                    className="mt-3 rounded-xl p-4"
                     style={{
-                      border: 'none',
-                      backgroundColor: 'rgba(255,255,255,0.55)',
-                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 1px 3px rgba(0,0,0,0.05)',
-                      color: 'var(--text-primary)',
-                    }}
-                    disabled={coachLoading || !coachPlan}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void handleCoachSend()}
-                    disabled={coachLoading || !coachPlan || coachInput.trim().length === 0}
-                    className="rounded-xl px-4 py-2 text-sm font-semibold btn-press disabled:opacity-50"
-                    style={{
-                      background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
-                      color: 'var(--text-inverse)',
+                      backgroundColor: 'rgba(255,255,255,0.5)',
+                      border: '1px solid var(--border-light)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.75)',
                     }}
                   >
-                    {coachLoading && coachPlan ? 'Sending...' : 'Send'}
-                  </button>
-                </div>
-                {coachError && (
-                  <p className="text-xs mt-2" style={{ color: 'var(--status-danger)' }}>
-                    {coachError}
-                  </p>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      Sign in to chat with your Coach
+                    </p>
+                    <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+                      Create a free account to ask follow-up questions and get personalized coaching chat.
+                    </p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <Link
+                        href="/sign-in"
+                        className="rounded-xl px-3 py-2 text-xs font-semibold btn-press"
+                        style={{
+                          background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+                          color: 'var(--text-inverse)',
+                        }}
+                      >
+                        Sign In
+                      </Link>
+                      <Link
+                        href="/sign-up"
+                        className="rounded-xl px-3 py-2 text-xs font-semibold btn-press"
+                        style={{
+                          backgroundColor: 'var(--border-light)',
+                          color: 'var(--text-primary)',
+                          border: '1px solid var(--border)',
+                        }}
+                      >
+                        Sign Up
+                      </Link>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
