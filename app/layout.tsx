@@ -53,6 +53,11 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  icons: {
+    icon: '/logo/bettercals-logo-icon-tight.png',
+    shortcut: '/logo/bettercals-logo-icon-tight.png',
+    apple: '/logo/bettercals-logo-icon-tight.png',
+  },
 };
 
 export default function RootLayout({
