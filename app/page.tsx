@@ -12,9 +12,11 @@ import {
   LineChart,
   History,
   Play,
+  BookOpen,
 } from 'lucide-react';
 import VitalsMark from '@/components/VitalsMark';
 import DemoModal from '@/components/DemoModal';
+import LearnMarkersModal from '@/components/LearnMarkersModal';
 
 function FeatureCard({
   icon,
@@ -98,6 +100,7 @@ function StepCard({
 export default function HomePage() {
   const { isSignedIn } = useAuth();
   const [demoOpen, setDemoOpen] = useState(false);
+  const [learnOpen, setLearnOpen] = useState(false);
 
   return (
     <div
@@ -277,12 +280,29 @@ export default function HomePage() {
                 boxShadow: 'var(--card-shadow-heavy)',
               }}
             >
-              <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                What you get
-              </h2>
-              <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                A clear plan, not a wall of numbers.
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    What you get
+                  </h2>
+                  <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    A clear plan, not a wall of numbers.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLearnOpen(true)}
+                  className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press transition-colors"
+                  style={{
+                    background: 'var(--accent-subtle)',
+                    color: 'var(--accent)',
+                    border: '1px solid rgba(107, 143, 113, 0.22)',
+                  }}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  Learn
+                </button>
+              </div>
 
               <div className="mt-5 grid grid-cols-1 gap-3">
                 <FeatureCard
@@ -415,6 +435,7 @@ export default function HomePage() {
       </footer>
 
       <DemoModal open={demoOpen} onCloseAction={() => setDemoOpen(false)} />
+      <LearnMarkersModal open={learnOpen} onCloseAction={() => setLearnOpen(false)} />
     </div>
   );
 }
