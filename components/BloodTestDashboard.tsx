@@ -11,7 +11,7 @@ import {
   getMarkerUnit,
   markerValueToBarPercent,
 } from '@/lib/bloodParser';
-import MarkerEducationDrawer from '@/components/dashboard/MarkerEducationDrawer';
+import MarkerHoverPopup from '@/components/dashboard/MarkerHoverPopup';
 import VitalsMark from '@/components/VitalsMark';
 import {
   Heart,
@@ -530,7 +530,7 @@ function RangeBar({
   value: number;
   delay: number;
   gender?: UserProfile['gender'];
-  onOpenDetails: (markerKey: keyof BloodMarkers, value: number) => void;
+  onOpenDetails: (markerKey: keyof BloodMarkers, value: number, rect: DOMRect | null) => void;
 }) {
   const interp = getMarkerInterpretation(markerKey, value, gender);
   const style = getStatusTone(interp.status);
@@ -539,6 +539,29 @@ function RangeBar({
   const scale = useMemo(() => getMarkerBarScale(markerKey, gender), [markerKey, gender]);
   const needlePos = scale ? markerValueToBarPercent(value, scale) : 50;
   const tiers = useMemo(() => getMarkerTiers(markerKey, gender), [markerKey, gender]);
+  const hoverTimerRef = useRef<number | null>(null);
+
+  const startHover = (el: HTMLElement) => {
+    if (hoverTimerRef.current !== null) window.clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = window.setTimeout(() => {
+      onOpenDetails(markerKey, value, el.getBoundingClientRect());
+      hoverTimerRef.current = null;
+    }, 1000);
+  };
+
+  const cancelHover = () => {
+    if (hoverTimerRef.current !== null) {
+      window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    onOpenDetails(markerKey, value, null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current !== null) window.clearTimeout(hoverTimerRef.current);
+    };
+  }, []);
 
   const zoneGradient = useMemo(() => {
     const stops = segments.flatMap((seg) => {
@@ -564,14 +587,19 @@ function RangeBar({
   }, [scale, tiers]);
 
   return (
-    <button
-      type="button"
-      className="w-full text-left rounded-lg p-2.5 transition-colors"
-      onClick={() => onOpenDetails(markerKey, value)}
+    <div
+      role="button"
+      tabIndex={0}
+      className="w-full text-left rounded-lg p-2.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+      onMouseEnter={(e) => startHover(e.currentTarget)}
+      onMouseLeave={cancelHover}
+      onFocus={(e) => startHover(e.currentTarget)}
+      onBlur={cancelHover}
       style={{
         backgroundColor: 'var(--bg-warm)',
         border: `1px solid ${style.fill}33`,
         boxShadow: `inset 0 0 0 1px ${style.fill}22`,
+        cursor: 'default',
       }}
     >
       <div className="flex items-start justify-between gap-3">
@@ -659,10 +687,10 @@ function RangeBar({
           <span className="font-semibold uppercase tracking-[0.1em]">Current Status</span>
         </div>
         <span style={{ color: 'var(--text-tertiary)' }}>
-          Tap for details
+          Hover for details
         </span>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -674,7 +702,7 @@ function CategoryCard({
   score: number;
   delayBase: number;
   gender?: UserProfile['gender'];
-  onOpenDetails: (markerKey: keyof BloodMarkers, value: number) => void;
+  onOpenDetails: (markerKey: keyof BloodMarkers, value: number, rect: DOMRect | null) => void;
 }) {
   const Icon = category.icon;
   const grade = getScoreGrade(score);
@@ -845,7 +873,7 @@ export default function BloodTestDashboard({
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const foodFlags = computeFoodSensitivityFlags(markers, profile);
-  const [activeMarker, setActiveMarker] = useState<{ key: keyof BloodMarkers; value: number } | null>(null);
+  const [activeMarker, setActiveMarker] = useState<{ key: keyof BloodMarkers; value: number; rect: DOMRect } | null>(null);
   const [activeTab, setActiveTab] = useState<ResultsTab>('biomarkers');
   const [coachPlan, setCoachPlan] = useState<CoachPlan | null>(result.coach?.plan ?? null);
   const [coachMessages, setCoachMessages] = useState<CoachMessage[]>(result.coach?.messages ?? []);
@@ -990,14 +1018,22 @@ export default function BloodTestDashboard({
     };
   }, [coachPlan, coachInitAttempted, profile, markers, result]);
 
-  const handleOpenMarkerDetails = (key: keyof BloodMarkers, value: number) => {
+  const handleOpenMarkerDetails = (
+    key: keyof BloodMarkers,
+    value: number,
+    rect: DOMRect | null,
+  ) => {
+    if (!rect) {
+      setActiveMarker(null);
+      return;
+    }
     debugLog({
       hypothesisId: 'Q12_marker_detail',
       location: 'components/BloodTestDashboard.tsx:open_marker_details',
-      message: 'Opened marker detail drawer',
+      message: 'Opened marker detail popup',
       data: { marker: key, value },
     });
-    setActiveMarker({ key, value });
+    setActiveMarker({ key, value, rect });
   };
 
   const handleDownloadPDF = async () => {
@@ -1938,11 +1974,11 @@ export default function BloodTestDashboard({
         )}
       </div>
 
-      <MarkerEducationDrawer
-        open={activeMarker !== null}
+      <MarkerHoverPopup
         markerKey={activeMarker?.key ?? null}
         value={activeMarker?.value ?? null}
-        onClose={() => setActiveMarker(null)}
+        rect={activeMarker?.rect ?? null}
+        onDismiss={() => setActiveMarker(null)}
       />
 
       <button
