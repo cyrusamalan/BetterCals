@@ -17,11 +17,11 @@ import {
   Flame,
   Activity,
   Download,
+  ChevronDown,
   AlertTriangle,
   CheckCircle,
   Info,
   XCircle,
-  ArrowLeft,
   Droplets,
   Zap,
   Pill,
@@ -868,6 +868,7 @@ export default function BloodTestDashboard({
   const hasMarkers = Object.keys(markers).length > 0;
   const usedAverageMarkers = result.usedAverageMarkers === true;
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savedAnalysisId, setSavedAnalysisId] = useState<number | null>(null);
@@ -886,6 +887,7 @@ export default function BloodTestDashboard({
   const [coachClosing, setCoachClosing] = useState(false);
   const [coachInitAttempted, setCoachInitAttempted] = useState(Boolean(result.coach?.plan));
   const typedMessageIdsRef = useRef<Set<string>>(new Set());
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const animatedOverallScore = useCountUp(healthScore.overall, 1100);
   const countUpDidLogRef = useRef(false);
 
@@ -1276,6 +1278,29 @@ export default function BloodTestDashboard({
     }, 260);
   };
 
+  useEffect(() => {
+    if (!exportOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!exportMenuRef.current) return;
+      if (exportMenuRef.current.contains(event.target as Node)) return;
+      setExportOpen(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setExportOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [exportOpen]);
+
   return (
     <div
       className="min-h-screen pb-16"
@@ -1307,55 +1332,78 @@ export default function BloodTestDashboard({
                   BetterCals
                 </span>
               </Link>
-              <button
-                onClick={onReset}
-                className="flex items-center gap-1.5 text-sm font-medium group btn-press shrink-0"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" style={{ color: 'var(--text-tertiary)' }} />
-                <span className="hidden sm:inline">{resetLabel}</span>
-              </button>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
-              <button
-                onClick={handleDownloadPDF}
-                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press"
-                style={{
-                  backgroundColor: 'var(--border-light)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border)',
-                }}
-                title="Download PDF report"
-              >
-                <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                <span className="hidden sm:inline">PDF</span>
-              </button>
-              <button
-                onClick={handleDownloadCSV}
-                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press"
-                style={{
-                  backgroundColor: 'var(--border-light)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border)',
-                }}
-                title="Download CSV spreadsheet"
-              >
-                <FileSpreadsheet className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                <span className="hidden sm:inline">CSV</span>
-              </button>
-              <button
-                onClick={handleDownloadJSON}
-                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press"
-                style={{
-                  backgroundColor: 'var(--border-light)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border)',
-                }}
-                title="Download JSON data"
-              >
-                <FileJson className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                <span className="hidden sm:inline">JSON</span>
-              </button>
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setExportOpen((prev) => !prev)}
+                  aria-haspopup="menu"
+                  aria-expanded={exportOpen}
+                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press"
+                  style={{
+                    backgroundColor: 'var(--border-light)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border)',
+                  }}
+                  title="Export report"
+                >
+                  <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                  <span>Export</span>
+                  <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                </button>
+                {exportOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 min-w-[190px] rounded-xl p-1.5 z-20"
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      boxShadow: '0 10px 28px rgba(0,0,0,0.12)',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        handleDownloadPDF();
+                        setExportOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                      Export as PDF
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        handleDownloadCSV();
+                        setExportOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      <FileSpreadsheet className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                      Export as CSV
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        handleDownloadJSON();
+                        setExportOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      <FileJson className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                      Export as JSON
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {isSignedIn ? (
                 <>
@@ -1706,13 +1754,26 @@ export default function BloodTestDashboard({
               )}
 
               <div className="space-y-5">
-                <div>
-                  <h1 className="font-display text-2xl md:text-3xl" style={{ color: 'var(--text-primary)' }}>
-                    Your Results
-                  </h1>
-                  <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
-                    {usedAverageMarkers ? 'Based on your profile and estimated average markers' : 'Based on your profile and blood markers'}
-                  </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h1 className="font-display text-2xl md:text-3xl" style={{ color: 'var(--text-primary)' }}>
+                      Your Results
+                    </h1>
+                    <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                      {usedAverageMarkers ? 'Based on your profile and estimated average markers' : 'Based on your profile and blood markers'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={onReset}
+                    className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press shrink-0"
+                    style={{
+                      backgroundColor: 'var(--border-light)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <span>{resetLabel}</span>
+                  </button>
                 </div>
 
                 {usedAverageMarkers && (
