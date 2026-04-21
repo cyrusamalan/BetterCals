@@ -73,6 +73,32 @@ export const userProfileSchema = z.object({
 
 // ── API Request Schemas ────────────────────────────────────────────────────
 
+const coachPrioritySchema = z.object({
+  title: z.string().min(1).max(200),
+  reason: z.string().min(1).max(800),
+  relatedMarkers: z.array(z.string()).max(12),
+});
+
+const coachWeeklyActionSchema = z.object({
+  title: z.string().min(1).max(200),
+  details: z.string().min(1).max(800),
+});
+
+export const coachPlanSchema = z.object({
+  summary: z.string().min(1).max(1200),
+  priorities: z.array(coachPrioritySchema).min(1).max(6),
+  weeklyActions: z.array(coachWeeklyActionSchema).min(1).max(8),
+  whyItMatters: z.array(z.string().min(1).max(500)).min(1).max(6),
+  guardrails: z.array(z.string().min(1).max(500)).min(1).max(8),
+});
+
+const coachMessageSchema = z.object({
+  role: z.enum(['assistant', 'user']),
+  source: z.enum(['coach_engine', 'llm_chat']),
+  text: z.string().min(1).max(4000),
+  createdAt: z.string().optional(),
+});
+
 /** POST /api/analyses — save a new analysis */
 export const saveAnalysisSchema = z.object({
   profile: userProfileSchema,
@@ -131,10 +157,69 @@ export const saveAnalysisSchema = z.object({
       priority: z.union([z.literal(1), z.literal(2), z.literal(3)]),
       relatedMarkers: z.array(z.string()),
     })).optional(),
+    coach: z.object({
+      plan: coachPlanSchema,
+      messages: z.array(z.object({
+        id: z.string(),
+        role: z.enum(['assistant', 'user']),
+        source: z.enum(['coach_engine', 'llm_chat']),
+        text: z.string(),
+        createdAt: z.string(),
+      })).max(40),
+      telemetry: z.array(z.object({
+        model: z.string(),
+        latencyMs: z.number(),
+        usage: z.object({
+          promptTokens: z.number().optional(),
+          completionTokens: z.number().optional(),
+          totalTokens: z.number().optional(),
+        }).optional(),
+        safetyState: z.enum(['safe', 'blocked', 'unknown']).optional(),
+        fallbackUsed: z.boolean(),
+      })).optional(),
+    }).optional(),
   }),
+  coach: z.object({
+    plan: coachPlanSchema,
+    messages: z.array(z.object({
+      id: z.string(),
+      role: z.enum(['assistant', 'user']),
+      source: z.enum(['coach_engine', 'llm_chat']),
+      text: z.string(),
+      createdAt: z.string(),
+    })).max(40),
+    telemetry: z.array(z.object({
+      model: z.string(),
+      latencyMs: z.number(),
+      usage: z.object({
+        promptTokens: z.number().optional(),
+        completionTokens: z.number().optional(),
+        totalTokens: z.number().optional(),
+      }).optional(),
+      safetyState: z.enum(['safe', 'blocked', 'unknown']).optional(),
+      fallbackUsed: z.boolean(),
+    })).optional(),
+  }).optional(),
 });
 
 /** PUT /api/profile — upsert user profile */
 export const saveProfileSchema = z.object({
   profile: userProfileSchema,
+});
+
+export const coachInitialRequestSchema = z.object({
+  profile: userProfileSchema,
+  markers: bloodMarkersSchema,
+  result: saveAnalysisSchema.shape.result,
+});
+
+export const coachChatRequestSchema = z.object({
+  analysisSnapshot: z.object({
+    profile: userProfileSchema,
+    markers: bloodMarkersSchema,
+    result: saveAnalysisSchema.shape.result,
+  }),
+  coachPlan: coachPlanSchema,
+  messages: z.array(coachMessageSchema).max(20),
+  userQuestion: z.string().min(1).max(1200),
 });

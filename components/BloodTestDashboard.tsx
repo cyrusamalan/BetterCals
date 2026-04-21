@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AnalysisResult, BloodMarkers, FoodSensitivityFlag, Insight, MarkerStatus, UserProfile } from '@/types';
+import { AnalysisResult, BloodMarkers, CoachMessage, CoachPlan, CoachProviderTelemetry, FoodSensitivityFlag, Insight, MarkerStatus, UserProfile } from '@/types';
 import {
   getMarkerBarScale,
   getMarkerDisplayRange,
@@ -39,6 +39,7 @@ import {
   FileJson,
   Share2,
   Link as LinkIcon,
+  MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
@@ -61,6 +62,39 @@ import MedicalDisclaimer from '@/components/MedicalDisclaimer';
 const MacroDonutChart = dynamic(() => import('@/components/dashboard/MacroDonutChart'), { ssr: false, loading: () => <SkeletonChart /> });
 const HealthRadarChart = dynamic(() => import('@/components/dashboard/HealthRadarChart'), { ssr: false, loading: () => <SkeletonChart /> });
 const MarkerComparisonChart = dynamic(() => import('@/components/dashboard/MarkerComparisonChart'), { ssr: false, loading: () => <SkeletonChart /> });
+
+function TypewriterText({
+  text,
+  alreadyTyped,
+  speed = 16,
+  onDone,
+}: {
+  text: string;
+  alreadyTyped: boolean;
+  speed?: number;
+  onDone: () => void;
+}) {
+  const [idx, setIdx] = useState(alreadyTyped ? text.length : 0);
+
+  useEffect(() => {
+    if (alreadyTyped) return;
+    if (idx >= text.length) {
+      onDone();
+      return;
+    }
+    const step = /\s/.test(text[idx]) ? speed * 0.6 : speed;
+    const t = setTimeout(() => setIdx((i) => i + 1), step);
+    return () => clearTimeout(t);
+  }, [idx, text, speed, alreadyTyped, onDone]);
+
+  const typing = !alreadyTyped && idx < text.length;
+  return (
+    <>
+      {text.slice(0, idx)}
+      {typing && <span className="coach-typewriter-caret">▍</span>}
+    </>
+  );
+}
 
 interface BloodTestDashboardProps {
   result: AnalysisResult;
@@ -813,6 +847,15 @@ export default function BloodTestDashboard({
   const foodFlags = computeFoodSensitivityFlags(markers, profile);
   const [activeMarker, setActiveMarker] = useState<{ key: keyof BloodMarkers; value: number } | null>(null);
   const [activeTab, setActiveTab] = useState<ResultsTab>('biomarkers');
+  const [coachPlan, setCoachPlan] = useState<CoachPlan | null>(result.coach?.plan ?? null);
+  const [coachMessages, setCoachMessages] = useState<CoachMessage[]>(result.coach?.messages ?? []);
+  const [coachTelemetry, setCoachTelemetry] = useState<CoachProviderTelemetry[]>(result.coach?.telemetry ?? []);
+  const [coachInput, setCoachInput] = useState('');
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachError, setCoachError] = useState<string | null>(null);
+  const [coachOpen, setCoachOpen] = useState(false);
+  const [coachInitAttempted, setCoachInitAttempted] = useState(Boolean(result.coach?.plan));
+  const typedMessageIdsRef = useRef<Set<string>>(new Set());
   const animatedOverallScore = useCountUp(healthScore.overall, 1100);
   const countUpDidLogRef = useRef(false);
 
@@ -908,6 +951,43 @@ export default function BloodTestDashboard({
     });
   }, [prioritizedInsights.length, actionableInsights.length, informationalInsights.length]);
   // #endregion
+
+  useEffect(() => {
+    if (coachPlan || coachInitAttempted) return;
+    let cancelled = false;
+
+    async function loadCoachInitial() {
+      setCoachLoading(true);
+      setCoachError(null);
+      try {
+        const res = await fetch('/api/coach/initial', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile, markers, result }),
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to create coach plan (${res.status})`);
+        }
+        const data = await res.json() as { plan: CoachPlan; initialMessage: CoachMessage };
+        if (cancelled) return;
+        setCoachPlan(data.plan);
+        setCoachMessages((prev) => (prev.length > 0 ? prev : [data.initialMessage]));
+      } catch (err) {
+        if (cancelled) return;
+        setCoachError(err instanceof Error ? err.message : 'Could not load coach');
+      } finally {
+        if (!cancelled) {
+          setCoachLoading(false);
+          setCoachInitAttempted(true);
+        }
+      }
+    }
+
+    loadCoachInitial();
+    return () => {
+      cancelled = true;
+    };
+  }, [coachPlan, coachInitAttempted, profile, markers, result]);
 
   const handleOpenMarkerDetails = (key: keyof BloodMarkers, value: number) => {
     debugLog({
@@ -1026,7 +1106,7 @@ export default function BloodTestDashboard({
       const res = await fetch('/api/analyses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, markers, result }),
+        body: JSON.stringify({ profile, markers, result, coach: coachState }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -1061,6 +1141,57 @@ export default function BloodTestDashboard({
       setSharing(false);
     }
   };
+
+  const handleCoachSend = async () => {
+    const question = coachInput.trim();
+    if (!question || !coachPlan || coachLoading) return;
+
+    const userMessage: CoachMessage = {
+      id: `coach-user-${Date.now()}`,
+      role: 'user',
+      source: 'llm_chat',
+      text: question,
+      createdAt: new Date().toISOString(),
+    };
+
+    const nextMessages = [...coachMessages, userMessage];
+    setCoachMessages(nextMessages);
+    setCoachInput('');
+    setCoachLoading(true);
+    setCoachError(null);
+    try {
+      const res = await fetch('/api/coach/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          analysisSnapshot: { profile, markers, result },
+          coachPlan,
+          messages: nextMessages,
+          userQuestion: question,
+        }),
+      });
+      if (!res.ok) throw new Error(`Coach chat failed (${res.status})`);
+      const data = await res.json() as { message: CoachMessage; telemetry?: CoachProviderTelemetry };
+      setCoachMessages((prev) => [...prev, data.message]);
+      const telemetry = data.telemetry;
+      if (telemetry) {
+        setCoachTelemetry((prev) => [...prev, telemetry]);
+      }
+    } catch (err) {
+      setCoachError(err instanceof Error ? err.message : 'Coach response failed');
+    } finally {
+      setCoachLoading(false);
+    }
+  };
+
+  const coachState = coachPlan
+    ? {
+      plan: coachPlan,
+      messages: coachMessages,
+      telemetry: coachTelemetry,
+    }
+    : undefined;
+  const visibleCoachMessages = coachMessages.filter((message) => message.source !== 'coach_engine');
 
   const markerRows = (Object.keys(MARKER_NAMES) as (keyof BloodMarkers)[])
     .filter((k) => markers[k] !== undefined)
@@ -1803,6 +1934,255 @@ export default function BloodTestDashboard({
         value={activeMarker?.value ?? null}
         onClose={() => setActiveMarker(null)}
       />
+
+      <button
+        type="button"
+        onClick={() => setCoachOpen(true)}
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full px-4 py-3 text-sm font-semibold btn-press"
+        style={{
+          background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+          color: 'var(--text-inverse)',
+          boxShadow: '0 12px 28px rgba(0,0,0,0.22)',
+        }}
+      >
+        <MessageCircle className="w-4 h-4" />
+        Coach
+      </button>
+
+      {coachOpen && (
+        <>
+          <style>{`
+            @keyframes coachSlideIn {
+              from {
+                opacity: 0;
+                transform: translateX(calc(100% + 24px));
+              }
+              to {
+                opacity: 1;
+                transform: translateX(0);
+              }
+            }
+            @keyframes coachBackdropFade {
+              from { opacity: 0; }
+              to   { opacity: 1; }
+            }
+            @keyframes coachPriorityPop {
+              0%   { opacity: 0; transform: scale(0.78) translateY(8px); }
+              55%  { opacity: 1; transform: scale(1.06) translateY(-2px); }
+              80%  { transform: scale(0.98) translateY(0.5px); }
+              100% { opacity: 1; transform: scale(1) translateY(0); }
+            }
+            @keyframes coachCaretBlink {
+              0%, 45%   { opacity: 1; }
+              50%, 95%  { opacity: 0; }
+              100%      { opacity: 1; }
+            }
+            .coach-typewriter-caret {
+              display: inline-block;
+              margin-left: 1px;
+              color: var(--accent);
+              font-weight: 600;
+              animation: coachCaretBlink 0.9s steps(1, end) infinite;
+            }
+          `}</style>
+          <button
+            type="button"
+            aria-label="Close coach panel backdrop"
+            onClick={() => setCoachOpen(false)}
+            className="fixed inset-0 z-40"
+            style={{
+              backgroundColor: 'transparent',
+              animation: 'coachBackdropFade 0.3s ease both',
+            }}
+          />
+          <aside
+            className="fixed right-3 sm:right-4 top-3 sm:top-4 h-[calc(100%-1.5rem)] sm:h-[calc(100%-2rem)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-y-auto rounded-3xl"
+            style={{
+              animation: 'coachSlideIn 0.48s cubic-bezier(0.22, 1.12, 0.36, 1) both',
+              willChange: 'transform, opacity',
+              background: 'linear-gradient(165deg, rgba(255,255,255,0.70) 0%, rgba(255,255,255,0.58) 55%, rgba(255,255,255,0.48) 100%)',
+              border: '1px solid rgba(255,255,255,0.55)',
+              backdropFilter: 'blur(28px) saturate(1.7)',
+              WebkitBackdropFilter: 'blur(28px) saturate(1.7)',
+              boxShadow: [
+                '0 28px 72px rgba(8, 12, 22, 0.18)',
+                '0 8px 24px rgba(8, 12, 22, 0.08)',
+                'inset 0 1.5px 0 rgba(255,255,255,0.85)',
+                'inset 0 -1px 0 rgba(255,255,255,0.18)',
+              ].join(', '),
+            }}
+          >
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-3xl"
+              style={{
+                background:
+                  'radial-gradient(160% 80% at 8% -18%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.10) 38%, transparent 68%), radial-gradient(110% 70% at 100% 110%, rgba(125, 186, 133, 0.22) 0%, transparent 62%)',
+                mixBlendMode: 'screen',
+              }}
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-3xl"
+              style={{
+                background:
+                  'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.85) 20%, rgba(255,255,255,0.95) 50%, rgba(255,255,255,0.85) 80%, transparent 100%)',
+              }}
+            />
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-xl" style={{ color: 'var(--text-primary)' }}>
+                Coach
+              </h2>
+              <button
+                type="button"
+                onClick={() => setCoachOpen(false)}
+                className="rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.45)',
+                  border: 'none',
+                  color: 'var(--text-primary)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)',
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="space-y-4 relative z-[1]">
+              {coachPlan ? (
+                <div
+                  className="rounded-2xl p-4"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}
+                >
+                  <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Coach Plan
+                  </h3>
+                  <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
+                    {coachPlan.summary}
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {coachPlan.priorities.slice(0, 3).map((priority, idx) => (
+                      <div
+                        key={`${priority.title}-${idx}`}
+                        className="rounded-xl p-3"
+                        style={{
+                          backgroundColor: 'rgba(255,255,255,0.42)',
+                          border: 'none',
+                          boxShadow: '0 1px 6px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.65)',
+                          animation: 'coachPriorityPop 0.55s cubic-bezier(0.34, 1.6, 0.5, 1) both',
+                          animationDelay: `${150 + idx * 140}ms`,
+                          transformOrigin: 'left center',
+                          willChange: 'transform, opacity',
+                        }}
+                      >
+                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {idx + 1}. {priority.title}
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                          {priority.reason}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl p-4" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
+                  <p className="text-sm" style={{ color: coachError ? 'var(--status-danger)' : 'var(--text-secondary)' }}>
+                    {coachLoading
+                      ? 'Creating your initial coach plan...'
+                      : coachError ?? 'Coach plan is not ready yet.'}
+                  </p>
+                </div>
+              )}
+
+              <div className="rounded-2xl p-4" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
+                <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Ask the Coach
+                </h3>
+                <div className="mt-3 space-y-3 max-h-[360px] overflow-y-auto pr-1">
+                  {visibleCoachMessages.length === 0 ? (
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      Ask a question to start the conversation.
+                    </p>
+                  ) : visibleCoachMessages.map((message) => {
+                    const isAssistant = message.role === 'assistant';
+                    const alreadyTyped =
+                      !isAssistant || typedMessageIdsRef.current.has(message.id);
+                    return (
+                      <div
+                        key={message.id}
+                        className="rounded-xl px-3 py-2"
+                        style={{
+                          backgroundColor: isAssistant ? 'rgba(255,255,255,0.45)' : 'rgba(107, 143, 113, 0.12)',
+                          border: 'none',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.65)',
+                        }}
+                      >
+                        <p className="text-[11px] uppercase tracking-[0.08em] font-semibold" style={{ color: 'var(--text-tertiary)' }}>
+                          {isAssistant ? 'Coach' : 'You'}
+                        </p>
+                        <p className="text-sm mt-1 whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
+                          {isAssistant ? (
+                            <TypewriterText
+                              text={message.text}
+                              alreadyTyped={alreadyTyped}
+                              onDone={() => {
+                                typedMessageIdsRef.current.add(message.id);
+                              }}
+                            />
+                          ) : (
+                            message.text
+                          )}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <input
+                    type="text"
+                    value={coachInput}
+                    onChange={(e) => setCoachInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void handleCoachSend();
+                      }
+                    }}
+                    placeholder="Ask a follow-up about your plan..."
+                    className="flex-1 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                    style={{
+                      border: 'none',
+                      backgroundColor: 'rgba(255,255,255,0.55)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 1px 3px rgba(0,0,0,0.05)',
+                      color: 'var(--text-primary)',
+                    }}
+                    disabled={coachLoading || !coachPlan}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleCoachSend()}
+                    disabled={coachLoading || !coachPlan || coachInput.trim().length === 0}
+                    className="rounded-xl px-4 py-2 text-sm font-semibold btn-press disabled:opacity-50"
+                    style={{
+                      background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+                      color: 'var(--text-inverse)',
+                    }}
+                  >
+                    {coachLoading && coachPlan ? 'Sending...' : 'Send'}
+                  </button>
+                </div>
+                {coachError && (
+                  <p className="text-xs mt-2" style={{ color: 'var(--status-danger)' }}>
+                    {coachError}
+                  </p>
+                )}
+              </div>
+            </div>
+          </aside>
+        </>
+      )}
     </div>
   );
 }

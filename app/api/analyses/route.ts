@@ -42,14 +42,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { profile, markers, result } = parsed.data;
+    const { profile, markers, result, coach } = parsed.data;
+    const persistedResult = coach ? { ...result, coach } : result;
 
     const db = getDb();
     const [inserted] = await db.insert(analyses).values({
       userId,
       profile,
       markers,
-      result,
+      result: persistedResult,
     }).returning();
 
     return NextResponse.json(inserted, { status: 201 });
