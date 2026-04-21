@@ -12,6 +12,7 @@ import {
   Flame,
   TrendingUp,
 } from 'lucide-react';
+import VitalsMark from '@/components/VitalsMark';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://bettercals.com';
 const base = siteUrl.replace(/\/$/, '');
@@ -72,18 +73,28 @@ export default function AboutPage() {
         }}
       >
         <div className="max-w-5xl mx-auto px-4 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between gap-2">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press transition-colors"
-            style={{
-              background: 'var(--border-light)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Back to home
-          </Link>
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <Link href="/" className="flex items-center gap-2.5 min-w-0 w-fit">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
+                <VitalsMark sizePx={32} />
+              </div>
+              <div className="text-[18px] sm:text-[20px] font-bold font-display" style={{ color: 'var(--text-primary)' }}>
+                BetterCals
+              </div>
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press transition-colors"
+              style={{
+                background: 'var(--border-light)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Back to home
+            </Link>
+          </div>
           <Link
             href="/analyze"
             className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"

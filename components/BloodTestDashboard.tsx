@@ -1293,14 +1293,31 @@ export default function BloodTestDashboard({
       >
         <div className="max-w-5xl mx-auto px-4 sm:px-5 py-3 sm:py-4 xl:relative xl:-translate-x-5">
           <div className="flex items-center justify-between gap-2">
-            <button
-              onClick={onReset}
-              className="flex items-center gap-1.5 text-sm font-medium group btn-press shrink-0"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" style={{ color: 'var(--text-tertiary)' }} />
-              <span className="hidden sm:inline">{resetLabel}</span>
-            </button>
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <Link href="/" className="flex items-center gap-2 shrink-0">
+                <div
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-[14px] flex items-center justify-center"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    boxShadow: '0 2px 5px var(--shadow-soft)',
+                  }}
+                >
+                  <VitalsMark sizePx={22} />
+                </div>
+                <span className="hidden sm:inline text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>
+                  BetterCals
+                </span>
+              </Link>
+              <button
+                onClick={onReset}
+                className="flex items-center gap-1.5 text-sm font-medium group btn-press shrink-0"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" style={{ color: 'var(--text-tertiary)' }} />
+                <span className="hidden sm:inline">{resetLabel}</span>
+              </button>
+            </div>
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
               <button
                 onClick={handleDownloadPDF}
@@ -1413,19 +1430,6 @@ export default function BloodTestDashboard({
                 </Link>
               )}
 
-              <div className="flex items-center gap-2 shrink-0">
-                <div
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-[14px] flex items-center justify-center"
-                  style={{
-                    backgroundColor: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    boxShadow: '0 2px 5px var(--shadow-soft)',
-                  }}
-                >
-                  <VitalsMark sizePx={22} />
-                </div>
-                <span className="hidden sm:inline text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
-              </div>
             </div>
           </div>
 
