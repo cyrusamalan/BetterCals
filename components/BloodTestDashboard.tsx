@@ -12,7 +12,6 @@ import {
   markerValueToBarPercent,
 } from '@/lib/bloodParser';
 import MarkerHoverPopup from '@/components/dashboard/MarkerHoverPopup';
-import VitalsMark from '@/components/VitalsMark';
 import {
   Heart,
   Flame,
@@ -43,6 +42,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
+import Image from 'next/image';
 import ProfileDropdown from '@/components/ProfileDropdown';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
@@ -1291,21 +1291,19 @@ export default function BloodTestDashboard({
           WebkitBackdropFilter: 'blur(16px)',
         }}
       >
-        <div className="max-w-5xl mx-auto px-4 sm:px-5 py-3 sm:py-4 xl:relative xl:-translate-x-5">
+        <div className="w-full px-4 sm:px-5 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-              <Link href="/" className="flex items-center gap-2 shrink-0">
-                <div
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-[14px] flex items-center justify-center"
-                  style={{
-                    backgroundColor: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    boxShadow: '0 2px 5px var(--shadow-soft)',
-                  }}
-                >
-                  <VitalsMark sizePx={22} />
-                </div>
-                <span className="hidden sm:inline text-sm font-bold font-display" style={{ color: 'var(--text-primary)' }}>
+              <Link href="/" className="flex items-center gap-2.5 sm:gap-3 min-w-0 shrink-0">
+                <Image
+                  src="/logo/bettercals-logo-icon.png"
+                  alt="BetterCals logo"
+                  width={40}
+                  height={40}
+                  className="w-9 h-9 sm:w-10 sm:h-10"
+                  priority
+                />
+                <span className="text-[18px] sm:text-[20px] font-bold font-display" style={{ color: 'var(--text-primary)' }}>
                   BetterCals
                 </span>
               </Link>
