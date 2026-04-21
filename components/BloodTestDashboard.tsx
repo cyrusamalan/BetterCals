@@ -837,7 +837,7 @@ function TabButton({
     <button
       type="button"
       onClick={() => onClick(tab)}
-      className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all"
+      className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0"
       style={{
         backgroundColor: active ? 'var(--text-primary)' : 'var(--bg-warm)',
         color: active ? 'var(--text-inverse)' : 'var(--text-secondary)',
@@ -1851,7 +1851,11 @@ export default function BloodTestDashboard({
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] mb-3" style={{ color: 'var(--text-tertiary)' }}>
                     Jump To Section
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <style>{`.tab-scroll::-webkit-scrollbar { display: none; }`}</style>
+                  <div
+                    className="tab-scroll flex gap-2 overflow-x-auto sm:flex-wrap sm:overflow-x-visible -mx-1 px-1 sm:mx-0 sm:px-0 pb-1 sm:pb-0"
+                    style={{ scrollbarWidth: 'none' }}
+                  >
                     {availableTabs.map((tab) => (
                       <TabButton key={tab} tab={tab} active={displayedTab === tab} onClick={setActiveTab} />
                     ))}
@@ -1859,6 +1863,57 @@ export default function BloodTestDashboard({
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="mt-6 xl:hidden anim-fade-up delay-2">
+          <div
+            className="rounded-2xl p-4 sm:p-5"
+            style={{
+              backgroundColor: 'var(--card-bg)',
+              border: '1px solid var(--card-border)',
+              boxShadow: 'var(--card-shadow, 0 6px 20px rgba(0,0,0,0.05))',
+            }}
+          >
+            <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Personalized Plan
+            </h3>
+            {coachPlan ? (
+              <>
+                <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
+                  {coachPlan.summary}
+                </p>
+                <div className="mt-3 space-y-2">
+                  {coachPlan.priorities.slice(0, 3).map((priority, idx) => (
+                    <div
+                      key={`inline-plan-${priority.title}-${idx}`}
+                      className="rounded-xl p-3"
+                      style={{
+                        backgroundColor: 'var(--bg-warm)',
+                        border: '1px solid var(--border-light)',
+                        animation: 'coachPriorityPop 0.55s cubic-bezier(0.34, 1.6, 0.5, 1) both',
+                        animationDelay: `${140 + idx * 140}ms`,
+                        transformOrigin: 'left center',
+                        willChange: 'transform, opacity',
+                      }}
+                    >
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {idx + 1}. {priority.title}
+                      </p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                        {priority.reason}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm mt-2" style={{ color: coachError ? 'var(--status-danger)' : 'var(--text-secondary)' }}>
+                {coachLoading
+                  ? 'Creating your personalized plan...'
+                  : coachError ?? 'Your personalized plan is not ready yet.'}
+              </p>
+            )}
           </div>
         </div>
 
