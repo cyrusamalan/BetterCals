@@ -5,8 +5,8 @@ import { isCoachReplyGrounded } from '@/lib/ai/coachSafety';
 import type { AnalysisResult, BloodMarkers, CoachMessage, CoachPlan, UserProfile } from '@/types';
 
 const MAX_TOTAL_CHARS = 18_000;
-const MIN_REPLY_CHARS = 220;
-const MIN_BULLETS = 3;
+const MIN_REPLY_CHARS = 120;
+const MIN_BULLETS = 2;
 
 function buildFallbackMessage(
   question: string,
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
         result: analysisSnapshot.result as unknown as AnalysisResult,
         coachPlan: coachPlan as CoachPlan,
         recentMessages,
-        userQuestion,
+        userQuestion: `${userQuestion}\n\nFormat strictly: one short direct sentence, then 4-8 bullets with at least two concrete anchors from this user's data.`,
       });
       if (retry.text && (!gemini.text || retry.text.length > gemini.text.length)) {
         gemini = retry;
