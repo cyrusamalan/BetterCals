@@ -5,44 +5,11 @@ import { parseBloodReport, PLAUSIBLE_RANGES } from '@/lib/bloodParser';
 import { checkRateLimit } from '@/lib/rateLimit';
 import Tesseract from 'tesseract.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 // Defaults to DeepSeek cloud API; override with LLM_BASE_URL for local models
 // e.g. Ollama: http://localhost:11434/v1    LM Studio: http://localhost:1234/v1
 const DEFAULT_BASE_URL = 'https://api.deepseek.com';
 const DEFAULT_DEEPSEEK_MODEL = 'deepseek-chat';
-
-async function extractPdfTextWithPdfJs(bytes: Buffer): Promise<string> {
-  try {
-    const workerPath = path.resolve(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
-    GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString();
-    const loadingTask = getDocument({
-      data: new Uint8Array(bytes),
-    });
-    const pdf = await loadingTask.promise;
-    const pages: string[] = [];
-
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
-      const page = await pdf.getPage(pageNum);
-      const content = await page.getTextContent();
-      const pageText = content.items
-        .map((item) => {
-          if ('str' in item && typeof item.str === 'string') return item.str;
-          return '';
-        })
-        .join(' ')
-        .trim();
-      if (pageText) pages.push(pageText);
-    }
-
-    return pages.join('\n').trim();
-  } catch (error) {
-    console.warn('[extract-blood-report] pdfjs fallback failed:', error);
-    return '';
-  }
-}
 
 function sanitizeBloodMarkers(input: unknown): BloodMarkers {
   if (!input || typeof input !== 'object') return {};
@@ -584,11 +551,8 @@ export async function POST(request: Request) {
         const pdfData = await pdfParse(bytes);
         text = pdfData.text?.trim() ?? '';
       } catch (error) {
-        console.warn('[extract-blood-report] pdf-parse failed, trying pdfjs fallback:', error);
+        console.warn('[extract-blood-report] pdf-parse failed:', error);
         text = '';
-      }
-      if (!text) {
-        text = await extractPdfTextWithPdfJs(bytes);
       }
 
       // If text extraction fails for scanned/complex PDFs, ask Gemini directly on the PDF bytes.
