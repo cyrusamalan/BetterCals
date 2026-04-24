@@ -19,8 +19,11 @@ async function extractMarkersServerSide(file: File): Promise<BloodMarkers> {
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error || 'Extraction failed');
+    const err = await res.json().catch(() => ({})) as { error?: string; details?: string[] };
+    const detailText = Array.isArray(err?.details) && err.details.length > 0
+      ? ` (${err.details.join(' | ')})`
+      : '';
+    throw new Error(`${err?.error || 'Extraction failed'}${detailText}`);
   }
 
   const data = await res.json() as { markers?: BloodMarkers };

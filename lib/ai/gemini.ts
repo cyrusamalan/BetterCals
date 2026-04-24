@@ -29,13 +29,14 @@ function getClient() {
 }
 
 function getModelName(): string {
-  return process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const configured = process.env.GEMINI_MODEL?.trim();
+  if (!configured) throw new Error('GEMINI_MODEL is missing');
+  return configured;
 }
 
 function getFallbackModelName(primary: string): string {
   const configured = process.env.GEMINI_FALLBACK_MODEL?.trim();
-  if (configured) return configured;
-  return primary === 'gemini-1.5-flash' ? 'gemini-2.5-flash' : 'gemini-1.5-flash';
+  return configured || primary;
 }
 
 function sleep(ms: number): Promise<void> {
