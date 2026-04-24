@@ -61,6 +61,11 @@ describe('isCoachReplyGrounded', () => {
     expect(isCoachReplyGrounded(reply, { profile, markers, result, plan })).toBe(true);
   });
 
+  it('accepts derived calorie deltas from grounded anchors', () => {
+    const reply = 'Move from 2400 to 2000 calories for a 400 calorie deficit and reassess after 14 days.';
+    expect(isCoachReplyGrounded(reply, { profile, markers, result, plan })).toBe(true);
+  });
+
   it('rejects ungrounded novel numbers', () => {
     const reply = 'Set calories to 3100 and target LDL 70 immediately.';
     expect(isCoachReplyGrounded(reply, { profile, markers, result, plan })).toBe(false);
