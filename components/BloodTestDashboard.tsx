@@ -39,6 +39,8 @@ import {
   Share2,
   Link as LinkIcon,
   MessageCircle,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
@@ -62,6 +64,90 @@ import MedicalDisclaimer from '@/components/MedicalDisclaimer';
 const MacroDonutChart = dynamic(() => import('@/components/dashboard/MacroDonutChart'), { ssr: false, loading: () => <SkeletonChart /> });
 const HealthRadarChart = dynamic(() => import('@/components/dashboard/HealthRadarChart'), { ssr: false, loading: () => <SkeletonChart /> });
 const MarkerComparisonChart = dynamic(() => import('@/components/dashboard/MarkerComparisonChart'), { ssr: false, loading: () => <SkeletonChart /> });
+
+type LiveServerMessage = {
+  setupComplete?: Record<string, never>;
+  error?: { message?: string };
+  serverContent?: {
+    outputTranscription?: { text?: string };
+    modelTurn?: {
+      parts?: Array<{
+        text?: string;
+        inlineData?: {
+          data?: string;
+          mimeType?: string;
+        };
+      }>;
+    };
+  };
+};
+
+const LIVE_SAMPLE_RATE = 16000;
+
+function floatTo16BitPcm(input: Float32Array): Int16Array {
+  const output = new Int16Array(input.length);
+  for (let i = 0; i < input.length; i += 1) {
+    const sample = Math.max(-1, Math.min(1, input[i]));
+    output[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+  }
+  return output;
+}
+
+function downsampleTo16k(input: Float32Array, sourceRate: number): Float32Array {
+  if (sourceRate === LIVE_SAMPLE_RATE) return input;
+  const ratio = sourceRate / LIVE_SAMPLE_RATE;
+  const newLength = Math.round(input.length / ratio);
+  const output = new Float32Array(newLength);
+  let offset = 0;
+  for (let i = 0; i < newLength; i += 1) {
+    const nextOffset = Math.round((i + 1) * ratio);
+    let sum = 0;
+    let count = 0;
+    for (let j = offset; j < nextOffset && j < input.length; j += 1) {
+      sum += input[j];
+      count += 1;
+    }
+    output[i] = count > 0 ? sum / count : 0;
+    offset = nextOffset;
+  }
+  return output;
+}
+
+function pcmToBase64(pcm: Int16Array): string {
+  const bytes = new Uint8Array(pcm.length * 2);
+  for (let i = 0; i < pcm.length; i += 1) {
+    const value = pcm[i];
+    bytes[i * 2] = value & 0xff;
+    bytes[i * 2 + 1] = (value >> 8) & 0xff;
+  }
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToPcm(base64: string): Int16Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  const pcm = new Int16Array(bytes.length / 2);
+  for (let i = 0; i < pcm.length; i += 1) {
+    pcm[i] = (bytes[i * 2 + 1] << 8) | bytes[i * 2];
+  }
+  return pcm;
+}
+
+function sampleRateFromMimeType(mimeType?: string): number {
+  if (!mimeType) return 24000;
+  const match = mimeType.match(/rate=(\d+)/i);
+  if (!match) return 24000;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 24000;
+}
 
 function TypewriterText({
   text,
@@ -883,10 +969,21 @@ export default function BloodTestDashboard({
   const [coachInput, setCoachInput] = useState('');
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachError, setCoachError] = useState<string | null>(null);
+  const [coachListening, setCoachListening] = useState(false);
+  const [coachLiveTranscript, setCoachLiveTranscript] = useState('Live voice ready');
   const [coachOpen, setCoachOpen] = useState(false);
   const [coachClosing, setCoachClosing] = useState(false);
   const [coachInitAttempted, setCoachInitAttempted] = useState(Boolean(result.coach?.plan));
   const typedMessageIdsRef = useRef<Set<string>>(new Set());
+  const liveSocketRef = useRef<WebSocket | null>(null);
+  const liveAudioContextRef = useRef<AudioContext | null>(null);
+  const liveSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const liveProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const liveMicStreamRef = useRef<MediaStream | null>(null);
+  const livePlaybackStartAtRef = useRef(0);
+  const liveAssistantMessageIdRef = useRef<string | null>(null);
+  const liveReconnectAllowedRef = useRef(false);
+  const liveSetupCompleteRef = useRef(false);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const animatedOverallScore = useCountUp(healthScore.overall, 1100);
   const countUpDidLogRef = useRef(false);
@@ -1182,8 +1279,8 @@ export default function BloodTestDashboard({
     }
   };
 
-  const handleCoachSend = async () => {
-    const question = coachInput.trim();
+  const sendCoachQuestion = async (rawQuestion: string) => {
+    const question = rawQuestion.trim();
     if (!question || !coachPlan || coachLoading) return;
 
     const userMessage: CoachMessage = {
@@ -1196,7 +1293,6 @@ export default function BloodTestDashboard({
 
     const nextMessages = [...coachMessages, userMessage];
     setCoachMessages(nextMessages);
-    setCoachInput('');
     setCoachLoading(true);
     setCoachError(null);
     try {
@@ -1223,6 +1319,231 @@ export default function BloodTestDashboard({
       setCoachLoading(false);
     }
   };
+
+  const handleCoachSend = async () => {
+    await sendCoachQuestion(coachInput);
+    setCoachInput('');
+  };
+
+  const stopCoachLiveSession = () => {
+    liveReconnectAllowedRef.current = false;
+    liveSetupCompleteRef.current = false;
+    livePlaybackStartAtRef.current = 0;
+    setCoachListening(false);
+    setCoachLiveTranscript('Live voice off');
+    if (liveSocketRef.current) {
+      liveSocketRef.current.close();
+      liveSocketRef.current = null;
+    }
+    if (liveProcessorNodeRef.current) {
+      liveProcessorNodeRef.current.disconnect();
+      liveProcessorNodeRef.current.onaudioprocess = null;
+      liveProcessorNodeRef.current = null;
+    }
+    if (liveSourceNodeRef.current) {
+      liveSourceNodeRef.current.disconnect();
+      liveSourceNodeRef.current = null;
+    }
+    if (liveAudioContextRef.current) {
+      void liveAudioContextRef.current.close();
+      liveAudioContextRef.current = null;
+    }
+    if (liveMicStreamRef.current) {
+      liveMicStreamRef.current.getTracks().forEach((track) => track.stop());
+      liveMicStreamRef.current = null;
+    }
+  };
+
+  const startCoachLiveSession = async () => {
+    if (!coachPlan || coachLoading) return;
+    if (typeof window === 'undefined' || !window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      setCoachError('Live voice requires HTTPS and microphone access support.');
+      return;
+    }
+
+    setCoachError(null);
+    setCoachLiveTranscript('Connecting live voice...');
+    liveReconnectAllowedRef.current = true;
+
+    const tokenRes = await fetch('/api/coach/live-token', { method: 'POST' });
+    if (!tokenRes.ok) {
+      throw new Error(`Could not start live session (${tokenRes.status})`);
+    }
+    const tokenData = await tokenRes.json() as { token: string; model: string };
+    const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(tokenData.token)}`;
+    const socket = new WebSocket(wsUrl);
+    liveSocketRef.current = socket;
+    liveSetupCompleteRef.current = false;
+    socket.onopen = () => {
+      socket.send(JSON.stringify({
+        setup: {
+          model: `models/${tokenData.model}`,
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+          },
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
+        },
+      }));
+    };
+
+    socket.onmessage = async (event) => {
+      let raw = '';
+      if (typeof event.data === 'string') {
+        raw = event.data;
+      } else if (event.data instanceof Blob) {
+        raw = await event.data.text();
+      } else {
+        return;
+      }
+
+      let payload: LiveServerMessage;
+      try {
+        payload = JSON.parse(raw) as LiveServerMessage;
+      } catch {
+        return;
+      }
+
+      if (payload.setupComplete) {
+        liveSetupCompleteRef.current = true;
+        setCoachLiveTranscript('Live voice connected');
+        return;
+      }
+
+      if (payload.error?.message) {
+        setCoachError(`Live session error: ${payload.error.message}`);
+        return;
+      }
+
+      const outputTranscript = payload.serverContent?.outputTranscription?.text?.trim();
+      const modelText = payload.serverContent?.modelTurn?.parts
+        ?.map((part) => part.text ?? '')
+        .join(' ')
+        .trim();
+      const streamText = outputTranscript || modelText || '';
+
+      if (streamText) {
+        let assistantMessageId = liveAssistantMessageIdRef.current;
+        if (!assistantMessageId) {
+          assistantMessageId = `coach-live-${Date.now()}`;
+          liveAssistantMessageIdRef.current = assistantMessageId;
+          setCoachMessages((prev) => [
+            ...prev,
+            {
+              id: assistantMessageId!,
+              role: 'assistant',
+              source: 'llm_chat',
+              text: streamText,
+              createdAt: new Date().toISOString(),
+            },
+          ]);
+        } else {
+          setCoachMessages((prev) => prev.map((message) => (
+            message.id === assistantMessageId
+              ? { ...message, text: streamText }
+              : message
+          )));
+        }
+      }
+
+      const audioParts = payload.serverContent?.modelTurn?.parts
+        ?.filter((part) => part.inlineData?.data && part.inlineData?.mimeType?.includes('audio/pcm'));
+      if (audioParts && audioParts.length > 0 && liveAudioContextRef.current) {
+        const ctx = liveAudioContextRef.current;
+        for (const part of audioParts) {
+          const pcm = base64ToPcm(part.inlineData!.data!);
+          const sampleRate = sampleRateFromMimeType(part.inlineData?.mimeType);
+          const floatBuffer = new Float32Array(pcm.length);
+          for (let i = 0; i < pcm.length; i += 1) {
+            floatBuffer[i] = pcm[i] / 0x8000;
+          }
+          const audioBuffer = ctx.createBuffer(1, floatBuffer.length, sampleRate);
+          audioBuffer.getChannelData(0).set(floatBuffer);
+          const src = ctx.createBufferSource();
+          src.buffer = audioBuffer;
+          src.connect(ctx.destination);
+          const when = Math.max(ctx.currentTime, livePlaybackStartAtRef.current);
+          src.start(when);
+          livePlaybackStartAtRef.current = when + audioBuffer.duration;
+        }
+      }
+    };
+
+    socket.onerror = () => {
+      setCoachError('Live connection failed. Please try again.');
+    };
+
+    socket.onclose = () => {
+      liveSocketRef.current = null;
+      liveAssistantMessageIdRef.current = null;
+      liveSetupCompleteRef.current = false;
+      if (liveReconnectAllowedRef.current) {
+        setCoachError('Live session ended. Tap mic to reconnect.');
+      }
+      stopCoachLiveSession();
+    };
+
+    try {
+      const micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      liveMicStreamRef.current = micStream;
+      const audioContext = new AudioContext({ sampleRate: LIVE_SAMPLE_RATE });
+      liveAudioContextRef.current = audioContext;
+      livePlaybackStartAtRef.current = audioContext.currentTime;
+
+      const sourceNode = audioContext.createMediaStreamSource(micStream);
+      liveSourceNodeRef.current = sourceNode;
+      const processorNode = audioContext.createScriptProcessor(2048, 1, 1);
+      liveProcessorNodeRef.current = processorNode;
+
+      processorNode.onaudioprocess = (procEvent) => {
+        if (!liveSetupCompleteRef.current || liveSocketRef.current?.readyState !== WebSocket.OPEN) return;
+        const inputData = procEvent.inputBuffer.getChannelData(0);
+        const downsampled = downsampleTo16k(inputData, audioContext.sampleRate);
+        const pcm16 = floatTo16BitPcm(downsampled);
+        const base64Audio = pcmToBase64(pcm16);
+        liveSocketRef.current.send(JSON.stringify({
+          realtimeInput: {
+            audio: {
+              data: base64Audio,
+              mimeType: 'audio/pcm;rate=16000',
+            },
+          },
+        }));
+      };
+
+      sourceNode.connect(processorNode);
+      processorNode.connect(audioContext.destination);
+      setCoachListening(true);
+    } catch (error) {
+      stopCoachLiveSession();
+      throw new Error(error instanceof Error ? error.message : 'Could not access microphone audio');
+    }
+  };
+
+  const handleCoachMicToggle = async () => {
+    if (coachListening) {
+      stopCoachLiveSession();
+      return;
+    }
+    try {
+      await startCoachLiveSession();
+    } catch (err) {
+      setCoachError(err instanceof Error ? err.message : 'Could not start live session');
+      setCoachListening(false);
+      stopCoachLiveSession();
+    }
+  };
+
+  useEffect(() => () => {
+    stopCoachLiveSession();
+  }, []);
 
   const coachState = coachPlan
     ? {
@@ -2367,6 +2688,20 @@ export default function BloodTestDashboard({
                       />
                       <button
                         type="button"
+                        onClick={() => void handleCoachMicToggle()}
+                        disabled={!coachPlan}
+                        aria-label={coachListening ? 'Stop live coach voice' : 'Start live coach voice'}
+                        className="rounded-xl px-3 py-2 text-sm font-semibold btn-press disabled:opacity-50"
+                        style={{
+                          backgroundColor: coachListening ? 'rgba(220, 38, 38, 0.15)' : 'rgba(255,255,255,0.55)',
+                          color: coachListening ? 'var(--status-danger)' : 'var(--text-primary)',
+                          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 1px 3px rgba(0,0,0,0.05)',
+                        }}
+                      >
+                        {coachListening ? <MicOff size={16} /> : <Mic size={16} />}
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => void handleCoachSend()}
                         disabled={coachLoading || !coachPlan || coachInput.trim().length === 0}
                         className="rounded-xl px-4 py-2 text-sm font-semibold btn-press disabled:opacity-50"
@@ -2378,6 +2713,11 @@ export default function BloodTestDashboard({
                         {coachLoading && coachPlan ? 'Sending...' : 'Send'}
                       </button>
                     </div>
+                    {coachListening && (
+                      <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
+                        Listening... {coachLiveTranscript ? `"${coachLiveTranscript}"` : 'speak now'}
+                      </p>
+                    )}
                     {coachError && (
                       <p className="text-xs mt-2" style={{ color: 'var(--status-danger)' }}>
                         {coachError}

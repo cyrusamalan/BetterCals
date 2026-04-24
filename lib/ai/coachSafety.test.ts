@@ -126,6 +126,26 @@ describe('isCoachReplyGrounded', () => {
     ).toBe(true);
   });
 
+  it('accepts slightly rounded numeric anchors', () => {
+    const roundedResult: AnalysisResult = {
+      ...result,
+      recommendations: {
+        ...result.recommendations,
+        homaIR: 7.64,
+      },
+    };
+
+    const reply = 'Keep calories around 2000 and address insulin resistance (HOMA-IR 7.6) this week.';
+    expect(
+      isCoachReplyGrounded(reply, {
+        profile,
+        markers,
+        result: roundedResult,
+        plan,
+      }),
+    ).toBe(true);
+  });
+
   it('rejects ungrounded novel numbers', () => {
     const reply = 'Set calories to 3100 and target LDL 70 immediately.';
     expect(isCoachReplyGrounded(reply, { profile, markers, result, plan })).toBe(false);

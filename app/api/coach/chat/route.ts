@@ -144,7 +144,9 @@ export async function POST(request: Request) {
 
     const generic = gemini.text ? isLikelyGenericReply(gemini.text) : false;
     const lowQuality = gemini.text ? isLowQualityReply(gemini.text) : true;
-    const responseText = gemini.text && grounded && !generic && !lowQuality
+    // Always surface model output to the user when present.
+    // Fallback is only used when the model returns empty text.
+    const responseText = gemini.text
       ? gemini.text
       : buildFallbackMessage(userQuestion, {
           result: analysisSnapshot.result as unknown as AnalysisResult,

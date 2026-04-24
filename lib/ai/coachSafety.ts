@@ -46,6 +46,26 @@ function buildAllowedNumbers(input: {
   return baseTokens;
 }
 
+function isApproximatelyGrounded(token: string, allowedTokens: Set<string>): boolean {
+  const value = Number(token);
+  if (!Number.isFinite(value)) return false;
+
+  for (const allowedToken of allowedTokens) {
+    const allowedValue = Number(allowedToken);
+    if (!Number.isFinite(allowedValue)) continue;
+    const delta = Math.abs(value - allowedValue);
+
+    // Tight tolerance for small numbers, wider for larger anchors where
+    // rounding (e.g. calories/steps) is common in model phrasing.
+    if (allowedValue < 10 && delta <= 0.15) return true;
+    if (allowedValue >= 10 && allowedValue < 100 && delta <= 0.5) return true;
+    if (allowedValue >= 100 && allowedValue < 1000 && delta <= 2) return true;
+    if (allowedValue >= 1000 && delta <= 10) return true;
+  }
+
+  return false;
+}
+
 export function isCoachReplyGrounded(
   reply: string,
   input: {
@@ -64,6 +84,7 @@ export function isCoachReplyGrounded(
   for (const token of replyNumbers) {
     if (allowed.has(token)) continue;
     if (benign.has(token)) continue;
+    if (isApproximatelyGrounded(token, allowed)) continue;
     return false;
   }
   return true;
