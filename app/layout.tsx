@@ -54,9 +54,9 @@ export const metadata: Metadata = {
     follow: true,
   },
   icons: {
-    icon: '/logo/bettercals-logo-icon-tight.png',
-    shortcut: '/logo/bettercals-logo-icon-tight.png',
-    apple: '/logo/bettercals-logo-icon-tight.png',
+    icon: '/logo/bettercals-logo-icon.png',
+    shortcut: '/logo/bettercals-logo-icon.png',
+    apple: '/logo/bettercals-logo-icon.png',
   },
 };
 
