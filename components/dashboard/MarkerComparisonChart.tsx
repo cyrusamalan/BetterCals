@@ -42,6 +42,11 @@ const MARKER_SHORT: Record<keyof BloodMarkers, string> = {
   creatinine: 'Creat',
   uricAcid: 'Uric Acid',
   fastingInsulin: 'Insulin',
+  lymphocytePct: 'Lymphs %',
+  mcv: 'MCV',
+  rdw: 'RDW',
+  alkalinePhosphatase: 'ALP',
+  whiteBloodCells: 'WBC',
 };
 
 const STATUS_COLORS: Record<string, string> = {

@@ -227,6 +227,52 @@ export const MARKER_RULES: Record<keyof BloodMarkers, MarkerDefinition> = {
       { min: 50.01, max: VERY_HIGH, status: 'critical', label: 'Very high', score: 15 },
     ],
   },
+  lymphocytePct: {
+    unit: '%',
+    universal: [
+      { min: 0, max: 14.99, status: 'low', label: 'Low', score: 45 },
+      { min: 15, max: 19.99, status: 'borderline', label: 'Below normal', score: 70 },
+      { min: 20, max: 40, status: 'normal', label: 'Normal', score: 92 },
+      { min: 40.01, max: 50, status: 'borderline', label: 'Above normal', score: 70 },
+      { min: 50.01, max: VERY_HIGH, status: 'high', label: 'High', score: 45 },
+    ],
+  },
+  mcv: {
+    unit: 'fL',
+    universal: [
+      { min: 0, max: 79.99, status: 'low', label: 'Microcytic', score: 50 },
+      { min: 80, max: 100, status: 'normal', label: 'Normal', score: 92 },
+      { min: 100.01, max: 110, status: 'borderline', label: 'Mildly macrocytic', score: 65 },
+      { min: 110.01, max: VERY_HIGH, status: 'high', label: 'Macrocytic', score: 40 },
+    ],
+  },
+  rdw: {
+    unit: '%',
+    universal: [
+      { min: 0, max: 12.99, status: 'optimal', label: 'Optimal', score: 100 },
+      { min: 13, max: 14.5, status: 'normal', label: 'Normal', score: 90 },
+      { min: 14.51, max: 15.5, status: 'borderline', label: 'Borderline elevated', score: 65 },
+      { min: 15.51, max: VERY_HIGH, status: 'high', label: 'Elevated', score: 40 },
+    ],
+  },
+  alkalinePhosphatase: {
+    unit: 'U/L',
+    universal: [
+      { min: 0, max: 43.99, status: 'low', label: 'Low', score: 55 },
+      { min: 44, max: 147, status: 'normal', label: 'Normal', score: 92 },
+      { min: 147.01, max: 200, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 200.01, max: VERY_HIGH, status: 'high', label: 'Elevated', score: 40 },
+    ],
+  },
+  whiteBloodCells: {
+    unit: 'K/µL',
+    universal: [
+      { min: 0, max: 3.99, status: 'low', label: 'Low', score: 45 },
+      { min: 4, max: 11, status: 'normal', label: 'Normal', score: 92 },
+      { min: 11.01, max: 15, status: 'borderline', label: 'Mildly elevated', score: 65 },
+      { min: 15.01, max: VERY_HIGH, status: 'high', label: 'Elevated', score: 40 },
+    ],
+  },
 };
 
 /**
@@ -255,6 +301,11 @@ export const PLAUSIBLE_RANGES: Partial<Record<keyof BloodMarkers, { min: number;
   creatinine: { min: 0.1, max: 15 },      // mg/dL
   uricAcid: { min: 0.5, max: 20 },        // mg/dL
   fastingInsulin: { min: 0.1, max: 300 },  // mIU/L
+  lymphocytePct: { min: 1, max: 90 },     // %
+  mcv: { min: 50, max: 130 },             // fL
+  rdw: { min: 8, max: 30 },               // %
+  alkalinePhosphatase: { min: 5, max: 1500 }, // U/L
+  whiteBloodCells: { min: 0.5, max: 50 }, // K/µL
 };
 
 /** Returns true if the value is within the plausible physiological range for the marker. */
@@ -375,6 +426,11 @@ export function parseBloodReport(text: string): BloodMarkers {
   accept('creatinine', extractValue(['creatinine'], ['mg/dL', 'mg/dl']));
   accept('uricAcid', extractValue(['uric acid', 'urate'], ['mg/dL', 'mg/dl']));
   accept('fastingInsulin', extractValue(['fasting insulin', 'insulin'], ['mIU/L', 'uIU/mL', 'miu/l']));
+  accept('lymphocytePct', extractValue(['lymphocytes %', 'lymphocyte %', 'lymphs %', 'lymphocytes percent'], ['%']));
+  accept('mcv', extractValue(['mcv', 'mean corpuscular volume', 'mean cell volume'], ['fL', 'fl']));
+  accept('rdw', extractValue(['rdw', 'red cell distribution width', 'rdw-cv'], ['%']));
+  accept('alkalinePhosphatase', extractValue(['alkaline phosphatase', 'alk phos', 'alp'], ['U/L', 'IU/L', 'u/l']));
+  accept('whiteBloodCells', extractValue(['wbc', 'white blood cells', 'white blood cell count', 'leukocytes'], ['K/uL', 'K/µL', 'x10^3/uL', '10^3/uL', '10*3/uL']));
 
   // Derived markers — only compute nonHdl if HDL <= Total Cholesterol (sanity check)
   if (markers.totalCholesterol !== undefined && markers.hdl !== undefined && markers.hdl <= markers.totalCholesterol) {

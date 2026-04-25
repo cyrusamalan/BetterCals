@@ -49,6 +49,7 @@ import ProfileDropdown from '@/components/ProfileDropdown';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
 import ASCVDRiskCard from '@/components/dashboard/ASCVDRiskCard';
+import BioAgeCard from '@/components/dashboard/BioAgeCard';
 import RestingHeartRateCard from '@/components/dashboard/RestingHeartRateCard';
 import FoodSensitivityCard from '@/components/dashboard/FoodSensitivityCard';
 import ActionPlanCard from '@/components/dashboard/ActionPlanCard';
@@ -56,6 +57,7 @@ import PopulationBenchmarksCard from '@/components/dashboard/PopulationBenchmark
 import { deriveActionPlan, derivePopulationBenchmarks } from '@/lib/derivedInsights';
 import { debugLog } from '@/lib/debugLog';
 import { MARKER_NAMES } from '@/lib/calculations';
+import { calculatePhenoAge } from '@/lib/phenoAge';
 
 import { SkeletonChart } from '@/components/dashboard/Skeleton';
 import TechnicalMethodology from '@/components/TechnicalMethodology';
@@ -1195,6 +1197,8 @@ export default function BloodTestDashboard({
       iron: 'Iron (mcg/dL)', alt: 'ALT (U/L)', ast: 'AST (U/L)', albumin: 'Albumin (g/dL)',
       creatinine: 'Creatinine (mg/dL)', uricAcid: 'Uric Acid (mg/dL)', fastingInsulin: 'Fasting Insulin (mIU/L)',
       nonHdl: 'Non-HDL (mg/dL)',
+      lymphocytePct: 'Lymphocytes (%)', mcv: 'MCV (fL)', rdw: 'RDW (%)',
+      alkalinePhosphatase: 'Alkaline Phosphatase (U/L)', whiteBloodCells: 'WBC (K/µL)',
     };
     const rows: string[] = ['Marker,Value,Status'];
     for (const [key, value] of Object.entries(markers)) {
@@ -1213,6 +1217,15 @@ export default function BloodTestDashboard({
     rows.push(`Protein (g),${macros.protein.grams}`);
     rows.push(`Carbs (g),${macros.carbs.grams}`);
     rows.push(`Fat (g),${macros.fat.grams}`);
+    if (phenoAgeSnapshot) {
+      rows.push('');
+      rows.push('Biological Age,Value');
+      rows.push(`PhenoAge (years),${phenoAgeSnapshot.phenoAge}`);
+      rows.push(`Chronological Age (years),${phenoAgeSnapshot.chronologicalAge}`);
+      rows.push(`Delta (years),${phenoAgeSnapshot.delta}`);
+      rows.push(`10-Year Mortality Score,${phenoAgeSnapshot.mortalityScore.toFixed(4)}`);
+      rows.push(`Used Population Estimates,${phenoAgeSnapshot.usedEstimates ? 'yes' : 'no'}`);
+    }
 
     const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -1229,6 +1242,7 @@ export default function BloodTestDashboard({
       profile,
       markers,
       result,
+      phenoAge: phenoAgeSnapshot,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1548,6 +1562,8 @@ export default function BloodTestDashboard({
       return { key: k, name: MARKER_NAMES[k], value, unit, status: interp.status, label: interp.label, score: interp.score };
     });
 
+  const phenoAgeSnapshot = calculatePhenoAge(profile, markers);
+
   const ratioRows: { label: string; value: string; interpretation: string }[] = [];
   if (recommendations.ldlHdlRatio !== null && recommendations.ldlHdlInterpretation) {
     ratioRows.push({
@@ -1865,6 +1881,33 @@ export default function BloodTestDashboard({
           </div>
         </div>
 
+        {phenoAgeSnapshot && (
+          <div className="pdf-avoid-break" style={{ marginTop: 14, border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>Biological Age (PhenoAge)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 8 }}>
+              <div>
+                <div style={{ fontSize: 10, color: '#666' }}>Bio age</div>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>{phenoAgeSnapshot.phenoAge.toFixed(1)} yrs</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#666' }}>Calendar age</div>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>{phenoAgeSnapshot.chronologicalAge} yrs</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#666' }}>Delta</div>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>
+                  {phenoAgeSnapshot.delta > 0 ? '+' : ''}{phenoAgeSnapshot.delta.toFixed(1)} yrs
+                </div>
+              </div>
+            </div>
+            {phenoAgeSnapshot.usedEstimates && phenoAgeSnapshot.missingMarkers.length > 0 && (
+              <div style={{ fontSize: 10, color: '#666', marginTop: 6 }}>
+                Population averages used for: {phenoAgeSnapshot.missingMarkers.map((k) => MARKER_NAMES[k]).join(', ')}.
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="pdf-avoid-break" style={{ marginTop: 14, border: '1px solid #e5e5e5', borderRadius: 10, padding: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#555' }}>Scores</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginTop: 8 }}>
@@ -2121,6 +2164,8 @@ export default function BloodTestDashboard({
                     </p>
                   </div>
                 )}
+
+                <BioAgeCard profile={profile} markers={markers} />
 
                 {/* Inline BMR / TDEE / BMI */}
                 <div className="flex flex-wrap items-center gap-3">

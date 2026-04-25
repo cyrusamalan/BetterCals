@@ -2,6 +2,14 @@ import { UserProfile, ActivityLevel, TDEEResult, BloodMarkers, HealthScore, Insi
 import { getMarkerInterpretation } from '@/lib/bloodParser';
 import { calculateCVDRisk, type CVDRiskResult } from '@/lib/riskModels';
 
+export {
+  calculatePhenoAge,
+  PHENOAGE_REQUIRED_MARKERS,
+  type PhenoAgeResult,
+  type PhenoAgeOptions,
+  type PhenoAgeMarkerKey,
+} from '@/lib/phenoAge';
+
 /** Human-readable names for blood markers — shared across insight generation, risk identification, and UI. */
 export const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
   glucose: 'Glucose',
@@ -24,6 +32,11 @@ export const MARKER_NAMES: Record<keyof BloodMarkers, string> = {
   creatinine: 'Creatinine',
   uricAcid: 'Uric Acid',
   fastingInsulin: 'Fasting Insulin',
+  lymphocytePct: 'Lymphocytes %',
+  mcv: 'MCV',
+  rdw: 'RDW',
+  alkalinePhosphatase: 'Alkaline Phosphatase',
+  whiteBloodCells: 'White Blood Cells',
 };
 
 /** Shorter display labels for compact UI contexts (charts, trend tables). */
@@ -48,6 +61,11 @@ export const MARKER_SHORT_NAMES: Record<keyof BloodMarkers, string> = {
   creatinine: 'Creatinine',
   uricAcid: 'Uric Acid',
   fastingInsulin: 'Fasting Insulin',
+  lymphocytePct: 'Lymphs %',
+  mcv: 'MCV',
+  rdw: 'RDW',
+  alkalinePhosphatase: 'ALP',
+  whiteBloodCells: 'WBC',
 };
 
 /** HOMA-IR: (fasting glucose × fasting insulin) / 405. Returns null if either input is missing. */

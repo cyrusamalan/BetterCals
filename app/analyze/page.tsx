@@ -31,6 +31,7 @@ import {
   deriveMarkers,
 } from '@/lib/calculations';
 import { estimateAverageMarkers } from '@/lib/averageMarkers';
+import { calculatePhenoAge } from '@/lib/phenoAge';
 import { normalizeUserProfile } from '@/lib/profileUtils';
 import { AnalyzeWizardSkeleton } from '@/components/Skeleton';
 import { debugLog } from '@/lib/debugLog';
@@ -211,6 +212,7 @@ export default function AnalyzePage() {
       const insights = usedAverageMarkers ? [] : generateInsights(profile, tdee, mergedMarkers);
       const deficiencies = usedAverageMarkers ? [] : identifyDeficiencies(mergedMarkers, profile);
       const ascvdResult = usedAverageMarkers ? { risk: null, reason: undefined } : calculateASCVDRiskScore(profile, mergedMarkers);
+      const phenoAgeResult = usedAverageMarkers ? null : calculatePhenoAge(profile, mergedMarkers);
 
       setResult({
         tdee,
@@ -223,6 +225,7 @@ export default function AnalyzePage() {
         recommendations: calculateRecommendations(profile, mergedMarkers, deficiencies),
         ascvdRiskScore: ascvdResult.risk ?? undefined,
         ascvdRiskReason: ascvdResult.reason,
+        phenoAge: phenoAgeResult ?? undefined,
         usedAverageMarkers,
         estimatedFromQuestionnaire: isEstimated,
         derivedMarkers: derived,

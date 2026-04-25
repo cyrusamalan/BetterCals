@@ -85,6 +85,12 @@ export interface BloodMarkers {
   creatinine?: number; // mg/dL
   uricAcid?: number; // mg/dL
   fastingInsulin?: number; // mIU/L
+  // ── PhenoAge (Levine 2018) inputs ──
+  lymphocytePct?: number; // % of WBC
+  mcv?: number; // fL — mean corpuscular volume
+  rdw?: number; // % — red cell distribution width
+  alkalinePhosphatase?: number; // U/L
+  whiteBloodCells?: number; // 10^3 cells/µL (K/µL)
 }
 
 /** Where blood marker values came from for labeling in the UI. */
@@ -209,6 +215,15 @@ export interface PersonalizedRecs {
   mealTiming: MealTimingSuggestion[];
 }
 
+export interface PhenoAgeSnapshot {
+  phenoAge: number;
+  chronologicalAge: number;
+  delta: number;
+  mortalityScore: number;
+  usedEstimates: boolean;
+  missingMarkers: string[];
+}
+
 export interface AnalysisResult {
   tdee: TDEEResult;
   healthScore: HealthScore;
@@ -221,6 +236,7 @@ export interface AnalysisResult {
   derivedMarkers?: { ldl?: number; nonHdl?: number };
   ascvdRiskScore?: number;
   ascvdRiskReason?: string;
+  phenoAge?: PhenoAgeSnapshot;
   usedAverageMarkers?: boolean;
   estimatedFromQuestionnaire?: boolean;
   actionPlan?: ActionPlanItem[];

@@ -131,7 +131,7 @@ export default function BloodValuesForm({ onSubmit, initialValues, estimateRange
   };
 
   // Group fields by category
-  const categories = ['Metabolic', 'Cardiovascular', 'Hormonal', 'Nutritional', 'Hepatic', 'Renal'];
+  const categories = ['Metabolic', 'Cardiovascular', 'Hormonal', 'Nutritional', 'Hepatic', 'Renal', 'Hematology'];
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

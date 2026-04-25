@@ -30,6 +30,11 @@ export const bloodMarkersSchema = z.object({
   creatinine: rangeField('creatinine'),
   uricAcid: rangeField('uricAcid'),
   fastingInsulin: rangeField('fastingInsulin'),
+  lymphocytePct: rangeField('lymphocytePct'),
+  mcv: rangeField('mcv'),
+  rdw: rangeField('rdw'),
+  alkalinePhosphatase: rangeField('alkalinePhosphatase'),
+  whiteBloodCells: rangeField('whiteBloodCells'),
 }).strict();
 
 // ── User Profile ───────────────────────────────────────────────────────────
@@ -150,6 +155,15 @@ export const saveAnalysisSchema = z.object({
     ascvdRiskScore: z.number().optional(),
     ascvdRiskReason: z.string().optional(),
     usedAverageMarkers: z.boolean().optional(),
+    estimatedFromQuestionnaire: z.boolean().optional(),
+    phenoAge: z.object({
+      phenoAge: z.number(),
+      chronologicalAge: z.number(),
+      delta: z.number(),
+      mortalityScore: z.number(),
+      usedEstimates: z.boolean(),
+      missingMarkers: z.array(z.string()),
+    }).optional(),
     actionPlan: z.array(z.object({
       id: z.string(),
       title: z.string(),
