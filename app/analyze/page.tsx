@@ -7,6 +7,8 @@ import TDEEForm from '@/components/TDEEForm';
 import BloodValuesForm from '@/components/BloodValuesForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
+import LifestyleEstimateModal from '@/components/LifestyleEstimateModal';
+import type { EstimationResult, MarkerEstimate } from '@/lib/estimateFromQuestionnaire';
 import VitalsMark from '@/components/VitalsMark';
 import ProfileDropdown from '@/components/ProfileDropdown';
 import Link from 'next/link';
@@ -34,7 +36,7 @@ import { AnalyzeWizardSkeleton } from '@/components/Skeleton';
 import { debugLog } from '@/lib/debugLog';
 
 type Step = 'profile' | 'blood' | 'results';
-type EntryMode = 'manual' | 'autofilled';
+type EntryMode = 'manual' | 'autofilled' | 'estimated';
 
 function sanitizeBloodMarkers(input: BloodMarkers): BloodMarkers {
   const cleaned: BloodMarkers = {};
@@ -55,6 +57,8 @@ export default function AnalyzePage() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [entryMode, setEntryMode] = useState<EntryMode>('manual');
+  const [estimateRanges, setEstimateRanges] = useState<Partial<Record<keyof BloodMarkers, MarkerEstimate>> | undefined>(undefined);
+  const [estimateModalOpen, setEstimateModalOpen] = useState(false);
   const { isSignedIn, isLoaded: isAuthLoaded, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [serverProfileLoaded, setServerProfileLoaded] = useState(false);
@@ -142,6 +146,7 @@ export default function AnalyzePage() {
     setStep('blood');
     setShowManualEntry(false);
     setEntryMode('manual');
+    setEstimateRanges(undefined);
 
     if (isSignedIn) {
       fetch('/api/profile', {
@@ -187,7 +192,8 @@ export default function AnalyzePage() {
     const normalizedCurrentMarkers = sanitizeBloodMarkers(markers);
     const normalizedSubmittedMarkers = sanitizeBloodMarkers(data);
     let mergedMarkers = { ...normalizedCurrentMarkers, ...normalizedSubmittedMarkers };
-    const usedAverageMarkers = Object.keys(mergedMarkers).length === 0;
+    const isEstimated = entryMode === 'estimated';
+    const usedAverageMarkers = !isEstimated && Object.keys(mergedMarkers).length === 0;
 
     if (usedAverageMarkers) {
       mergedMarkers = profile ? estimateAverageMarkers(profile) : {};
@@ -218,6 +224,7 @@ export default function AnalyzePage() {
         ascvdRiskScore: ascvdResult.risk ?? undefined,
         ascvdRiskReason: ascvdResult.reason,
         usedAverageMarkers,
+        estimatedFromQuestionnaire: isEstimated,
         derivedMarkers: derived,
       });
 
@@ -231,6 +238,16 @@ export default function AnalyzePage() {
     setMarkers(normalizedExtracted);
     setShowManualEntry(true);
     setEntryMode('autofilled');
+    setEstimateRanges(undefined);
+  };
+
+  const handleEstimateComplete = (estimation: EstimationResult) => {
+    const cleanedMarkers = sanitizeBloodMarkers(estimation.markers);
+    setMarkers(cleanedMarkers);
+    setEstimateRanges(estimation.estimates);
+    setShowManualEntry(true);
+    setEntryMode('estimated');
+    setEstimateModalOpen(false);
   };
 
   const handleReset = () => {
@@ -240,6 +257,7 @@ export default function AnalyzePage() {
     setResult(null);
     setShowManualEntry(false);
     setEntryMode('manual');
+    setEstimateRanges(undefined);
 
     try {
       localStorage.removeItem('bettercals_step');
@@ -553,12 +571,13 @@ export default function AnalyzePage() {
             </div>
 
             {!showManualEntry && (
-              <div className="flex justify-center mb-8 anim-fade-up delay-5">
+              <div className="flex flex-col sm:flex-row justify-center items-center gap-3 mt-12 mb-8 anim-fade-up delay-5">
                 <button
                   type="button"
                   onClick={() => {
                     setShowManualEntry(true);
                     setEntryMode('manual');
+                    setEstimateRanges(undefined);
                   }}
                   className="px-5 py-2.5 rounded-xl text-sm font-semibold btn-press"
                   style={{
@@ -569,6 +588,45 @@ export default function AnalyzePage() {
                 >
                   Manual Entry
                 </button>
+                {profile && (
+                  <div className="relative">
+                    <div
+                      className="bubble-hint absolute left-1/2 -translate-x-1/2 -top-12 whitespace-nowrap pointer-events-none"
+                      aria-hidden="true"
+                    >
+                      <div
+                        className="relative px-3 py-1.5 rounded-xl text-xs font-semibold"
+                        style={{
+                          background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+                          color: 'var(--text-inverse)',
+                          boxShadow: '0 4px 14px rgba(107, 143, 113, 0.35)',
+                        }}
+                      >
+                        Don&apos;t have a blood report?
+                        <span
+                          className="absolute left-1/2 -translate-x-1/2 -bottom-[5px] w-0 h-0"
+                          style={{
+                            borderLeft: '6px solid transparent',
+                            borderRight: '6px solid transparent',
+                            borderTop: '6px solid var(--accent-hover)',
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEstimateModalOpen(true)}
+                      className="px-5 py-2.5 rounded-xl text-sm font-semibold btn-press"
+                      style={{
+                        background: 'var(--accent-subtle)',
+                        color: 'var(--accent)',
+                        border: '1px solid rgba(107, 143, 113, 0.35)',
+                      }}
+                    >
+                      Estimate from Lifestyle
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -588,12 +646,22 @@ export default function AnalyzePage() {
                   <div className="flex items-center gap-2 mb-5">
                     <FileText className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
                     <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
-                      {entryMode === 'autofilled' ? 'Auto-filled Values' : 'Manual Entry'}
+                      {entryMode === 'autofilled'
+                        ? 'Auto-filled Values'
+                        : entryMode === 'estimated'
+                          ? 'Estimated Values'
+                          : 'Manual Entry'}
                     </h3>
                   </div>
+                  {entryMode === 'estimated' && (
+                    <p className="-mt-3 mb-4 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      Estimated from your lifestyle answers. Edit any field to overwrite the estimate.
+                    </p>
+                  )}
                   <BloodValuesForm
                     onSubmit={handleBloodSubmit}
                     initialValues={markers}
+                    estimateRanges={estimateRanges}
                   />
                 </div>
               </div>
@@ -601,6 +669,15 @@ export default function AnalyzePage() {
           </div>
         )}
       </main>
+
+      {profile && (
+        <LifestyleEstimateModal
+          profile={profile}
+          open={estimateModalOpen}
+          onClose={() => setEstimateModalOpen(false)}
+          onComplete={handleEstimateComplete}
+        />
+      )}
 
       {/* ── Footer ── */}
       <footer

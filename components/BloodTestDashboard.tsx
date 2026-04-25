@@ -953,6 +953,7 @@ export default function BloodTestDashboard({
   const grade = getScoreGrade(healthScore.overall);
   const hasMarkers = Object.keys(markers).length > 0;
   const usedAverageMarkers = result.usedAverageMarkers === true;
+  const estimatedFromQuestionnaire = result.estimatedFromQuestionnaire === true;
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -2065,7 +2066,11 @@ export default function BloodTestDashboard({
                       Your Results
                     </h1>
                     <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
-                      {usedAverageMarkers ? 'Based on your profile and estimated average markers' : 'Based on your profile and blood markers'}
+                      {usedAverageMarkers
+                        ? 'Based on your profile and estimated average markers'
+                        : estimatedFromQuestionnaire
+                          ? 'Based on your profile and lifestyle-estimated markers'
+                          : 'Based on your profile and blood markers'}
                     </p>
                   </div>
                   <button
@@ -2095,6 +2100,24 @@ export default function BloodTestDashboard({
                     </p>
                     <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
                       Enter your real blood values for accurate risks, deficiencies, and personalized insights.
+                    </p>
+                  </div>
+                )}
+
+                {estimatedFromQuestionnaire && !usedAverageMarkers && (
+                  <div
+                    className="rounded-xl px-4 py-3"
+                    style={{
+                      backgroundColor: 'var(--status-info-bg)',
+                      border: '1px solid var(--status-info-border)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                      Estimated from your lifestyle answers
+                    </p>
+                    <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                      These markers were estimated from a short questionnaire — not a real blood panel. Use this as a directional guide, not a diagnosis.
                     </p>
                   </div>
                 )}

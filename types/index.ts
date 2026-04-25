@@ -222,6 +222,7 @@ export interface AnalysisResult {
   ascvdRiskScore?: number;
   ascvdRiskReason?: string;
   usedAverageMarkers?: boolean;
+  estimatedFromQuestionnaire?: boolean;
   actionPlan?: ActionPlanItem[];
   coach?: CoachState;
 }

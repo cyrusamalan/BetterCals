@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { BloodMarkers } from '@/types';
 import { MARKER_FIELDS } from '@/lib/markerMetadata';
-import { ArrowRight, Info, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowRight, Info, Sparkles, TrendingUp, TrendingDown } from 'lucide-react';
 import { debugLog } from '@/lib/debugLog';
+import type { MarkerEstimate } from '@/lib/estimateFromQuestionnaire';
 
 interface BloodValuesFormProps {
   onSubmit: (markers: BloodMarkers) => void;
   initialValues?: BloodMarkers;
+  estimateRanges?: Partial<Record<keyof BloodMarkers, MarkerEstimate>>;
 }
 
 const FIELDS = MARKER_FIELDS;
@@ -80,7 +82,7 @@ const SUFFICIENT_PRESET: BloodMarkers = {
   fastingInsulin: 12,
 };
 
-export default function BloodValuesForm({ onSubmit, initialValues }: BloodValuesFormProps) {
+export default function BloodValuesForm({ onSubmit, initialValues, estimateRanges }: BloodValuesFormProps) {
   const { register, handleSubmit, reset, watch, setValue } = useForm<BloodMarkers>({
     defaultValues: initialValues || {},
   });
@@ -88,11 +90,29 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
   const [expandedField, setExpandedField] = useState<string | null>(null);
   const [activeMobileField, setActiveMobileField] = useState<(typeof FIELDS)[number] | null>(null);
   const [filledCount, setFilledCount] = useState(0);
+  const [editedKeys, setEditedKeys] = useState<Set<keyof BloodMarkers>>(new Set());
 
   const formValues = watch();
 
+  const getEstimate = (key: keyof BloodMarkers): MarkerEstimate | undefined => {
+    if (!estimateRanges) return undefined;
+    if (editedKeys.has(key)) return undefined;
+    return estimateRanges[key];
+  };
+
+  const markEdited = (key: keyof BloodMarkers) => {
+    if (!estimateRanges?.[key]) return;
+    if (editedKeys.has(key)) return;
+    setEditedKeys((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  };
+
   useEffect(() => {
     reset(initialValues || {});
+    setEditedKeys(new Set());
   }, [initialValues, reset]);
 
   useEffect(() => {
@@ -223,15 +243,24 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
                     </div>
 
                     <div className="flex gap-2 items-center">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step={field.step || 'any'}
-                        {...register(field.key, numberField)}
-                        className="input-field flex-1 text-sm"
-                        placeholder={field.placeholder}
-                        onClick={(e) => e.stopPropagation()}
-                      />
+                      {(() => {
+                        const reg = register(field.key, numberField);
+                        return (
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step={field.step || 'any'}
+                            {...reg}
+                            onChange={(e) => {
+                              markEdited(field.key);
+                              return reg.onChange(e);
+                            }}
+                            className="input-field flex-1 text-sm"
+                            placeholder={field.placeholder}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        );
+                      })()}
                       <span
                         className="text-xs font-medium px-2 py-1 rounded"
                         style={{
@@ -242,6 +271,26 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
                         {field.unit}
                       </span>
                     </div>
+
+                    {(() => {
+                      const est = getEstimate(field.key);
+                      if (!est) return null;
+                      return (
+                        <div
+                          className="mt-2 flex items-center gap-2 text-[11px] px-2 py-1.5 rounded-md"
+                          style={{
+                            backgroundColor: 'var(--accent-subtle)',
+                            color: 'var(--text-secondary)',
+                          }}
+                        >
+                          <Sparkles className="w-3 h-3 shrink-0" style={{ color: 'var(--accent)' }} />
+                          <span>
+                            <span className="font-semibold" style={{ color: 'var(--accent)' }}>Estimated</span>
+                            {' '}from your answers: {est.low}–{est.high} {est.unit} ({est.label.toLowerCase()})
+                          </span>
+                        </div>
+                      );
+                    })()}
 
                     {/* Expanded details */}
                     {expandedField === field.key && (
@@ -269,6 +318,7 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
             <div className="md:hidden space-y-2">
               {catFields.map((field) => {
                 const currentVal = formValues[field.key];
+                const est = getEstimate(field.key);
                 return (
                   <button
                     key={`${cat}-mobile-${field.key}`}
@@ -306,6 +356,21 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
                         </p>
                       </div>
                     </div>
+                    {est && (
+                      <div
+                        className="mt-2 flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-md"
+                        style={{
+                          backgroundColor: 'var(--accent-subtle)',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        <Sparkles className="w-3 h-3 shrink-0" style={{ color: 'var(--accent)' }} />
+                        <span>
+                          <span className="font-semibold" style={{ color: 'var(--accent)' }}>Estimated</span>
+                          {' '}{est.low}–{est.high} {est.unit}
+                        </span>
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -391,7 +456,10 @@ export default function BloodValuesForm({ onSubmit, initialValues }: BloodValues
                 inputMode="decimal"
                 step={activeMobileField.step || 'any'}
                 value={formValues[activeMobileField.key] ?? ''}
-                onChange={(e) => setValue(activeMobileField.key, e.target.value === '' ? undefined : Number(e.target.value))}
+                onChange={(e) => {
+                  markEdited(activeMobileField.key);
+                  setValue(activeMobileField.key, e.target.value === '' ? undefined : Number(e.target.value));
+                }}
                 className="input-field mt-1 text-2xl font-semibold tabular-nums"
                 placeholder={activeMobileField.placeholder}
                 autoFocus
