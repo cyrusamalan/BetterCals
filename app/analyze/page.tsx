@@ -34,6 +34,7 @@ import { AnalyzeWizardSkeleton } from '@/components/Skeleton';
 import { debugLog } from '@/lib/debugLog';
 
 type Step = 'profile' | 'blood' | 'results';
+type EntryMode = 'manual' | 'autofilled';
 
 function sanitizeBloodMarkers(input: BloodMarkers): BloodMarkers {
   const cleaned: BloodMarkers = {};
@@ -52,6 +53,8 @@ export default function AnalyzePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [markers, setMarkers] = useState<BloodMarkers>({});
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [entryMode, setEntryMode] = useState<EntryMode>('manual');
   const { isSignedIn, isLoaded: isAuthLoaded, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [serverProfileLoaded, setServerProfileLoaded] = useState(false);
@@ -137,6 +140,8 @@ export default function AnalyzePage() {
   const handleProfileSubmit = (data: UserProfile) => {
     setProfile(data);
     setStep('blood');
+    setShowManualEntry(false);
+    setEntryMode('manual');
 
     if (isSignedIn) {
       fetch('/api/profile', {
@@ -221,10 +226,11 @@ export default function AnalyzePage() {
   };
 
   const handleUploadMarkersExtracted = (extracted: BloodMarkers) => {
-    const normalizedCurrentMarkers = sanitizeBloodMarkers(markers);
     const normalizedExtracted = sanitizeBloodMarkers(extracted);
-    const merged = { ...normalizedCurrentMarkers, ...normalizedExtracted };
-    setMarkers(merged);
+    // Treat each upload as a fresh autofill source to avoid carrying old marker values.
+    setMarkers(normalizedExtracted);
+    setShowManualEntry(true);
+    setEntryMode('autofilled');
   };
 
   const handleReset = () => {
@@ -232,6 +238,8 @@ export default function AnalyzePage() {
     setProfile(null);
     setMarkers({});
     setResult(null);
+    setShowManualEntry(false);
+    setEntryMode('manual');
 
     try {
       localStorage.removeItem('bettercals_step');
@@ -539,35 +547,57 @@ export default function AnalyzePage() {
                 className="text-[11px] font-semibold uppercase tracking-[0.2em]"
                 style={{ color: 'var(--text-tertiary)' }}
               >
-                or enter manually
+                or
               </span>
               <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, transparent, var(--border), transparent)' }} />
             </div>
 
-            {/* Manual entry card */}
-            <div
-              className="relative overflow-hidden rounded-3xl noise anim-fade-up delay-5"
-              style={{
-                background: 'var(--card-bg)',
-                backdropFilter: 'blur(20px) saturate(1.3)',
-                WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
-                border: '1px solid var(--card-border)',
-                boxShadow: 'var(--card-shadow-heavy)',
-              }}
-            >
-              <div className="p-6 sm:p-8">
-                <div className="flex items-center gap-2 mb-5">
-                  <FileText className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                  <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
-                    Manual Entry
-                  </h3>
-                </div>
-                <BloodValuesForm
-                  onSubmit={handleBloodSubmit}
-                  initialValues={markers}
-                />
+            {!showManualEntry && (
+              <div className="flex justify-center mb-8 anim-fade-up delay-5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowManualEntry(true);
+                    setEntryMode('manual');
+                  }}
+                  className="px-5 py-2.5 rounded-xl text-sm font-semibold btn-press"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+                    color: 'var(--text-inverse)',
+                    boxShadow: '0 2px 8px rgba(107, 143, 113, 0.25)',
+                  }}
+                >
+                  Manual Entry
+                </button>
               </div>
-            </div>
+            )}
+
+            {/* Manual entry card */}
+            {showManualEntry && (
+              <div
+                className="relative overflow-hidden rounded-3xl noise anim-fade-up delay-5"
+                style={{
+                  background: 'var(--card-bg)',
+                  backdropFilter: 'blur(20px) saturate(1.3)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+                  border: '1px solid var(--card-border)',
+                  boxShadow: 'var(--card-shadow-heavy)',
+                }}
+              >
+                <div className="p-6 sm:p-8">
+                  <div className="flex items-center gap-2 mb-5">
+                    <FileText className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                    <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
+                      {entryMode === 'autofilled' ? 'Auto-filled Values' : 'Manual Entry'}
+                    </h3>
+                  </div>
+                  <BloodValuesForm
+                    onSubmit={handleBloodSubmit}
+                    initialValues={markers}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

@@ -20,6 +20,9 @@ async function extractMarkersServerSide(file: File): Promise<BloodMarkers> {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: string; details?: string[] };
+    if (err?.error?.toLowerCase().includes('no blood markers could be extracted')) {
+      return {};
+    }
     const detailText = Array.isArray(err?.details) && err.details.length > 0
       ? ` (${err.details.join(' | ')})`
       : '';

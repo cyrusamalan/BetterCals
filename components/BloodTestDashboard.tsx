@@ -979,6 +979,7 @@ export default function BloodTestDashboard({
   const liveAudioContextRef = useRef<AudioContext | null>(null);
   const liveSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const liveProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const liveSilentSinkRef = useRef<GainNode | null>(null);
   const liveMicStreamRef = useRef<MediaStream | null>(null);
   const livePlaybackStartAtRef = useRef(0);
   const liveAssistantMessageIdRef = useRef<string | null>(null);
@@ -1340,6 +1341,10 @@ export default function BloodTestDashboard({
       liveProcessorNodeRef.current.onaudioprocess = null;
       liveProcessorNodeRef.current = null;
     }
+    if (liveSilentSinkRef.current) {
+      liveSilentSinkRef.current.disconnect();
+      liveSilentSinkRef.current = null;
+    }
     if (liveSourceNodeRef.current) {
       liveSourceNodeRef.current.disconnect();
       liveSourceNodeRef.current = null;
@@ -1416,34 +1421,8 @@ export default function BloodTestDashboard({
       }
 
       const outputTranscript = payload.serverContent?.outputTranscription?.text?.trim();
-      const modelText = payload.serverContent?.modelTurn?.parts
-        ?.map((part) => part.text ?? '')
-        .join(' ')
-        .trim();
-      const streamText = outputTranscript || modelText || '';
-
-      if (streamText) {
-        let assistantMessageId = liveAssistantMessageIdRef.current;
-        if (!assistantMessageId) {
-          assistantMessageId = `coach-live-${Date.now()}`;
-          liveAssistantMessageIdRef.current = assistantMessageId;
-          setCoachMessages((prev) => [
-            ...prev,
-            {
-              id: assistantMessageId!,
-              role: 'assistant',
-              source: 'llm_chat',
-              text: streamText,
-              createdAt: new Date().toISOString(),
-            },
-          ]);
-        } else {
-          setCoachMessages((prev) => prev.map((message) => (
-            message.id === assistantMessageId
-              ? { ...message, text: streamText }
-              : message
-          )));
-        }
+      if (outputTranscript) {
+        setCoachLiveTranscript(outputTranscript);
       }
 
       const audioParts = payload.serverContent?.modelTurn?.parts
@@ -1501,6 +1480,9 @@ export default function BloodTestDashboard({
       liveSourceNodeRef.current = sourceNode;
       const processorNode = audioContext.createScriptProcessor(2048, 1, 1);
       liveProcessorNodeRef.current = processorNode;
+      const silentSink = audioContext.createGain();
+      silentSink.gain.value = 0;
+      liveSilentSinkRef.current = silentSink;
 
       processorNode.onaudioprocess = (procEvent) => {
         if (!liveSetupCompleteRef.current || liveSocketRef.current?.readyState !== WebSocket.OPEN) return;
@@ -1519,7 +1501,9 @@ export default function BloodTestDashboard({
       };
 
       sourceNode.connect(processorNode);
-      processorNode.connect(audioContext.destination);
+      // Keep the processor running without routing mic audio to the speakers.
+      processorNode.connect(silentSink);
+      silentSink.connect(audioContext.destination);
       setCoachListening(true);
     } catch (error) {
       stopCoachLiveSession();
@@ -2567,7 +2551,7 @@ export default function BloodTestDashboard({
             </div>
           </aside>
           <aside
-            className="fixed right-3 sm:right-4 top-3 sm:top-4 h-[calc(100%-1.5rem)] sm:h-[calc(100%-2rem)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-y-auto rounded-3xl"
+            className="fixed right-3 sm:right-4 top-3 sm:top-4 h-[calc(100%-1.5rem)] sm:h-[calc(100%-2rem)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-hidden rounded-3xl flex flex-col"
             style={{
               animation: coachClosing
                 ? 'coachSlideOut 0.26s ease both'
@@ -2602,7 +2586,7 @@ export default function BloodTestDashboard({
                   'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.85) 20%, rgba(255,255,255,0.95) 50%, rgba(255,255,255,0.85) 80%, transparent 100%)',
               }}
             />
-            <div className="relative mb-4">
+            <div className="relative mb-4 shrink-0">
               <h2 className="font-display text-xl text-center" style={{ color: 'var(--text-primary)' }}>
                 Coach
               </h2>
@@ -2621,11 +2605,11 @@ export default function BloodTestDashboard({
               </button>
             </div>
 
-            <div className="space-y-4 relative z-[1]">
-              <div className="rounded-2xl p-4" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
+            <div className="space-y-4 relative z-[1] flex-1 min-h-0">
+              <div className="rounded-2xl p-4 h-full flex flex-col" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
                 {isSignedIn ? (
                   <>
-                    <div className="mt-3 space-y-3 max-h-[360px] overflow-y-auto pr-1">
+                    <div className="mt-3 space-y-3 flex-1 min-h-0 overflow-y-auto pr-1">
                       {visibleCoachMessages.length === 0 ? (
                         <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                           Ask a question to start the conversation.
