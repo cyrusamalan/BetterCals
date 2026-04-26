@@ -11,6 +11,7 @@ import {
   HeartPulse,
   LineChart,
   History,
+  MessageCircle,
   UserCog,
   Settings,
   LogOut,
