@@ -22,6 +22,15 @@ type ChatOutput = {
   telemetry: CoachProviderTelemetry;
 };
 
+type GeminiModelInfo = {
+  name?: string;
+  supportedGenerationMethods?: string[];
+};
+
+type GeminiListModelsResponse = {
+  models?: GeminiModelInfo[];
+};
+
 function getClient() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is missing');
@@ -41,6 +50,55 @@ function getCandidateModelNames(primary: string): string[] {
     .map((m) => m.trim())
     .filter(Boolean) ?? [];
   return Array.from(new Set([primary, ...configuredList, configuredFallback].filter(Boolean))) as string[];
+}
+
+let cachedSupportedModels: Set<string> | null = null;
+let cachedAtMs = 0;
+const MODEL_CACHE_TTL_MS = 5 * 60 * 1000;
+
+async function getSupportedGenerateContentModels(): Promise<Set<string> | null> {
+  const now = Date.now();
+  if (cachedSupportedModels && now - cachedAtMs < MODEL_CACHE_TTL_MS) {
+    return cachedSupportedModels;
+  }
+
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return null;
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+      { method: 'GET' },
+    );
+    if (!response.ok) {
+      return null;
+    }
+    const payload = (await response.json()) as GeminiListModelsResponse;
+    const models = payload.models ?? [];
+    const supported = new Set<string>();
+
+    for (const m of models) {
+      if (!m?.name) continue;
+      const supportsGenerate = (m.supportedGenerationMethods ?? []).some((method) =>
+        method.toLowerCase().includes('generatecontent'),
+      );
+      if (!supportsGenerate) continue;
+
+      // API returns e.g. "models/gemini-2.0-flash"; normalize to plain ID.
+      const plain = m.name.startsWith('models/') ? m.name.slice('models/'.length) : m.name;
+      supported.add(plain);
+    }
+
+    if (supported.size > 0) {
+      cachedSupportedModels = supported;
+      cachedAtMs = now;
+      return supported;
+    }
+  } catch (err) {
+    console.warn('[coach/gemini] failed to list models for preflight filtering, proceeding with configured candidates');
+    return null;
+  }
+
+  return null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -84,7 +142,24 @@ async function generateOnce(
 export async function generateCoachReply(input: ChatInput): Promise<ChatOutput> {
   const started = Date.now();
   const primaryModel = getModelName();
-  const candidateModels = getCandidateModelNames(primaryModel);
+  const configuredCandidates = getCandidateModelNames(primaryModel);
+  const supportedModels = await getSupportedGenerateContentModels();
+  const candidateModels = supportedModels
+    ? configuredCandidates.filter((m) => supportedModels.has(m))
+    : configuredCandidates;
+
+  if (candidateModels.length === 0) {
+    console.error('[coach/gemini] none of the configured models support generateContent for this API key/version');
+    return {
+      text: '',
+      telemetry: {
+        model: configuredCandidates.join('|'),
+        latencyMs: Date.now() - started,
+        safetyState: 'unknown',
+        fallbackUsed: true,
+      },
+    };
+  }
   try {
     let selectedModel = primaryModel;
     let result: Awaited<ReturnType<typeof generateOnce>> | null = null;
