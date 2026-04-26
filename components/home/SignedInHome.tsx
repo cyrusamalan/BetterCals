@@ -97,6 +97,105 @@ const WORKOUT_PREFERENCE_OPTIONS: { value: WorkoutPreferenceOption; label: strin
   { value: 'mixed-balanced', label: 'Mixed balanced' },
 ];
 
+type LiveServerMessage = {
+  setupComplete?: Record<string, never>;
+  error?: { message?: string };
+  turnComplete?: boolean;
+  interrupted?: boolean;
+  serverContent?: {
+    inputTranscription?: { text?: string };
+    outputTranscription?: { text?: string };
+    turnComplete?: boolean;
+    interrupted?: boolean;
+    modelTurn?: {
+      parts?: Array<{
+        text?: string;
+        inlineData?: {
+          data?: string;
+          mimeType?: string;
+        };
+      }>;
+    };
+  };
+};
+
+const LIVE_SAMPLE_RATE = 16000;
+
+function floatTo16BitPcm(input: Float32Array): Int16Array {
+  const output = new Int16Array(input.length);
+  for (let i = 0; i < input.length; i += 1) {
+    const sample = Math.max(-1, Math.min(1, input[i]));
+    output[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+  }
+  return output;
+}
+
+function downsampleTo16k(input: Float32Array, sourceRate: number): Float32Array {
+  if (sourceRate === LIVE_SAMPLE_RATE) return input;
+  const ratio = sourceRate / LIVE_SAMPLE_RATE;
+  const newLength = Math.round(input.length / ratio);
+  const output = new Float32Array(newLength);
+  let offset = 0;
+  for (let i = 0; i < newLength; i += 1) {
+    const nextOffset = Math.round((i + 1) * ratio);
+    let sum = 0;
+    let count = 0;
+    for (let j = offset; j < nextOffset && j < input.length; j += 1) {
+      sum += input[j];
+      count += 1;
+    }
+    output[i] = count > 0 ? sum / count : 0;
+    offset = nextOffset;
+  }
+  return output;
+}
+
+function pcmToBase64(pcm: Int16Array): string {
+  const bytes = new Uint8Array(pcm.length * 2);
+  for (let i = 0; i < pcm.length; i += 1) {
+    const value = pcm[i];
+    bytes[i * 2] = value & 0xff;
+    bytes[i * 2 + 1] = (value >> 8) & 0xff;
+  }
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToPcm(base64: string): Int16Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  const pcm = new Int16Array(bytes.length / 2);
+  for (let i = 0; i < pcm.length; i += 1) {
+    pcm[i] = (bytes[i * 2 + 1] << 8) | bytes[i * 2];
+  }
+  return pcm;
+}
+
+function sampleRateFromMimeType(mimeType?: string): number {
+  if (!mimeType) return 24000;
+  const match = mimeType.match(/rate=(\d+)/i);
+  if (!match) return 24000;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 24000;
+}
+
+function mergeTranscriptSegments(existing: string, incoming: string): string {
+  const base = existing.trim();
+  const next = incoming.trim();
+  if (!next) return base;
+  if (!base) return next;
+  if (next.startsWith(base)) return next;
+  if (base.endsWith(next)) return base;
+  return `${base} ${next}`.replace(/\s+/g, ' ').trim();
+}
+
 export default function SignedInHome() {
   const [analyses, setAnalyses] = useState<AnalysisHistory[] | null>(null);
   const [coachEvents, setCoachEvents] = useState<CoachHistoryEvent[] | null>(null);
@@ -1319,15 +1418,23 @@ function CoachFloatingPanel({
   const [error, setError] = useState<string | null>(null);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [listening, setListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
-  const liveQuestionRef = useRef('');
+  const liveSocketRef = useRef<WebSocket | null>(null);
+  const liveAudioContextRef = useRef<AudioContext | null>(null);
+  const liveSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const liveProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const liveSilentSinkRef = useRef<GainNode | null>(null);
+  const liveMicStreamRef = useRef<MediaStream | null>(null);
+  const livePlaybackStartAtRef = useRef(0);
+  const liveSetupCompleteRef = useRef(false);
+  const liveReconnectAllowedRef = useRef(false);
+  const liveTurnRef = useRef<{ userText: string; modelText: string }>({ userText: '', modelText: '' });
   const typedMessageIdsRef = useRef<Set<string>>(new Set());
 
   const isVisible = coachState === 'open' || coachState === 'closing';
   const isClosing = coachState === 'closing';
 
   const closeCoachPanel = () => {
-    stopListening();
+    stopCoachLiveSession();
     onClose();
   };
 
@@ -1354,6 +1461,10 @@ function CoachFloatingPanel({
       }
     })();
   }, [isVisible, plan, analysis]);
+
+  useEffect(() => () => {
+    stopCoachLiveSession();
+  }, []);
 
   const persistHistory = async (
     source: 'llm_chat' | 'live_mic' | 'live_model',
@@ -1428,60 +1539,246 @@ function CoachFloatingPanel({
     }
   };
 
-  const stopListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
+  const stopCoachLiveSession = () => {
+    liveReconnectAllowedRef.current = false;
+    if (liveSocketRef.current) {
+      liveSocketRef.current.close();
+      liveSocketRef.current = null;
+    }
+    liveSetupCompleteRef.current = false;
+    liveTurnRef.current = { userText: '', modelText: '' };
+    setLiveTranscript('');
+    if (liveProcessorNodeRef.current) {
+      liveProcessorNodeRef.current.disconnect();
+      liveProcessorNodeRef.current.onaudioprocess = null;
+      liveProcessorNodeRef.current = null;
+    }
+    if (liveSilentSinkRef.current) {
+      liveSilentSinkRef.current.disconnect();
+      liveSilentSinkRef.current = null;
+    }
+    if (liveSourceNodeRef.current) {
+      liveSourceNodeRef.current.disconnect();
+      liveSourceNodeRef.current = null;
+    }
+    if (liveAudioContextRef.current) {
+      void liveAudioContextRef.current.close();
+      liveAudioContextRef.current = null;
+    }
+    if (liveMicStreamRef.current) {
+      liveMicStreamRef.current.getTracks().forEach((track) => track.stop());
+      liveMicStreamRef.current = null;
     }
     setListening(false);
   };
 
-  const toggleLiveAudio = () => {
-    if (listening) {
-      stopListening();
-      return;
+  const captureLiveTranscript = (source: 'live_mic' | 'live_model', text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    if (source === 'live_mic') {
+      liveTurnRef.current.userText = mergeTranscriptSegments(liveTurnRef.current.userText, trimmed);
+    } else {
+      liveTurnRef.current.modelText = mergeTranscriptSegments(liveTurnRef.current.modelText, trimmed);
     }
-    const SpeechRecognitionCtor =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognitionCtor) {
-      setError('Live audio is not supported in this browser.');
-      return;
+  };
+
+  const flushLiveTurnHistory = async () => {
+    const userText = liveTurnRef.current.userText.trim();
+    const modelText = liveTurnRef.current.modelText.trim();
+    liveTurnRef.current = { userText: '', modelText: '' };
+
+    if (userText) {
+      const userMessage: CoachMessage = {
+        id: `home-coach-live-user-${Date.now()}`,
+        role: 'user',
+        source: 'llm_chat',
+        text: userText,
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      await persistHistory('live_mic', 'user', userText);
+    }
+    if (modelText) {
+      const assistantMessage: CoachMessage = {
+        id: `home-coach-live-assistant-${Date.now()}`,
+        role: 'assistant',
+        source: 'llm_chat',
+        text: modelText,
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+      await persistHistory('live_model', 'assistant', modelText);
+    }
+  };
+
+  const startCoachLiveSession = async () => {
+    if (!plan || loading) return;
+    if (typeof window === 'undefined' || !window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      throw new Error('Live voice requires HTTPS and microphone access support.');
     }
 
-    const recognition = new SpeechRecognitionCtor();
-    recognition.lang = 'en-US';
-    recognition.interimResults = true;
-    recognition.continuous = false;
-    liveQuestionRef.current = '';
-    setLiveTranscript('');
+    setError(null);
+    setLiveTranscript('Connecting live voice...');
+    liveReconnectAllowedRef.current = true;
 
-    recognition.onresult = (event: any) => {
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const transcript = event.results[i][0]?.transcript ?? '';
-        if (event.results[i].isFinal) {
-          liveQuestionRef.current = `${liveQuestionRef.current} ${transcript}`.trim();
-        } else {
-          interim = transcript;
+    const tokenRes = await fetch('/api/coach/live-token', { method: 'POST' });
+    if (!tokenRes.ok) {
+      throw new Error(`Could not start live session (${tokenRes.status})`);
+    }
+    const tokenData = await tokenRes.json() as { token: string; model: string };
+    const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(tokenData.token)}`;
+    const socket = new WebSocket(wsUrl);
+    liveSocketRef.current = socket;
+    liveSetupCompleteRef.current = false;
+
+    socket.onopen = () => {
+      socket.send(JSON.stringify({
+        setup: {
+          model: `models/${tokenData.model}`,
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+          },
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
+        },
+      }));
+    };
+
+    socket.onmessage = async (event) => {
+      let raw = '';
+      if (typeof event.data === 'string') {
+        raw = event.data;
+      } else if (event.data instanceof Blob) {
+        raw = await event.data.text();
+      } else {
+        return;
+      }
+
+      let payload: LiveServerMessage;
+      try {
+        payload = JSON.parse(raw) as LiveServerMessage;
+      } catch {
+        return;
+      }
+
+      if (payload.setupComplete) {
+        liveSetupCompleteRef.current = true;
+        setLiveTranscript('Live voice connected');
+        return;
+      }
+      if (payload.error?.message) {
+        setError(`Live session error: ${payload.error.message}`);
+        return;
+      }
+
+      const inputTranscript = payload.serverContent?.inputTranscription?.text?.trim();
+      const outputTranscript = payload.serverContent?.outputTranscription?.text?.trim();
+      if (inputTranscript) captureLiveTranscript('live_mic', inputTranscript);
+      if (outputTranscript) {
+        setLiveTranscript(outputTranscript);
+        captureLiveTranscript('live_model', outputTranscript);
+      }
+
+      const shouldFlushTurn = Boolean(
+        payload.turnComplete ||
+        payload.interrupted ||
+        payload.serverContent?.turnComplete ||
+        payload.serverContent?.interrupted,
+      );
+      if (shouldFlushTurn) {
+        await flushLiveTurnHistory();
+      }
+
+      const audioParts = payload.serverContent?.modelTurn?.parts
+        ?.filter((part) => part.inlineData?.data && part.inlineData?.mimeType?.includes('audio/pcm'));
+      if (audioParts && audioParts.length > 0 && liveAudioContextRef.current) {
+        const ctx = liveAudioContextRef.current;
+        for (const part of audioParts) {
+          const pcm = base64ToPcm(part.inlineData!.data!);
+          const sampleRate = sampleRateFromMimeType(part.inlineData?.mimeType);
+          const floatBuffer = new Float32Array(pcm.length);
+          for (let i = 0; i < pcm.length; i += 1) {
+            floatBuffer[i] = pcm[i] / 0x8000;
+          }
+          const audioBuffer = ctx.createBuffer(1, floatBuffer.length, sampleRate);
+          audioBuffer.getChannelData(0).set(floatBuffer);
+          const src = ctx.createBufferSource();
+          src.buffer = audioBuffer;
+          src.connect(ctx.destination);
+          const when = Math.max(ctx.currentTime, livePlaybackStartAtRef.current);
+          src.start(when);
+          livePlaybackStartAtRef.current = when + audioBuffer.duration;
         }
       }
-      const combined = `${liveQuestionRef.current} ${interim}`.trim();
-      setLiveTranscript(combined);
     };
-    recognition.onerror = () => {
-      setListening(false);
+
+    socket.onerror = () => {
+      setError('Live connection failed. Please try again.');
     };
-    recognition.onend = () => {
-      setListening(false);
-      recognitionRef.current = null;
-      const finalQuestion = liveQuestionRef.current.trim();
-      setLiveTranscript('');
-      if (finalQuestion) void sendQuestion(finalQuestion, 'live_mic');
+
+    socket.onclose = () => {
+      liveSocketRef.current = null;
+      liveSetupCompleteRef.current = false;
+      if (liveReconnectAllowedRef.current) {
+        setError('Live session ended. Tap mic to reconnect.');
+      }
+      stopCoachLiveSession();
     };
-    recognitionRef.current = recognition;
-    recognition.start();
+
+    const micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+    liveMicStreamRef.current = micStream;
+    const audioContext = new AudioContext({ sampleRate: LIVE_SAMPLE_RATE });
+    liveAudioContextRef.current = audioContext;
+    livePlaybackStartAtRef.current = audioContext.currentTime;
+
+    const sourceNode = audioContext.createMediaStreamSource(micStream);
+    liveSourceNodeRef.current = sourceNode;
+    const processorNode = audioContext.createScriptProcessor(2048, 1, 1);
+    liveProcessorNodeRef.current = processorNode;
+    const silentSink = audioContext.createGain();
+    silentSink.gain.value = 0;
+    liveSilentSinkRef.current = silentSink;
+
+    processorNode.onaudioprocess = (procEvent) => {
+      if (!liveSetupCompleteRef.current || liveSocketRef.current?.readyState !== WebSocket.OPEN) return;
+      const inputData = procEvent.inputBuffer.getChannelData(0);
+      const downsampled = downsampleTo16k(inputData, audioContext.sampleRate);
+      const pcm16 = floatTo16BitPcm(downsampled);
+      const base64Audio = pcmToBase64(pcm16);
+      liveSocketRef.current.send(JSON.stringify({
+        realtimeInput: {
+          audio: {
+            data: base64Audio,
+            mimeType: 'audio/pcm;rate=16000',
+          },
+        },
+      }));
+    };
+
+    sourceNode.connect(processorNode);
+    processorNode.connect(silentSink);
+    silentSink.connect(audioContext.destination);
     setListening(true);
+  };
+
+  const toggleLiveAudio = async () => {
+    if (listening) {
+      stopCoachLiveSession();
+      return;
+    }
+    try {
+      await startCoachLiveSession();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start live session');
+      stopCoachLiveSession();
+    }
   };
 
   const panelIntroMessage = messages.find((message) => message.role === 'assistant')?.text?.trim();
