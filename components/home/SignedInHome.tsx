@@ -1546,15 +1546,7 @@ function CoachFloatingPanel({
 
       {isVisible && (
         <>
-          <button
-            type="button"
-            onClick={closeCoachPanel}
-            className="fixed inset-0 z-40 bg-black/35 backdrop-blur-[1px]"
-            aria-label="Close coach panel"
-            style={{
-              animation: isClosing ? 'coachFadeOut 0.4s ease forwards' : 'coachFadeIn 0.4s ease forwards',
-            }}
-          />
+
           <aside
             className="fixed right-3 sm:right-4 top-[80px] sm:top-[84px] h-[calc(100vh-104px)] sm:h-[calc(100vh-108px)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-hidden rounded-3xl flex flex-col"
             style={{
