@@ -34,9 +34,21 @@ function getModelName(): string {
   return configured;
 }
 
-function getFallbackModelName(primary: string): string {
-  const configured = process.env.GEMINI_FALLBACK_MODEL?.trim();
-  return configured || primary;
+function getCandidateModelNames(primary: string): string[] {
+  const configuredFallback = process.env.GEMINI_FALLBACK_MODEL?.trim();
+  const configuredList = process.env.GEMINI_MODEL_CANDIDATES
+    ?.split(',')
+    .map((m) => m.trim())
+    .filter(Boolean) ?? [];
+
+  const builtInFallbacks = [
+    configuredFallback,
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-8b',
+    'gemini-1.5-pro',
+  ].filter((m): m is string => Boolean(m && m.length > 0));
+
+  return Array.from(new Set([primary, ...configuredList, ...builtInFallbacks]));
 }
 
 function sleep(ms: number): Promise<void> {
@@ -74,34 +86,52 @@ async function generateOnce(
 
 export async function generateCoachReply(input: ChatInput): Promise<ChatOutput> {
   const started = Date.now();
-  const modelName = getModelName();
-  const fallbackModel = getFallbackModelName(modelName);
+  const primaryModel = getModelName();
+  const candidateModels = getCandidateModelNames(primaryModel);
   try {
-    let selectedModel = modelName;
+    let selectedModel = primaryModel;
     let result: Awaited<ReturnType<typeof generateOnce>> | null = null;
+    let lastError: unknown = null;
 
-    try {
-      result = await generateOnce(modelName, input);
-    } catch (primaryErr) {
-      if (!shouldRetryOrFailover(primaryErr)) {
-        throw primaryErr;
-      }
-      console.warn('[coach/gemini] primary model temporarily unavailable, retrying once before failover:', modelName);
-      await sleep(300);
+    for (let i = 0; i < candidateModels.length; i++) {
+      const model = candidateModels[i];
+      selectedModel = model;
       try {
-        result = await generateOnce(modelName, input);
-      } catch (retryErr) {
-        if (!shouldRetryOrFailover(retryErr)) {
-          throw retryErr;
+        result = await generateOnce(model, input);
+        break;
+      } catch (firstErr) {
+        if (!shouldRetryOrFailover(firstErr)) {
+          throw firstErr;
         }
-        if (fallbackModel === modelName) {
-          throw retryErr;
+
+        const isPrimary = i === 0;
+        console.warn(
+          `[coach/gemini] ${isPrimary ? 'primary' : 'fallback'} model temporarily unavailable, retrying once before next fallback:`,
+          model,
+        );
+        await sleep(300);
+
+        try {
+          result = await generateOnce(model, input);
+          break;
+        } catch (retryErr) {
+          lastError = retryErr;
+          if (!shouldRetryOrFailover(retryErr)) {
+            throw retryErr;
+          }
+
+          const nextModel = candidateModels[i + 1];
+          if (nextModel) {
+            console.warn('[coach/gemini] retry failed, failing over to next model:', nextModel);
+            await sleep(600);
+            continue;
+          }
         }
-        console.warn('[coach/gemini] retry failed, failing over to fallback model:', fallbackModel);
-        selectedModel = fallbackModel;
-        await sleep(600);
-        result = await generateOnce(fallbackModel, input);
       }
+    }
+
+    if (!result) {
+      throw lastError instanceof Error ? lastError : new Error('All Gemini models failed');
     }
 
     const text = result?.text?.trim() ?? '';
@@ -119,7 +149,7 @@ export async function generateCoachReply(input: ChatInput): Promise<ChatOutput> 
           totalTokens: usage?.totalTokenCount,
         },
         safetyState: 'safe',
-        fallbackUsed: false,
+        fallbackUsed: selectedModel !== primaryModel,
       },
     };
   } catch (err) {
@@ -127,7 +157,7 @@ export async function generateCoachReply(input: ChatInput): Promise<ChatOutput> 
     return {
       text: '',
       telemetry: {
-        model: `${modelName}${fallbackModel !== modelName ? `|fallback:${fallbackModel}` : ''}`,
+        model: candidateModels.join('|'),
         latencyMs: Date.now() - started,
         safetyState: 'unknown',
         fallbackUsed: true,
