@@ -415,7 +415,7 @@ export default function AnalyzePage() {
                 <>
                   <Link
                     href="/history"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
                     style={{
                       background: 'var(--border-light)',
                       color: 'var(--text-primary)',
@@ -427,7 +427,7 @@ export default function AnalyzePage() {
                   </Link>
                   <Link
                     href="/coach-history"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                    className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
                     style={{
                       background: 'var(--border-light)',
                       color: 'var(--text-primary)',
