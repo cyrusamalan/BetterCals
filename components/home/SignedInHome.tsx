@@ -155,7 +155,7 @@ export default function SignedInHome() {
   }
 
   return (
-    <main className="max-w-6xl mx-auto px-5 pt-6 pb-16 space-y-5">
+    <main className="max-w-6xl mx-auto pl-4 pr-6 lg:pl-3 lg:pr-8 pt-6 pb-16 space-y-5">
       <SafetyBanner markers={latest.markers} profile={latest.profile} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
@@ -1245,6 +1245,7 @@ function Sparkline({ label, values, unit }: { label: string; values: number[]; u
 
 function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; events: CoachHistoryEvent[] }) {
   const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [plan, setPlan] = useState<CoachPlan | null>(null);
@@ -1254,6 +1255,24 @@ function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; e
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const liveQuestionRef = useRef('');
+  const closeTimerRef = useRef<number | null>(null);
+
+  const closeCoachPanel = () => {
+    stopListening();
+    setClosing(true);
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = window.setTimeout(() => {
+      setOpen(false);
+      setClosing(false);
+      closeTimerRef.current = null;
+    }, 260);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open || plan) return;
@@ -1406,13 +1425,55 @@ function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; e
     setListening(true);
   };
 
-  const lastAssistant = events.find((event) => event.role === 'assistant');
+  const panelIntroMessage = messages.find((message) => message.role === 'assistant')?.text?.trim();
+  const lastAssistant = events.find((event) => event.role === 'assistant')?.message?.trim();
+  const coachBubbleText = panelIntroMessage || lastAssistant || 'Tap Coach for a personalized insight based on your latest labs and goals.';
 
   return (
     <>
+      <style>{`
+        @keyframes coachSlideInHome {
+          from { opacity: 0; transform: translateX(30px) scale(0.985); }
+          to { opacity: 1; transform: translateX(0) scale(1); }
+        }
+        @keyframes coachSlideOutHome {
+          from { opacity: 1; transform: translateX(0) scale(1); }
+          to { opacity: 0; transform: translateX(24px) scale(0.985); }
+        }
+      `}</style>
+      {!open && !closing && (
+        <div
+          className="fixed z-40 bottom-20 right-6 max-w-[24rem] rounded-2xl px-3 py-2.5"
+          style={{
+            backgroundColor: 'var(--surface)',
+            border: '1px solid var(--border)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          }}
+        >
+          <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-tertiary)' }}>
+            Coach insight
+          </p>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            {coachBubbleText}
+          </p>
+          <div
+            className="absolute -bottom-2 right-8 w-3 h-3 rotate-45"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderRight: '1px solid var(--border)',
+              borderBottom: '1px solid var(--border)',
+            }}
+            aria-hidden
+          />
+        </div>
+      )}
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+          setClosing(false);
+          setOpen(true);
+        }}
         className="fixed z-40 bottom-6 right-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-lg"
         style={{ backgroundColor: 'var(--accent)', color: 'var(--text-inverse)' }}
       >
@@ -1420,26 +1481,60 @@ function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; e
         Coach
       </button>
 
-      {open && (
+      {(open || closing) && (
         <>
           <button
             type="button"
-            onClick={() => {
-              stopListening();
-              setOpen(false);
-            }}
+            onClick={closeCoachPanel}
             className="fixed inset-0 z-40 bg-black/35 backdrop-blur-[1px]"
             aria-label="Close coach panel"
           />
           <aside
-            className="fixed z-50 top-0 right-0 h-full w-full max-w-md p-3 sm:p-4"
+            className="fixed right-3 sm:right-4 top-3 sm:top-4 h-[calc(100%-1.5rem)] sm:h-[calc(100%-2rem)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-hidden rounded-3xl flex flex-col"
+            style={{
+              animation: closing
+                ? 'coachSlideOutHome 0.26s ease both'
+                : 'coachSlideInHome 0.45s cubic-bezier(0.22, 1.12, 0.36, 1) both',
+              willChange: 'transform, opacity',
+              background: 'linear-gradient(165deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.02) 55%, rgba(255,255,255,0.008) 100%)',
+              border: '1px solid rgba(255,255,255,0.09)',
+              backdropFilter: 'blur(2px) saturate(1.01)',
+              WebkitBackdropFilter: 'blur(2px) saturate(1.01)',
+              boxShadow: [
+                '0 10px 18px rgba(8, 12, 22, 0.05)',
+                '0 2px 8px rgba(8, 12, 22, 0.02)',
+                'inset 0 1px 0 rgba(255,255,255,0.26)',
+                'inset 0 -1px 0 rgba(255,255,255,0.05)',
+              ].join(', '),
+            }}
           >
             <div
-              className="h-full rounded-2xl border overflow-hidden flex flex-col"
-              style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-3xl"
+              style={{
+                background:
+                  'radial-gradient(160% 80% at 8% -18%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.10) 38%, transparent 68%), radial-gradient(110% 70% at 100% 110%, rgba(125, 186, 133, 0.22) 0%, transparent 62%)',
+                mixBlendMode: 'screen',
+              }}
+            />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-3xl"
+              style={{
+                background:
+                  'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.85) 20%, rgba(255,255,255,0.95) 50%, rgba(255,255,255,0.85) 80%, transparent 100%)',
+              }}
+            />
+            <div
+              className="relative h-full rounded-2xl overflow-hidden flex flex-col"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.38)',
+                border: 'none',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)',
+              }}
             >
               <div className="px-4 py-3 border-b flex items-start justify-between gap-3" style={{ borderColor: 'var(--border-light)' }}>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                     Coach
                   </p>
@@ -1447,34 +1542,27 @@ function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; e
                     Ask a question or use live audio.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    stopListening();
-                    setOpen(false);
-                  }}
-                  className="p-1.5 rounded-lg"
-                  style={{ color: 'var(--text-tertiary)' }}
-                  aria-label="Close panel"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/coach-history"
+                    className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg hover:opacity-80"
+                    style={{ color: 'var(--text-primary)', backgroundColor: 'rgba(255,255,255,0.55)', border: '1px solid var(--border-light)' }}
+                  >
+                    Coach History
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={closeCoachPanel}
+                    className="p-1.5 rounded-lg"
+                    style={{ color: 'var(--text-tertiary)' }}
+                    aria-label="Close panel"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-                {lastAssistant && messages.length === 0 && (
-                  <div
-                    className="rounded-xl p-3"
-                    style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}
-                  >
-                    <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-tertiary)' }}>
-                      Last coach note
-                    </p>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      {truncate(lastAssistant.message, 220)}
-                    </p>
-                  </div>
-                )}
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -1549,13 +1637,6 @@ function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; e
                   <span className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
                     Live audio is available using your microphone.
                   </span>
-                  <Link
-                    href="/coach-history"
-                    className="text-[11px] font-semibold hover:opacity-80"
-                    style={{ color: 'var(--accent)' }}
-                  >
-                    History
-                  </Link>
                 </div>
               </div>
             </div>
