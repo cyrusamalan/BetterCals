@@ -160,6 +160,7 @@ export default function MarkerHoverPopup({
           left: pos.left,
           top: pos.top,
           width: pos.width,
+          maxWidth: 'calc(100vw - 24px)',
           animation: 'markerPopupIn 0.3s cubic-bezier(0.22, 1.2, 0.36, 1) both',
           transformOrigin: pos.transformOrigin,
         }}

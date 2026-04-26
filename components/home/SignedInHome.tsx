@@ -536,7 +536,7 @@ function TodaySnapshot({
           kcal {selectedTier ? `${selectedTier.label.toLowerCase()} target` : `for ${goalLabel.toLowerCase()}`}
         </span>
       </div>
-      <div className="grid grid-cols-3 gap-2 mt-4">
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-4">
         <MacroPill icon={Beef} label="Protein" grams={proteinTarget} pct={macros.protein.pct} />
         <MacroPill icon={Wheat} label="Carbs" grams={carbsTarget} pct={macros.carbs.pct} />
         <MacroPill icon={DropletIcon} label="Fat" grams={fatTarget} pct={macros.fat.pct} />
@@ -563,7 +563,7 @@ function TodaySnapshot({
 function MacroPill({ icon: Icon, label, grams, pct }: { icon: typeof Beef; label: string; grams: number; pct: number }) {
   return (
     <div
-      className="rounded-xl px-3 py-2.5"
+      className="rounded-xl px-2 sm:px-3 py-2 sm:py-2.5"
       style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}
     >
       <div className="flex items-center gap-1.5">
@@ -1950,7 +1950,7 @@ function CoachFloatingPanel({
         <>
 
           <aside
-            className="fixed right-3 sm:right-4 top-[80px] sm:top-[84px] h-[calc(100vh-104px)] sm:h-[calc(100vh-108px)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-hidden rounded-3xl flex flex-col"
+            className="fixed right-3 sm:right-4 top-[80px] sm:top-[84px] h-[calc(100dvh-104px)] sm:h-[calc(100dvh-108px)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-hidden rounded-3xl flex flex-col"
             style={{
               animation: isClosing
                 ? 'coachSlideOutHome 0.4s ease forwards'

@@ -2789,7 +2789,7 @@ export default function BloodTestDashboard({
             </div>
           </aside>
           <aside
-            className="fixed right-3 sm:right-4 top-3 sm:top-4 h-[calc(100%-1.5rem)] sm:h-[calc(100%-2rem)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-hidden rounded-3xl flex flex-col"
+            className="fixed right-3 sm:right-4 top-3 sm:top-4 h-[calc(100dvh-1.5rem)] sm:h-[calc(100dvh-2rem)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-hidden rounded-3xl flex flex-col"
             style={{
               animation: coachClosing
                 ? 'coachSlideOut 0.26s ease both'
