@@ -6,12 +6,13 @@ import {
   Sparkles, Flame, Beef, Wheat, Droplet as DropletIcon, Target,
   Utensils, AlertTriangle, TrendingUp, TrendingDown, Minus,
   MessageCircle, History as HistoryIcon, ArrowRight, CheckCircle2,
-  Footprints, Coffee, Sun, Moon, Apple, RefreshCw, ChevronRight, Activity, Mic, MicOff, X, Loader2, Globe, ChefHat,
+  Footprints, Coffee, Sun, Moon, Apple, RefreshCw, ChevronRight, Activity, Mic, MicOff, X, Loader2, Globe, ChefHat, Dumbbell,
   Stethoscope,
 } from 'lucide-react';
 import type {
   AnalysisHistory, AnalysisResult, BloodMarkers, UserProfile, ActionPlanItem,
-  DietPlanMealSlot, CoachHistoryEvent, CoachMessage, CoachPlan, DietPlan, Allergy, Cuisine, CookingTime,
+  DietPlanMealSlot, CoachHistoryEvent, CoachMessage, CoachPlan, DietPlan, Allergy, Cuisine, CookingTime, WorkoutPlan,
+  WorkoutConstraintOption, WorkoutPreferenceOption,
 } from '@/types';
 import { getMarkerInterpretation } from '@/lib/bloodParser';
 import { MARKER_NAMES } from '@/lib/calculations';
@@ -41,6 +42,15 @@ const SLOT_ICON: Record<DietPlanMealSlot, typeof Coffee> = {
   snack: Apple,
 };
 
+const SLOT_LABEL: Record<DietPlanMealSlot, string> = {
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  dinner: 'Dinner',
+  snack: 'Snack',
+};
+
+const SLOT_ORDER: DietPlanMealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
 const ALLERGY_OPTIONS: { value: Allergy; label: string }[] = [
   { value: 'peanuts', label: 'Peanuts' },
   { value: 'tree-nuts', label: 'Tree Nuts' },
@@ -67,6 +77,24 @@ const COOKING_TIME_OPTIONS: { value: CookingTime; label: string }[] = [
   { value: 'quick', label: 'Quick (<=15 min)' },
   { value: 'moderate', label: 'Moderate (15-30 min)' },
   { value: 'elaborate', label: 'Elaborate (30+ min)' },
+];
+
+const WORKOUT_CONSTRAINT_OPTIONS: { value: WorkoutConstraintOption; label: string }[] = [
+  { value: 'none', label: 'No major limitations' },
+  { value: 'knee-discomfort', label: 'Knee discomfort' },
+  { value: 'lower-back-sensitivity', label: 'Lower-back sensitivity' },
+  { value: 'shoulder-limitation', label: 'Shoulder limitation' },
+  { value: 'impact-sensitive-joints', label: 'Impact-sensitive joints' },
+  { value: 'balance-concerns', label: 'Balance concerns' },
+  { value: 'wrist-elbow-sensitivity', label: 'Wrist/elbow sensitivity' },
+];
+
+const WORKOUT_PREFERENCE_OPTIONS: { value: WorkoutPreferenceOption; label: string }[] = [
+  { value: 'strength-training', label: 'Strength training' },
+  { value: 'walking-cardio', label: 'Walking + cardio' },
+  { value: 'mobility-yoga', label: 'Mobility / yoga' },
+  { value: 'hiit-lite', label: 'HIIT-lite' },
+  { value: 'mixed-balanced', label: 'Mixed balanced' },
 ];
 
 export default function SignedInHome() {
@@ -326,18 +354,47 @@ function MacroPill({ icon: Icon, label, grams, pct }: { icon: typeof Beef; label
 // ── 2. Diet Plan Summary ──────────────────────────────────────────────────
 
 function DietPlanSummary({ analysis }: { analysis: AnalysisHistory }) {
-  const [plan, setPlan] = useState<DietPlan | undefined>(analysis.result.dietPlan);
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'diet' | 'workout'>('diet');
+  const [dietPlan, setDietPlan] = useState<DietPlan | undefined>(analysis.result.dietPlan);
+  const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | undefined>(analysis.result.workoutPlan);
+  const [dietLoading, setDietLoading] = useState(false);
+  const [workoutLoading, setWorkoutLoading] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [showDietModal, setShowDietModal] = useState(false);
+  const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+
   const [allergies, setAllergies] = useState<Allergy[]>(analysis.profile.allergies ?? []);
   const [dislikesText, setDislikesText] = useState((analysis.profile.dislikes ?? []).join(', '));
   const [preferredCuisines, setPreferredCuisines] = useState<Cuisine[]>(analysis.profile.preferredCuisines ?? []);
   const [cookingTime, setCookingTime] = useState<CookingTime | undefined>(analysis.profile.cookingTime);
-  const topMarker = pickPrimaryMarker(analysis.result);
+  const [workoutConstraints, setWorkoutConstraints] = useState<WorkoutConstraintOption[]>(['none']);
+  const [workoutConstraintNotes, setWorkoutConstraintNotes] = useState('');
+  const [workoutPreferences, setWorkoutPreferences] = useState<WorkoutPreferenceOption[]>(['mixed-balanced']);
+  const [showWorkoutFeedbackModal, setShowWorkoutFeedbackModal] = useState(false);
+  const [workoutFeedbackText, setWorkoutFeedbackText] = useState('');
 
-  const generate = async () => {
+  const topMarker = pickPrimaryMarker(analysis.result);
+  const mealsBySlot = new Map((dietPlan?.meals ?? []).map((meal) => [meal.slot, meal]));
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(`/api/workout-plan?analysisId=${analysis.id}&limit=1`);
+        if (!response.ok) return;
+        const rows = (await response.json()) as Array<{ plan?: WorkoutPlan }>;
+        if (!cancelled && rows.length > 0 && rows[0]?.plan) {
+          setWorkoutPlan(rows[0].plan);
+        }
+      } catch {
+        // non-fatal
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [analysis.id]);
+
+  const generateDietPlan = async () => {
     const mergedProfile: UserProfile = {
       ...analysis.profile,
       allergies: allergies.length > 0 ? allergies : undefined,
@@ -346,8 +403,8 @@ function DietPlanSummary({ analysis }: { analysis: AnalysisHistory }) {
       cookingTime,
     };
 
-    setShowModal(false);
-    setLoading(true);
+    setShowDietModal(false);
+    setDietLoading(true);
     setError(null);
     setWarning(null);
     try {
@@ -366,22 +423,90 @@ function DietPlanSummary({ analysis }: { analysis: AnalysisHistory }) {
         throw new Error(body?.error ?? `Request failed (${resp.status})`);
       }
       const data = (await resp.json()) as { dietPlan: DietPlan; fallbackUsed?: boolean; warning?: string };
-      setPlan(data.dietPlan);
+      setDietPlan(data.dietPlan);
       if (data.fallbackUsed && data.warning) setWarning(data.warning);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate diet plan');
     } finally {
-      setLoading(false);
+      setDietLoading(false);
+    }
+  };
+
+  const generateWorkout = async () => {
+    const sanitizedConstraints = workoutConstraints.includes('none')
+      ? ['none']
+      : workoutConstraints.filter((item) => item !== 'none');
+
+    setShowWorkoutModal(false);
+    setWorkoutLoading(true);
+    setError(null);
+    setWarning(null);
+    try {
+      const response = await fetch('/api/workout-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          analysisId: analysis.id,
+          profile: analysis.profile,
+          markers: analysis.markers,
+          result: analysis.result,
+          constraints: {
+            selected: sanitizedConstraints,
+            notes: workoutConstraintNotes.trim() || undefined,
+          },
+          preferences: {
+            selected: workoutPreferences,
+          },
+        }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? `Request failed (${response.status})`);
+      }
+      const data = (await response.json()) as { workoutPlan: WorkoutPlan; fallbackUsed?: boolean; warning?: string };
+      setWorkoutPlan(data.workoutPlan);
+      if (data.fallbackUsed && data.warning) setWarning(data.warning);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate workout plan');
+    } finally {
+      setWorkoutLoading(false);
     }
   };
 
   return (
     <>
     <Card className="min-h-[34rem] lg:h-full">
+      <div className="mb-4 inline-flex rounded-xl p-1" style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('diet')}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+          style={{
+            backgroundColor: activeTab === 'diet' ? 'var(--accent)' : 'transparent',
+            color: activeTab === 'diet' ? 'var(--text-inverse)' : 'var(--text-secondary)',
+          }}
+        >
+          Diet plan
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('workout')}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+          style={{
+            backgroundColor: activeTab === 'workout' ? 'var(--accent)' : 'transparent',
+            color: activeTab === 'workout' ? 'var(--text-inverse)' : 'var(--text-secondary)',
+          }}
+        >
+          Workout plan
+        </button>
+      </div>
+
+      {activeTab === 'diet' && (
+      <>
       <SectionHeader
         icon={Utensils}
         title="Diet plan"
-        subtitle={plan ? 'One-day plan tailored to your markers and goal macros' : 'No plan yet'}
+        subtitle={dietPlan ? 'One-day plan tailored to your markers and goal macros' : 'No plan yet'}
         action={
           <Link
             href={`/history/${analysis.id}`}
@@ -392,41 +517,68 @@ function DietPlanSummary({ analysis }: { analysis: AnalysisHistory }) {
           </Link>
         }
       />
-      {plan ? (
+      {dietPlan ? (
         <>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            {plan.summary.length > 140 ? `${plan.summary.slice(0, 140)}…` : plan.summary}
-          </p>
+          <div
+            className="rounded-xl p-3.5"
+            style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}
+          >
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              {dietPlan.summary.length > 180 ? `${dietPlan.summary.slice(0, 180)}…` : dietPlan.summary}
+            </p>
+          </div>
           {topMarker && (
             <p className="mt-2 text-xs italic" style={{ color: 'var(--text-tertiary)' }}>
               Why: prioritizing {topMarker}.
             </p>
           )}
-          <ul className="mt-3 space-y-1.5">
-            {plan.meals.slice(0, 4).map((m, i) => {
-              const Icon = SLOT_ICON[m.slot];
+          <ul className="mt-4 space-y-2.5">
+            {SLOT_ORDER.map((slot) => {
+              const meal = mealsBySlot.get(slot);
+              const Icon = SLOT_ICON[slot];
               return (
-                <li key={i} className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  <Icon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-                  <span className="truncate">{m.name}</span>
-                  <span className="text-[11px] ml-auto flex-shrink-0" style={{ color: 'var(--text-tertiary)' }}>{m.calories} kcal</span>
+                <li
+                  key={slot}
+                  className="flex items-start gap-3 rounded-xl px-3 py-2.5"
+                  style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
+                >
+                  <div
+                    className="h-7 w-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                    style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent)' }}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-tertiary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border-light)' }}>
+                      {SLOT_LABEL[slot]}
+                    </span>
+                    <p className="text-sm mt-1 leading-snug" style={{ color: 'var(--text-primary)' }}>
+                      {meal?.name ?? 'Not generated yet'}
+                    </p>
+                  </div>
+                  <span
+                    className="text-[11px] font-semibold ml-auto flex-shrink-0 px-2 py-1 rounded-md"
+                    style={{ color: 'var(--text-tertiary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border-light)' }}
+                  >
+                    {meal ? `${meal.calories} kcal` : '--'}
+                  </span>
                 </li>
               );
             })}
           </ul>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link href={`/history/${analysis.id}`} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'var(--accent)', color: 'var(--text-inverse)' }}>
+          <div className="mt-5 flex flex-wrap gap-2.5">
+            <Link href={`/history/${analysis.id}`} className="px-3.5 py-2 rounded-xl text-xs font-semibold" style={{ background: 'var(--accent)', color: 'var(--text-inverse)' }}>
               Open full plan
             </Link>
             <button
               type="button"
-              onClick={() => setShowModal(true)}
-              disabled={loading}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 disabled:opacity-70"
+              onClick={() => setShowDietModal(true)}
+              disabled={dietLoading}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-70"
               style={{ background: 'var(--surface)', border: '1.5px solid var(--border-light)', color: 'var(--text-secondary)' }}
             >
-              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-              {loading ? 'Generating...' : 'Unlock fully personalized diet plan'}
+              {dietLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              {dietLoading ? 'Generating...' : 'Unlock fully personalized diet plan'}
             </button>
           </div>
         </>
@@ -437,16 +589,94 @@ function DietPlanSummary({ analysis }: { analysis: AnalysisHistory }) {
           </p>
           <button
             type="button"
-            onClick={() => setShowModal(true)}
-            disabled={loading}
+            onClick={() => setShowDietModal(true)}
+            disabled={dietLoading}
             className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
             style={{ background: 'var(--accent)', color: 'var(--text-inverse)' }}
           >
-            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            {loading ? 'Generating...' : 'Unlock fully personalized diet plan'}
+            {dietLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {dietLoading ? 'Generating...' : 'Unlock fully personalized diet plan'}
           </button>
         </div>
       )}
+      </>
+      )}
+
+      {activeTab === 'workout' && (
+        <>
+          <SectionHeader
+            icon={Dumbbell}
+            title="Workout plan"
+            subtitle={workoutPlan ? 'Weekly plan tailored to your goals and movement considerations' : 'No workout plan yet'}
+          />
+          {workoutPlan ? (
+            <>
+              <div className="rounded-xl p-3.5" style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {workoutPlan.summary}
+                </p>
+                <p className="text-xs mt-2 font-semibold" style={{ color: 'var(--text-tertiary)' }}>
+                  Weekly goal: {workoutPlan.weeklyGoal}
+                </p>
+              </div>
+              <div className="mt-4 space-y-2.5">
+                {workoutPlan.sessions.slice(0, 5).map((session, idx) => (
+                  <div key={`${session.day}-${idx}`} className="rounded-xl p-3" style={{ backgroundColor: 'var(--bg-warm)', border: '1px solid var(--border-light)' }}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {session.day} - {session.focus}
+                      </p>
+                      <span className="text-[11px] px-2 py-1 rounded-md" style={{ color: 'var(--text-tertiary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border-light)' }}>
+                        {session.durationMinutes} min
+                      </span>
+                    </div>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                      Intensity: {session.intensity}
+                    </p>
+                    {session.main.length > 0 && (
+                      <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                        Main: {session.main.slice(0, 2).join(' • ')}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs mt-4" style={{ color: 'var(--text-tertiary)' }}>
+                Safety: Adapt intensity based on comfort, stop if pain worsens, and consult a clinician or physiotherapist for persistent pain.
+              </p>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowWorkoutFeedbackModal(true)}
+                  disabled={workoutLoading}
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-70"
+                  style={{ background: 'var(--surface)', border: '1.5px solid var(--border-light)', color: 'var(--text-secondary)' }}
+                >
+                  {workoutLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                  {workoutLoading ? 'Generating...' : 'Refine this workout plan'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="py-3">
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                Build a personalized workout plan that matches your diet target, age, and movement constraints.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowWorkoutModal(true)}
+                disabled={workoutLoading}
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={{ background: 'var(--accent)', color: 'var(--text-inverse)' }}
+              >
+                {workoutLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                {workoutLoading ? 'Generating...' : 'Unlock fully personalized workout plan'}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
       {warning && (
         <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
           {warning}
@@ -458,12 +688,12 @@ function DietPlanSummary({ analysis }: { analysis: AnalysisHistory }) {
         </p>
       )}
     </Card>
-    {showModal && (
+    {showDietModal && (
       <div className="fixed inset-0 z-50">
         <button
           type="button"
           className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-          onClick={() => setShowModal(false)}
+          onClick={() => setShowDietModal(false)}
           aria-label="Close food preferences"
         />
         <div className="absolute inset-0 flex items-center justify-center p-4">
@@ -484,7 +714,7 @@ function DietPlanSummary({ analysis }: { analysis: AnalysisHistory }) {
               </div>
               <button
                 type="button"
-                onClick={() => setShowModal(false)}
+                onClick={() => setShowDietModal(false)}
                 className="p-1.5 rounded-lg"
                 style={{ color: 'var(--text-tertiary)' }}
                 aria-label="Close"
@@ -606,7 +836,7 @@ function DietPlanSummary({ analysis }: { analysis: AnalysisHistory }) {
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setShowModal(false)}
+                onClick={() => setShowDietModal(false)}
                 className="px-3 py-2 rounded-lg text-xs font-semibold"
                 style={{ backgroundColor: 'var(--bg-warm)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
               >
@@ -614,12 +844,240 @@ function DietPlanSummary({ analysis }: { analysis: AnalysisHistory }) {
               </button>
               <button
                 type="button"
-                onClick={() => void generate()}
+                onClick={() => void generateDietPlan()}
                 className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
                 style={{ backgroundColor: 'var(--accent)', color: 'var(--text-inverse)' }}
               >
                 <Sparkles className="h-3.5 w-3.5" />
                 Generate diet plan
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    {showWorkoutModal && (
+      <div className="fixed inset-0 z-50">
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowWorkoutModal(false)}
+          aria-label="Close workout preferences"
+        />
+        <div className="absolute inset-0 flex items-center justify-center p-4">
+          <div
+            className="w-full max-w-2xl rounded-2xl p-5 sm:p-6"
+            style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Workout preferences
+                </h3>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                  Tell us your movement considerations and preferred training style for a safer, tailored workout plan.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWorkoutModal(false)}
+                className="p-1.5 rounded-lg"
+                style={{ color: 'var(--text-tertiary)' }}
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="flex items-center gap-1.5 mb-2">
+                  <Activity className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                    Movement considerations
+                  </span>
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  {WORKOUT_CONSTRAINT_OPTIONS.map((opt) => {
+                    const selected = workoutConstraints.includes(opt.value);
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          setWorkoutConstraints((current) => {
+                            if (opt.value === 'none') return ['none'];
+                            const withoutNone = current.filter((item) => item !== 'none');
+                            if (selected) return withoutNone.filter((item) => item !== opt.value);
+                            return [...withoutNone, opt.value];
+                          });
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                        style={{
+                          backgroundColor: selected ? 'var(--accent)' : 'var(--surface)',
+                          color: selected ? 'var(--text-inverse)' : 'var(--text-secondary)',
+                          border: `1px solid ${selected ? 'var(--accent)' : 'var(--border-light)'}`,
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1.5 mb-2">
+                  <Activity className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                    Notes (optional)
+                  </span>
+                </label>
+                <textarea
+                  value={workoutConstraintNotes}
+                  onChange={(event) => setWorkoutConstraintNotes(event.target.value)}
+                  className="input-field min-h-[84px]"
+                  placeholder="Any limitations, injuries, or movements you'd like to avoid."
+                  maxLength={600}
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1.5 mb-2">
+                  <Dumbbell className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                    Preferred training style
+                  </span>
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  {WORKOUT_PREFERENCE_OPTIONS.map((opt) => {
+                    const selected = workoutPreferences.includes(opt.value);
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          setWorkoutPreferences((current) => {
+                            if (selected) {
+                              const next = current.filter((item) => item !== opt.value);
+                              return next.length > 0 ? next : ['mixed-balanced'];
+                            }
+                            return [...current, opt.value];
+                          });
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                        style={{
+                          backgroundColor: selected ? 'var(--accent)' : 'var(--surface)',
+                          color: selected ? 'var(--text-inverse)' : 'var(--text-secondary)',
+                          border: `1px solid ${selected ? 'var(--accent)' : 'var(--border-light)'}`,
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowWorkoutModal(false)}
+                className="px-3 py-2 rounded-lg text-xs font-semibold"
+                style={{ backgroundColor: 'var(--bg-warm)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void generateWorkout()}
+                className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
+                style={{ backgroundColor: 'var(--accent)', color: 'var(--text-inverse)' }}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Generate workout plan
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    {showWorkoutFeedbackModal && (
+      <div className="fixed inset-0 z-50">
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowWorkoutFeedbackModal(false)}
+          aria-label="Close workout feedback"
+        />
+        <div className="absolute inset-0 flex items-center justify-center p-4">
+          <div
+            className="w-full max-w-xl rounded-2xl p-5 sm:p-6"
+            style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Refine your workout plan
+                </h3>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                  Tell us what is not working (too hard, pain triggers, schedule mismatch, disliked exercises), and we will personalize it further.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWorkoutFeedbackModal(false)}
+                className="p-1.5 rounded-lg"
+                style={{ color: 'var(--text-tertiary)' }}
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4">
+              <textarea
+                value={workoutFeedbackText}
+                onChange={(event) => setWorkoutFeedbackText(event.target.value)}
+                className="input-field min-h-[120px]"
+                placeholder="Example: Lunges bother my right knee, and 45 minutes is too long on weekdays. I prefer lower-impact home workouts."
+                maxLength={900}
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowWorkoutFeedbackModal(false)}
+                className="px-3 py-2 rounded-lg text-xs font-semibold"
+                style={{ backgroundColor: 'var(--bg-warm)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const feedback = workoutFeedbackText.trim();
+                  if (!feedback) return;
+                  setWorkoutConstraintNotes((prev) => {
+                    const base = prev.trim();
+                    return base ? `${base}\n\nUser plan feedback: ${feedback}` : `User plan feedback: ${feedback}`;
+                  });
+                  setShowWorkoutFeedbackModal(false);
+                  setWorkoutFeedbackText('');
+                  void generateWorkout();
+                }}
+                disabled={!workoutFeedbackText.trim() || workoutLoading}
+                className="px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60"
+                style={{ backgroundColor: 'var(--accent)', color: 'var(--text-inverse)' }}
+              >
+                {workoutLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                {workoutLoading ? 'Generating...' : 'Generate improved workout plan'}
               </button>
             </div>
           </div>

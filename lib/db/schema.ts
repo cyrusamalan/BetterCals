@@ -48,3 +48,19 @@ export const coachHistory = pgTable('coach_history', {
   index('coach_history_user_id_event_date_idx').on(table.userId, table.eventDateUtc),
   index('coach_history_user_id_created_at_idx').on(table.userId, table.createdAt),
 ]);
+
+export const workoutPlanHistory = pgTable('workout_plan_history', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  analysisId: integer('analysis_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  eventDateUtc: date('event_date_utc').notNull(),
+  constraints: jsonb('constraints').notNull(),
+  preferences: jsonb('preferences').notNull(),
+  plan: jsonb('plan').notNull(),
+}, (table) => [
+  index('workout_plan_history_user_id_created_at_idx').on(table.userId, table.createdAt),
+  index('workout_plan_history_user_id_event_date_idx').on(table.userId, table.eventDateUtc),
+  index('workout_plan_history_analysis_id_idx').on(table.analysisId),
+]);

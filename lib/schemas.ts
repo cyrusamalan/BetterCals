@@ -113,6 +113,23 @@ const coachMessageSchema = z.object({
 });
 
 const coachHistorySourceSchema = z.enum(['llm_chat', 'live_mic', 'live_model']);
+const workoutConstraintOptionSchema = z.enum([
+  'none',
+  'knee-discomfort',
+  'lower-back-sensitivity',
+  'shoulder-limitation',
+  'impact-sensitive-joints',
+  'balance-concerns',
+  'wrist-elbow-sensitivity',
+]);
+const workoutPreferenceOptionSchema = z.enum([
+  'strength-training',
+  'walking-cardio',
+  'mobility-yoga',
+  'hiit-lite',
+  'mixed-balanced',
+]);
+const workoutIntensitySchema = z.enum(['low', 'moderate', 'moderate-high']);
 
 /** POST /api/analyses — save a new analysis */
 export const saveAnalysisSchema = z.object({
@@ -199,6 +216,25 @@ export const saveAnalysisSchema = z.object({
       hydrationOz: z.number(),
       keyPrinciples: z.array(z.string().max(300)).max(8),
       flags: z.array(z.string().max(120)).max(8).optional(),
+      modelUsed: z.string().max(120).optional(),
+    }).optional(),
+    workoutPlan: z.object({
+      generatedAt: z.string(),
+      summary: z.string().max(1200),
+      weeklyGoal: z.string().max(240),
+      sessions: z.array(z.object({
+        day: z.string().max(40),
+        focus: z.string().max(200),
+        durationMinutes: z.number().int().min(5).max(240),
+        intensity: workoutIntensitySchema,
+        warmup: z.array(z.string().max(200)).max(10),
+        main: z.array(z.string().max(200)).max(20),
+        cooldown: z.array(z.string().max(200)).max(10),
+        modifications: z.array(z.string().max(240)).max(12).optional(),
+      })).max(14),
+      recoveryNotes: z.array(z.string().max(300)).max(12),
+      safetyNotes: z.array(z.string().max(300)).max(12),
+      equipmentNotes: z.array(z.string().max(240)).max(12).optional(),
       modelUsed: z.string().max(120).optional(),
     }).optional(),
     coach: z.object({
@@ -294,4 +330,18 @@ export const saveCoachHistoryEventSchema = z.object({
 export const listCoachHistoryQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+export const generateWorkoutPlanRequestSchema = z.object({
+  analysisId: z.number().int().positive().optional(),
+  profile: userProfileSchema,
+  markers: bloodMarkersSchema,
+  result: saveAnalysisSchema.shape.result,
+  constraints: z.object({
+    selected: z.array(workoutConstraintOptionSchema).max(7),
+    notes: z.string().max(600).optional(),
+  }),
+  preferences: z.object({
+    selected: z.array(workoutPreferenceOptionSchema).min(1).max(5),
+  }),
 });

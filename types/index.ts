@@ -270,6 +270,7 @@ export interface AnalysisResult {
   actionPlan?: ActionPlanItem[];
   coach?: CoachState;
   dietPlan?: DietPlan;
+  workoutPlan?: WorkoutPlan;
 }
 
 export type DietPlanMealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -294,6 +295,46 @@ export interface DietPlan {
   hydrationOz: number;
   keyPrinciples: string[];
   flags?: string[];
+  modelUsed?: string;
+}
+
+export type WorkoutConstraintOption =
+  | 'none'
+  | 'knee-discomfort'
+  | 'lower-back-sensitivity'
+  | 'shoulder-limitation'
+  | 'impact-sensitive-joints'
+  | 'balance-concerns'
+  | 'wrist-elbow-sensitivity';
+
+export type WorkoutPreferenceOption =
+  | 'strength-training'
+  | 'walking-cardio'
+  | 'mobility-yoga'
+  | 'hiit-lite'
+  | 'mixed-balanced';
+
+export type WorkoutIntensity = 'low' | 'moderate' | 'moderate-high';
+
+export interface WorkoutSession {
+  day: string;
+  focus: string;
+  durationMinutes: number;
+  intensity: WorkoutIntensity;
+  warmup: string[];
+  main: string[];
+  cooldown: string[];
+  modifications?: string[];
+}
+
+export interface WorkoutPlan {
+  generatedAt: string;
+  summary: string;
+  weeklyGoal: string;
+  sessions: WorkoutSession[];
+  recoveryNotes: string[];
+  safetyNotes: string[];
+  equipmentNotes?: string[];
   modelUsed?: string;
 }
 

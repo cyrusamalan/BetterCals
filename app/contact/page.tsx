@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default function ContactPage() {
-  const contactEmail = 'support@bettercal.com';
+  const contactEmail = 'support@bettercals.com';
   const composeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(contactEmail)}&su=${encodeURIComponent('BetterCals Support')}`;
 
   return (
