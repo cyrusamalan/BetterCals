@@ -1617,7 +1617,7 @@ function CoachFloatingPanel({
 
             <div className="space-y-4 relative z-[1] flex-1 min-h-0">
               <div className="rounded-2xl p-4 h-full flex flex-col" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
-                <div className="mt-3 space-y-3 flex-1 min-h-0 overflow-y-auto pr-1">
+                <div className="mt-3 space-y-3 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
                   {messages.length === 0 ? (
                     <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                       Ask a question to start the conversation.
