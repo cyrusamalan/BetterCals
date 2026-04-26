@@ -16,6 +16,23 @@ export default function SignInPage() {
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
+  const resolvePostSignInRoute = async (): Promise<string> => {
+    try {
+      const response = await fetch('/api/profile', {
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        return '/analyze';
+      }
+
+      const data = (await response.json()) as { profile?: { goal?: unknown } };
+      return data?.profile?.goal ? '/' : '/analyze';
+    } catch {
+      return '/analyze';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoaded || !signIn) return;
@@ -31,7 +48,8 @@ export default function SignInPage() {
 
       if (result.status === 'complete' && setActive) {
         await setActive({ session: result.createdSessionId });
-        router.push('/analyze');
+        const nextRoute = await resolvePostSignInRoute();
+        router.push(nextRoute);
       }
     } catch (err: unknown) {
       const clerkError = err as { errors?: { longMessage?: string }[] };
