@@ -330,7 +330,7 @@ export default function AnalyzePage() {
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
         }}
       >
-        <div className="w-full px-5 py-3.5 grid grid-cols-[auto_1fr_auto] items-center">
+        <div className="w-full pl-2 sm:pl-3 pr-5 py-3.5 grid grid-cols-[auto_1fr_auto] items-center">
           {/* Left: logo */}
           <div className="flex items-center gap-3 justify-start">
             <div

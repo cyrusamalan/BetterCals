@@ -118,7 +118,7 @@ export default function HomePage() {
           borderBottom: '1px solid var(--header-border)',
         }}
       >
-        <div className="max-w-6xl mx-auto px-4 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-3">
+        <div className="w-full pl-2 sm:pl-3 pr-4 sm:pr-5 py-3 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-3">
           <Link href="/" className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
               <VitalsMark sizePx={32} />

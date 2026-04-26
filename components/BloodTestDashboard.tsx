@@ -1744,7 +1744,7 @@ export default function BloodTestDashboard({
           WebkitBackdropFilter: 'blur(16px)',
         }}
       >
-        <div className="w-full px-4 sm:px-5 py-3 sm:py-4">
+        <div className="w-full pl-2 sm:pl-3 pr-4 sm:pr-5 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <Link href="/" className="flex items-center gap-2.5 sm:gap-3 min-w-0 shrink-0">
