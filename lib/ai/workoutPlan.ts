@@ -1,4 +1,4 @@
-import type { AnalysisResult, BloodMarkers, UserProfile, WorkoutPlan, WorkoutPreferenceOption } from '@/types';
+import type { AnalysisResult, BloodMarkers, UserProfile, WorkoutPlan, WorkoutPreferenceOption, WorkoutIntensity } from '@/types';
 
 const DEFAULT_BASE_URL = 'https://api.deepseek.com';
 const DEFAULT_MODEL = 'deepseek-chat';
@@ -190,9 +190,9 @@ function validateWorkoutPlan(raw: unknown, input: WorkoutPlanInput, modelUsed?: 
       const day = typeof row.day === 'string' ? row.day.slice(0, 24) : null;
       const focus = typeof row.focus === 'string' ? row.focus.slice(0, 200) : null;
       const duration = num(row.durationMinutes);
-      const intensity = typeof row.intensity === 'string' ? row.intensity : null;
+      const intensity = parseWorkoutIntensity(row.intensity);
       if (!day || !focus || duration === null) return null;
-      if (intensity !== 'low' && intensity !== 'moderate' && intensity !== 'moderate-high') return null;
+      if (!intensity) return null;
       return {
         day,
         focus,
@@ -231,6 +231,11 @@ function toStringArray(value: unknown, maxItems: number, maxLen: number): string
 function num(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   return value;
+}
+
+function parseWorkoutIntensity(value: unknown): WorkoutIntensity | null {
+  if (value === 'low' || value === 'moderate' || value === 'moderate-high') return value;
+  return null;
 }
 
 function buildFallbackWorkoutPlan(input: WorkoutPlanInput): WorkoutPlan {
