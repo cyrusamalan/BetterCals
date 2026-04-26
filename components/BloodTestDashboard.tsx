@@ -1772,8 +1772,8 @@ export default function BloodTestDashboard({
                   title="Export report"
                 >
                   <Download className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                  <span>Export</span>
-                  <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                  <span className="hidden sm:inline">Export</span>
+                  <ChevronDown className="w-3.5 h-3.5 hidden sm:block" style={{ color: 'var(--text-tertiary)' }} />
                 </button>
                 {exportOpen && (
                   <div
@@ -1832,7 +1832,7 @@ export default function BloodTestDashboard({
                 <>
                   <Link
                     href="/history"
-                    className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press"
+                    className="hidden sm:flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold btn-press"
                     style={{
                       backgroundColor: 'var(--border-light)',
                       color: 'var(--text-primary)',

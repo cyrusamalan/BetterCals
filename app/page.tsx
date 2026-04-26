@@ -165,7 +165,7 @@ export default function HomePage() {
               <>
                 <Link
                   href="/history"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
                   style={{
                     background: 'var(--border-light)',
                     color: 'var(--text-primary)',
@@ -186,7 +186,8 @@ export default function HomePage() {
                       border: '1px solid var(--border)',
                     }}
                   >
-                    Account
+                    <span className="hidden sm:inline">Account</span>
+                    <UserCog className="w-3.5 h-3.5 sm:hidden" style={{ color: 'var(--text-tertiary)' }} />
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform ${accountOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--text-tertiary)' }} />
                   </button>
                   {accountOpen && (
@@ -198,6 +199,15 @@ export default function HomePage() {
                         boxShadow: '0 10px 28px rgba(0,0,0,0.12)',
                       }}
                     >
+                      <Link
+                        href="/history"
+                        onClick={() => setAccountOpen(false)}
+                        className="sm:hidden w-full inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        <History className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                        History
+                      </Link>
                       <Link
                         href="/analyze?editProfile=1"
                         onClick={() => setAccountOpen(false)}
