@@ -228,7 +228,7 @@ export default function SignedInHome() {
 
   if (loading) {
     return (
-      <main className="max-w-6xl mx-auto px-5 pt-8 pb-16">
+      <main className="max-w-7xl 2xl:max-w-[1400px] mx-auto px-5 pt-8 pb-16">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="h-44 rounded-2xl animate-pulse" style={{ backgroundColor: 'var(--bg-warm)' }} />
@@ -240,7 +240,7 @@ export default function SignedInHome() {
 
   if (error) {
     return (
-      <main className="max-w-6xl mx-auto px-5 pt-8 pb-16">
+      <main className="max-w-7xl 2xl:max-w-[1400px] mx-auto px-5 pt-8 pb-16">
         <p className="text-sm" style={{ color: 'var(--status-danger)' }}>
           Could not load your dashboard: {error}
         </p>
@@ -265,11 +265,11 @@ export default function SignedInHome() {
   return (
     <>
       <div 
-        className={`transition-transform duration-[400ms] ease-in-out ${
-          coachState === 'open' ? 'lg:-translate-x-[200px] xl:-translate-x-[230px]' : 'translate-x-0'
+        className={`transition-all duration-[400ms] ease-in-out w-full ${
+          (coachState === 'open' || coachState === 'closing') ? 'lg:pr-[420px] xl:pr-[460px]' : 'pr-0'
         }`}
       >
-        <main className="max-w-6xl mx-auto pl-4 pr-6 lg:pl-3 lg:pr-8 pt-6 pb-16 space-y-5">
+        <main className="max-w-7xl 2xl:max-w-[1400px] mx-auto pl-4 pr-6 lg:pl-3 lg:pr-8 pt-6 pb-16 space-y-5">
           <SafetyBanner markers={latest.markers} profile={latest.profile} />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
@@ -1805,23 +1805,22 @@ function CoachFloatingPanel({
           to { opacity: 0; }
         }
       `}</style>
+
       {!isVisible && (
         <div
-          className="fixed z-40 bottom-20 right-6 max-w-[24rem] rounded-2xl px-3 py-2.5"
+          className="fixed z-40 bottom-20 right-6 max-w-[16rem] rounded-xl px-3 py-2"
           style={{
             backgroundColor: 'var(--surface)',
             border: '1px solid var(--border)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+            animation: 'coachFadeIn 0.5s ease 1s both',
           }}
         >
-          <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-tertiary)' }}>
-            Coach insight
-          </p>
-          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            {coachBubbleText}
+          <p className="text-xs font-semibold text-center" style={{ color: 'var(--text-primary)' }}>
+            Talk to your personalized coach
           </p>
           <div
-            className="absolute -bottom-2 right-8 w-3 h-3 rotate-45"
+            className="absolute -bottom-[5px] right-8 w-2 h-2 rotate-45"
             style={{
               backgroundColor: 'var(--surface)',
               borderRight: '1px solid var(--border)',
@@ -1831,6 +1830,7 @@ function CoachFloatingPanel({
           />
         </div>
       )}
+
       <button
         type="button"
         onClick={onOpen}

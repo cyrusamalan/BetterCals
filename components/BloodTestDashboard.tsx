@@ -2135,7 +2135,13 @@ export default function BloodTestDashboard({
       </div>
 
       {/* Screen UI */}
-      <div id="screen-content" className="max-w-5xl mx-auto px-4 sm:px-5 pt-6 sm:pt-8 xl:relative xl:-translate-x-5">
+      <div 
+        id="screen-wrapper" 
+        className={`transition-all duration-[400ms] ease-in-out w-full ${
+          coachOpen || coachClosing ? 'lg:pr-[420px] xl:pr-[460px]' : 'pr-0'
+        }`}
+      >
+        <div id="screen-content" className="max-w-7xl 2xl:max-w-[1400px] mx-auto px-4 sm:px-5 pt-6 sm:pt-8">
         {/* 1. Hero: Score + BMR/TDEE inline + BMI badge */}
         <div className="anim-fade-up delay-1">
           <div
@@ -2598,6 +2604,31 @@ export default function BloodTestDashboard({
         onDismiss={() => setActiveMarker(null)}
       />
 
+      {!coachOpen && (
+        <div
+          className="fixed z-40 bottom-20 right-6 max-w-[16rem] rounded-xl px-3 py-2"
+          style={{
+            backgroundColor: 'var(--surface)',
+            border: '1px solid var(--border)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+            animation: 'coachBackdropFade 0.5s ease 1s both',
+          }}
+        >
+          <p className="text-xs font-semibold text-center" style={{ color: 'var(--text-primary)' }}>
+            Talk to your personalized coach
+          </p>
+          <div
+            className="absolute -bottom-[5px] right-8 w-2 h-2 rotate-45"
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderRight: '1px solid var(--border)',
+              borderBottom: '1px solid var(--border)',
+            }}
+            aria-hidden
+          />
+        </div>
+      )}
+
       <button
         type="button"
         onClick={() => {
@@ -2973,6 +3004,7 @@ export default function BloodTestDashboard({
           </aside>
         </>
       )}
+      </div>
     </div>
   );
 }
