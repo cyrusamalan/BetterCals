@@ -40,15 +40,7 @@ function getCandidateModelNames(primary: string): string[] {
     ?.split(',')
     .map((m) => m.trim())
     .filter(Boolean) ?? [];
-
-  const builtInFallbacks = [
-    configuredFallback,
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-8b',
-    'gemini-1.5-pro',
-  ].filter((m): m is string => Boolean(m && m.length > 0));
-
-  return Array.from(new Set([primary, ...configuredList, ...builtInFallbacks]));
+  return Array.from(new Set([primary, ...configuredList, configuredFallback].filter(Boolean))) as string[];
 }
 
 function sleep(ms: number): Promise<void> {
@@ -58,6 +50,11 @@ function sleep(ms: number): Promise<void> {
 function shouldRetryOrFailover(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err);
   return /\b(429|503)\b/.test(message) || /high demand|resource exhausted|unavailable/i.test(message);
+}
+
+function isUnsupportedModelError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /\b404\b/.test(message) && /not found|not supported/i.test(message);
 }
 
 async function generateOnce(
@@ -100,6 +97,15 @@ export async function generateCoachReply(input: ChatInput): Promise<ChatOutput> 
         result = await generateOnce(model, input);
         break;
       } catch (firstErr) {
+        if (isUnsupportedModelError(firstErr)) {
+          const nextModel = candidateModels[i + 1];
+          if (nextModel) {
+            console.warn('[coach/gemini] model unavailable for this API key/version, skipping to next model:', nextModel);
+            continue;
+          }
+          throw firstErr;
+        }
+
         if (!shouldRetryOrFailover(firstErr)) {
           throw firstErr;
         }
@@ -116,6 +122,14 @@ export async function generateCoachReply(input: ChatInput): Promise<ChatOutput> 
           break;
         } catch (retryErr) {
           lastError = retryErr;
+          if (isUnsupportedModelError(retryErr)) {
+            const nextModel = candidateModels[i + 1];
+            if (nextModel) {
+              console.warn('[coach/gemini] model unsupported after retry, skipping to next model:', nextModel);
+              continue;
+            }
+            throw retryErr;
+          }
           if (!shouldRetryOrFailover(retryErr)) {
             throw retryErr;
           }
