@@ -104,6 +104,8 @@ const coachMessageSchema = z.object({
   createdAt: z.string().optional(),
 });
 
+const coachHistorySourceSchema = z.enum(['llm_chat', 'live_mic', 'live_model']);
+
 /** POST /api/analyses — save a new analysis */
 export const saveAnalysisSchema = z.object({
   profile: userProfileSchema,
@@ -236,4 +238,17 @@ export const coachChatRequestSchema = z.object({
   coachPlan: coachPlanSchema,
   messages: z.array(coachMessageSchema).max(20),
   userQuestion: z.string().min(1).max(1200),
+});
+
+export const saveCoachHistoryEventSchema = z.object({
+  source: coachHistorySourceSchema,
+  role: z.enum(['assistant', 'user']),
+  message: z.string().min(1).max(4000),
+  analysisId: z.number().int().positive().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const listCoachHistoryQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
 });

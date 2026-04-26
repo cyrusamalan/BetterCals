@@ -264,6 +264,8 @@ export interface CoachPlan {
 
 export type CoachMessageSource = 'coach_engine' | 'llm_chat';
 
+export type CoachHistorySource = 'llm_chat' | 'live_mic' | 'live_model';
+
 export interface CoachMessage {
   id: string;
   role: 'assistant' | 'user';
@@ -288,6 +290,25 @@ export interface CoachState {
   plan: CoachPlan;
   messages: CoachMessage[];
   telemetry?: CoachProviderTelemetry[];
+}
+
+export interface CoachHistoryEvent {
+  id: number;
+  userId: string;
+  createdAt: string;
+  eventDateUtc: string;
+  source: CoachHistorySource;
+  role: 'assistant' | 'user';
+  message: string;
+  analysisId?: number | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface CoachHistoryTurn {
+  day: string;
+  sourceFamily: 'live' | 'text';
+  user?: CoachHistoryEvent;
+  assistant?: CoachHistoryEvent;
 }
 
 export interface ParsedBloodReport {

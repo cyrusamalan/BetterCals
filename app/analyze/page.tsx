@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Heart, Activity, FileText, Droplets, ChevronRight, History } from 'lucide-react';
+import { Heart, Activity, FileText, Droplets, ChevronRight, History, MessageCircle } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import TDEEForm from '@/components/TDEEForm';
 import BloodValuesForm from '@/components/BloodValuesForm';
@@ -426,6 +426,18 @@ export default function AnalyzePage() {
                   >
                     <History className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
                     History
+                  </Link>
+                  <Link
+                    href="/coach-history"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                    style={{
+                      background: 'var(--border-light)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                    Coach
                   </Link>
                   <ProfileDropdown profile={profile} onEditProfile={handleEditProfile} />
                 </>

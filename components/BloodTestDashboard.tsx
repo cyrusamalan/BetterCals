@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AnalysisResult, BloodMarkers, CoachMessage, CoachPlan, CoachProviderTelemetry, FoodSensitivityFlag, Insight, MarkerStatus, UserProfile } from '@/types';
+import { AnalysisResult, BloodMarkers, CoachHistorySource, CoachMessage, CoachPlan, CoachProviderTelemetry, FoodSensitivityFlag, Insight, MarkerStatus, UserProfile } from '@/types';
 import {
   getMarkerBarScale,
   getMarkerDisplayRange,
@@ -70,8 +70,13 @@ const MarkerComparisonChart = dynamic(() => import('@/components/dashboard/Marke
 type LiveServerMessage = {
   setupComplete?: Record<string, never>;
   error?: { message?: string };
+  turnComplete?: boolean;
+  interrupted?: boolean;
   serverContent?: {
+    inputTranscription?: { text?: string };
     outputTranscription?: { text?: string };
+    turnComplete?: boolean;
+    interrupted?: boolean;
     modelTurn?: {
       parts?: Array<{
         text?: string;
@@ -85,6 +90,7 @@ type LiveServerMessage = {
 };
 
 const LIVE_SAMPLE_RATE = 16000;
+const LIVE_HISTORY_MIN_WORDS = 2;
 
 function floatTo16BitPcm(input: Float32Array): Int16Array {
   const output = new Int16Array(input.length);
@@ -149,6 +155,16 @@ function sampleRateFromMimeType(mimeType?: string): number {
   if (!match) return 24000;
   const parsed = Number(match[1]);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 24000;
+}
+
+function mergeTranscriptSegments(existing: string, incoming: string): string {
+  const base = existing.trim();
+  const next = incoming.trim();
+  if (!next) return base;
+  if (!base) return next;
+  if (next.startsWith(base)) return next;
+  if (base.endsWith(next)) return base;
+  return `${base} ${next}`.replace(/\s+/g, ' ').trim();
 }
 
 function TypewriterText({
@@ -988,6 +1004,8 @@ export default function BloodTestDashboard({
   const liveAssistantMessageIdRef = useRef<string | null>(null);
   const liveReconnectAllowedRef = useRef(false);
   const liveSetupCompleteRef = useRef(false);
+  const liveHistoryRef = useRef<Partial<Record<CoachHistorySource, { text: string; at: number }>>>({});
+  const liveTurnRef = useRef<{ userText: string; modelText: string }>({ userText: '', modelText: '' });
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const animatedOverallScore = useCountUp(healthScore.overall, 1100);
   const countUpDidLogRef = useRef(false);
@@ -1295,6 +1313,76 @@ export default function BloodTestDashboard({
     }
   };
 
+  const persistCoachHistoryEvent = async (
+    source: CoachHistorySource,
+    role: 'assistant' | 'user',
+    message: string,
+    metadata?: Record<string, unknown>,
+  ) => {
+    if (!isSignedIn) return;
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    try {
+      const res = await fetch('/api/coach/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source,
+          role,
+          message: trimmed,
+          analysisId: savedAnalysisId ?? undefined,
+          metadata,
+        }),
+      });
+      if (!res.ok) {
+        const details = await res.text();
+        console.warn('[coach/history] event persistence failed (non-blocking):', res.status, details);
+      }
+    } catch (error) {
+      console.warn('[coach/history] event persistence failed (non-blocking):', error);
+    }
+  };
+
+  const captureLiveTranscript = (
+    source: Extract<CoachHistorySource, 'live_mic' | 'live_model'>,
+    text: string,
+  ) => {
+    const trimmed = text.trim();
+    if (trimmed.length < 2) return;
+    const now = Date.now();
+    const prev = liveHistoryRef.current[source];
+    if (prev && prev.text === trimmed && now - prev.at < 1500) return;
+    liveHistoryRef.current[source] = { text: trimmed, at: now };
+    if (source === 'live_mic') {
+      liveTurnRef.current.userText = mergeTranscriptSegments(liveTurnRef.current.userText, trimmed);
+    } else {
+      liveTurnRef.current.modelText = mergeTranscriptSegments(liveTurnRef.current.modelText, trimmed);
+    }
+  };
+
+  const flushLiveTurnHistory = (flushReason: 'turn_complete' | 'session_end' | 'interrupted') => {
+    const persistIfValid = (
+      source: Extract<CoachHistorySource, 'live_mic' | 'live_model'>,
+      role: 'assistant' | 'user',
+      text: string,
+    ) => {
+      const normalized = text.replace(/\s+/g, ' ').trim();
+      if (!normalized) return;
+      const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+      if (wordCount < LIVE_HISTORY_MIN_WORDS) return;
+      void persistCoachHistoryEvent(source, role, normalized, {
+        liveTurn: true,
+        flushReason,
+        wordCount,
+      });
+    };
+
+    persistIfValid('live_mic', 'user', liveTurnRef.current.userText);
+    persistIfValid('live_model', 'assistant', liveTurnRef.current.modelText);
+    liveTurnRef.current.userText = '';
+    liveTurnRef.current.modelText = '';
+  };
+
   const sendCoachQuestion = async (rawQuestion: string) => {
     const question = rawQuestion.trim();
     if (!question || !coachPlan || coachLoading) return;
@@ -1309,6 +1397,7 @@ export default function BloodTestDashboard({
 
     const nextMessages = [...coachMessages, userMessage];
     setCoachMessages(nextMessages);
+    void persistCoachHistoryEvent('llm_chat', 'user', userMessage.text);
     setCoachLoading(true);
     setCoachError(null);
     try {
@@ -1325,6 +1414,7 @@ export default function BloodTestDashboard({
       if (!res.ok) throw new Error(`Coach chat failed (${res.status})`);
       const data = await res.json() as { message: CoachMessage; telemetry?: CoachProviderTelemetry };
       setCoachMessages((prev) => [...prev, data.message]);
+      void persistCoachHistoryEvent('llm_chat', 'assistant', data.message.text, data.telemetry ? { telemetry: data.telemetry } : undefined);
       const telemetry = data.telemetry;
       if (telemetry) {
         setCoachTelemetry((prev) => [...prev, telemetry]);
@@ -1342,6 +1432,8 @@ export default function BloodTestDashboard({
   };
 
   const stopCoachLiveSession = () => {
+    flushLiveTurnHistory('session_end');
+
     liveReconnectAllowedRef.current = false;
     liveSetupCompleteRef.current = false;
     livePlaybackStartAtRef.current = 0;
@@ -1436,8 +1528,22 @@ export default function BloodTestDashboard({
       }
 
       const outputTranscript = payload.serverContent?.outputTranscription?.text?.trim();
+      const inputTranscript = payload.serverContent?.inputTranscription?.text?.trim();
+      const shouldFlushTurn = Boolean(
+        payload.turnComplete ||
+        payload.interrupted ||
+        payload.serverContent?.turnComplete ||
+        payload.serverContent?.interrupted,
+      );
+      if (inputTranscript) {
+        captureLiveTranscript('live_mic', inputTranscript);
+      }
       if (outputTranscript) {
         setCoachLiveTranscript(outputTranscript);
+        captureLiveTranscript('live_model', outputTranscript);
+      }
+      if (shouldFlushTurn) {
+        flushLiveTurnHistory(payload.interrupted || payload.serverContent?.interrupted ? 'interrupted' : 'turn_complete');
       }
 
       const audioParts = payload.serverContent?.modelTurn?.parts
@@ -2248,9 +2354,23 @@ export default function BloodTestDashboard({
               boxShadow: 'var(--card-shadow, 0 6px 20px rgba(0,0,0,0.05))',
             }}
           >
-            <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Personalized Plan
-            </h3>
+            <div className="flex items-start justify-between gap-3">
+              <Link
+                href="/coach-history"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold btn-press"
+                style={{
+                  backgroundColor: 'var(--border-light)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                <MessageCircle className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                Coach History
+              </Link>
+              <h3 className="font-semibold text-right" style={{ color: 'var(--text-primary)' }}>
+                Personalized Plan
+              </h3>
+            </div>
             {coachPlan ? (
               <>
                 <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
@@ -2576,9 +2696,23 @@ export default function BloodTestDashboard({
             }}
           >
             <div className="rounded-2xl p-4" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
-              <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Personalized Plan
-              </h3>
+              <div className="flex items-start justify-between gap-3">
+                <Link
+                  href="/coach-history"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold btn-press"
+                  style={{
+                    backgroundColor: 'var(--border-light)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                  Coach History
+                </Link>
+                <h3 className="font-semibold text-right" style={{ color: 'var(--text-primary)' }}>
+                  Personalized Plan
+                </h3>
+              </div>
               {coachPlan ? (
                 <>
                   <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
@@ -2655,6 +2789,19 @@ export default function BloodTestDashboard({
               }}
             />
             <div className="relative mb-4 shrink-0">
+              <Link
+                href="/coach-history"
+                className="absolute left-0 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold btn-press"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.45)',
+                  border: 'none',
+                  color: 'var(--text-primary)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)',
+                }}
+              >
+                <MessageCircle className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                History
+              </Link>
               <h2 className="font-display text-xl text-center" style={{ color: 'var(--text-primary)' }}>
                 Coach
               </h2>

@@ -6,5 +6,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: siteUrl, lastModified: new Date(), changeFrequency: 'weekly', priority: 1 },
     { url: `${siteUrl}/analyze`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.9 },
     { url: `${siteUrl}/history`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.7 },
+    { url: `${siteUrl}/coach-history`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.7 },
   ];
 }

@@ -11,6 +11,7 @@ import {
   HeartPulse,
   LineChart,
   History,
+  MessageCircle,
   Play,
   BookOpen,
 } from 'lucide-react';
@@ -148,6 +149,18 @@ export default function HomePage() {
                   History
                 </Link>
                 <Link
+                  href="/coach-history"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                  style={{
+                    background: 'var(--border-light)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                  Coach
+                </Link>
+                <Link
                   href="/analyze"
                   className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
                   style={{
@@ -224,18 +237,32 @@ export default function HomePage() {
               </Link>
 
               {isSignedIn ? (
-                <Link
-                  href="/history"
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold btn-press"
-                  style={{
-                    background: 'var(--border-light)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border)',
-                  }}
-                >
-                  View history
-                  <LineChart className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-                </Link>
+                <>
+                  <Link
+                    href="/history"
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold btn-press"
+                    style={{
+                      background: 'var(--border-light)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    View history
+                    <LineChart className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                  </Link>
+                  <Link
+                    href="/coach-history"
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold btn-press"
+                    style={{
+                      background: 'var(--border-light)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    Coach history
+                    <MessageCircle className="w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
+                  </Link>
+                </>
               ) : (
                 <button
                   onClick={() => setDemoOpen(true)}

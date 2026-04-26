@@ -93,6 +93,31 @@ export function HistoryPageSkeleton() {
   );
 }
 
+export function CoachHistoryPageSkeleton() {
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-warm)' }} aria-busy="true" aria-label="Loading coach history">
+      <div className="max-w-5xl mx-auto px-4 pt-8 pb-4 space-y-4">
+        <SkeletonBlock className="h-4 w-32" />
+        <div className="flex items-center gap-3">
+          <SkeletonBlock className="h-9 w-9 rounded-lg" />
+          <SkeletonBlock className="h-8 w-72 max-w-[80%]" />
+        </div>
+        <SkeletonBlock className="h-4 w-full max-w-xl" />
+      </div>
+      <div className="max-w-5xl mx-auto px-4 pb-12 space-y-4 mt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <SkeletonBlock className="h-11 rounded-xl" />
+          <SkeletonBlock className="h-11 rounded-xl" />
+          <SkeletonBlock className="h-11 rounded-xl" />
+        </div>
+        <SkeletonBlock className="h-24 rounded-2xl" />
+        <SkeletonBlock className="h-28 rounded-2xl" />
+        <SkeletonBlock className="h-28 rounded-2xl" />
+      </div>
+    </div>
+  );
+}
+
 export function AnalysisDetailSkeleton() {
   return (
     <div
