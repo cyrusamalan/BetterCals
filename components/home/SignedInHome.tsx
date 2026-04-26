@@ -1347,6 +1347,7 @@ function CoachFloatingPanel({
         if (!response.ok) throw new Error('Failed to initialize coach');
         const data = await response.json() as { plan: CoachPlan; initialMessage: CoachMessage };
         setPlan(data.plan);
+        typedMessageIdsRef.current.add(data.initialMessage.id);
         setMessages([data.initialMessage]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to initialize coach');
