@@ -102,6 +102,7 @@ export default function SignedInHome() {
   const [coachEvents, setCoachEvents] = useState<CoachHistoryEvent[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [coachState, setCoachState] = useState<'closed' | 'open' | 'closing'>('closed');
 
   useEffect(() => {
     let cancelled = false;
@@ -154,27 +155,49 @@ export default function SignedInHome() {
     return <EmptyHome />;
   }
 
+  const handleOpenCoach = () => setCoachState('open');
+  const handleCloseCoach = () => {
+    setCoachState('closing');
+    setTimeout(() => {
+      setCoachState((prev) => (prev === 'closing' ? 'closed' : prev));
+    }, 400);
+  };
+
   return (
-    <main className="max-w-6xl mx-auto pl-4 pr-6 lg:pl-3 lg:pr-8 pt-6 pb-16 space-y-5">
-      <SafetyBanner markers={latest.markers} profile={latest.profile} />
+    <>
+      <div 
+        className={`transition-transform duration-[400ms] ease-in-out ${
+          coachState === 'open' ? 'lg:-translate-x-[200px] xl:-translate-x-[230px]' : 'translate-x-0'
+        }`}
+      >
+        <main className="max-w-6xl mx-auto pl-4 pr-6 lg:pl-3 lg:pr-8 pt-6 pb-16 space-y-5">
+          <SafetyBanner markers={latest.markers} profile={latest.profile} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
-        <div className="space-y-5 lg:h-full lg:flex lg:flex-col">
-          <TodaySnapshot analysis={latest} />
-          <div className="lg:flex-1">
-            <DietPlanSummary analysis={latest} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+            <div className="space-y-5 lg:h-full lg:flex lg:flex-col">
+              <TodaySnapshot analysis={latest} />
+              <div className="lg:flex-1">
+                <DietPlanSummary analysis={latest} />
+              </div>
+            </div>
+            <div className="space-y-5 lg:h-full">
+              <AdherenceChecklist />
+              <PriorityAlerts analysis={latest} />
+              <TrendStrip history={analyses ?? []} />
+            </div>
           </div>
-        </div>
-        <div className="space-y-5 lg:h-full">
-          <AdherenceChecklist />
-          <PriorityAlerts analysis={latest} />
-          <TrendStrip history={analyses ?? []} />
-        </div>
-      </div>
 
-      <RecentHistory latest={latest} />
-      <CoachFloatingPanel analysis={latest} events={coachEvents ?? []} />
-    </main>
+          <RecentHistory latest={latest} />
+        </main>
+      </div>
+      <CoachFloatingPanel 
+        analysis={latest} 
+        events={coachEvents ?? []} 
+        coachState={coachState}
+        onOpen={handleOpenCoach}
+        onClose={handleCloseCoach}
+      />
+    </>
   );
 }
 
@@ -1243,9 +1266,52 @@ function Sparkline({ label, values, unit }: { label: string; values: number[]; u
 
 // ── 5. Floating Coach Panel ───────────────────────────────────────────────
 
-function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; events: CoachHistoryEvent[] }) {
-  const [open, setOpen] = useState(false);
-  const [closing, setClosing] = useState(false);
+function TypewriterText({
+  text,
+  alreadyTyped,
+  speed = 16,
+  onDone,
+}: {
+  text: string;
+  alreadyTyped: boolean;
+  speed?: number;
+  onDone: () => void;
+}) {
+  const [idx, setIdx] = useState(alreadyTyped ? text.length : 0);
+
+  useEffect(() => {
+    if (alreadyTyped) return;
+    if (idx >= text.length) {
+      onDone();
+      return;
+    }
+    const step = /\s/.test(text[idx]) ? speed * 0.6 : speed;
+    const t = setTimeout(() => setIdx((i) => i + 1), step);
+    return () => clearTimeout(t);
+  }, [idx, text, speed, alreadyTyped, onDone]);
+
+  const typing = !alreadyTyped && idx < text.length;
+  return (
+    <>
+      {text.slice(0, idx)}
+      {typing && <span className="coach-typewriter-caret opacity-70">▍</span>}
+    </>
+  );
+}
+
+function CoachFloatingPanel({ 
+  analysis, 
+  events,
+  coachState,
+  onOpen,
+  onClose,
+}: { 
+  analysis: AnalysisHistory; 
+  events: CoachHistoryEvent[];
+  coachState: 'closed' | 'open' | 'closing';
+  onOpen: () => void;
+  onClose: () => void;
+}) {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [plan, setPlan] = useState<CoachPlan | null>(null);
@@ -1255,27 +1321,18 @@ function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; e
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   const liveQuestionRef = useRef('');
-  const closeTimerRef = useRef<number | null>(null);
+  const typedMessageIdsRef = useRef<Set<string>>(new Set());
+
+  const isVisible = coachState === 'open' || coachState === 'closing';
+  const isClosing = coachState === 'closing';
 
   const closeCoachPanel = () => {
     stopListening();
-    setClosing(true);
-    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = window.setTimeout(() => {
-      setOpen(false);
-      setClosing(false);
-      closeTimerRef.current = null;
-    }, 260);
+    onClose();
   };
 
   useEffect(() => {
-    return () => {
-      if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!open || plan) return;
+    if (!isVisible || plan) return;
     (async () => {
       try {
         const response = await fetch('/api/coach/initial', {
@@ -1295,7 +1352,7 @@ function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; e
         setError(err instanceof Error ? err.message : 'Failed to initialize coach');
       }
     })();
-  }, [open, plan, analysis]);
+  }, [isVisible, plan, analysis]);
 
   const persistHistory = async (
     source: 'llm_chat' | 'live_mic' | 'live_model',
@@ -1350,6 +1407,7 @@ function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; e
           coachPlan: plan,
           messages: nextMessages.map((msg) => ({
             role: msg.role,
+            source: msg.source,
             text: msg.text,
           })),
           userQuestion: question,
@@ -1433,15 +1491,23 @@ function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; e
     <>
       <style>{`
         @keyframes coachSlideInHome {
-          from { opacity: 0; transform: translateX(30px) scale(0.985); }
-          to { opacity: 1; transform: translateX(0) scale(1); }
+          from { opacity: 0; transform: translateX(100%); }
+          to { opacity: 1; transform: translateX(0); }
         }
         @keyframes coachSlideOutHome {
-          from { opacity: 1; transform: translateX(0) scale(1); }
-          to { opacity: 0; transform: translateX(24px) scale(0.985); }
+          from { opacity: 1; transform: translateX(0); }
+          to { opacity: 0; transform: translateX(100%); }
+        }
+        @keyframes coachFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes coachFadeOut {
+          from { opacity: 1; }
+          to { opacity: 0; }
         }
       `}</style>
-      {!open && !closing && (
+      {!isVisible && (
         <div
           className="fixed z-40 bottom-20 right-6 max-w-[24rem] rounded-2xl px-3 py-2.5"
           style={{
@@ -1469,11 +1535,7 @@ function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; e
       )}
       <button
         type="button"
-        onClick={() => {
-          if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
-          setClosing(false);
-          setOpen(true);
-        }}
+        onClick={onOpen}
         className="fixed z-40 bottom-6 right-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-lg"
         style={{ backgroundColor: 'var(--accent)', color: 'var(--text-inverse)' }}
       >
@@ -1481,20 +1543,23 @@ function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; e
         Coach
       </button>
 
-      {(open || closing) && (
+      {isVisible && (
         <>
           <button
             type="button"
             onClick={closeCoachPanel}
             className="fixed inset-0 z-40 bg-black/35 backdrop-blur-[1px]"
             aria-label="Close coach panel"
+            style={{
+              animation: isClosing ? 'coachFadeOut 0.4s ease forwards' : 'coachFadeIn 0.4s ease forwards',
+            }}
           />
           <aside
-            className="fixed right-3 sm:right-4 top-3 sm:top-4 h-[calc(100%-1.5rem)] sm:h-[calc(100%-2rem)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-hidden rounded-3xl flex flex-col"
+            className="fixed right-3 sm:right-4 top-[80px] sm:top-[84px] h-[calc(100vh-104px)] sm:h-[calc(100vh-108px)] w-[calc(100%-1.5rem)] sm:w-[420px] md:w-[460px] z-50 p-4 sm:p-5 overflow-hidden rounded-3xl flex flex-col"
             style={{
-              animation: closing
-                ? 'coachSlideOutHome 0.26s ease both'
-                : 'coachSlideInHome 0.45s cubic-bezier(0.22, 1.12, 0.36, 1) both',
+              animation: isClosing
+                ? 'coachSlideOutHome 0.4s ease forwards'
+                : 'coachSlideInHome 0.4s cubic-bezier(0.22, 1.12, 0.36, 1) forwards',
               willChange: 'transform, opacity',
               background: 'linear-gradient(165deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.02) 55%, rgba(255,255,255,0.008) 100%)',
               border: '1px solid rgba(255,255,255,0.09)',
@@ -1525,118 +1590,141 @@ function CoachFloatingPanel({ analysis, events }: { analysis: AnalysisHistory; e
                   'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.85) 20%, rgba(255,255,255,0.95) 50%, rgba(255,255,255,0.85) 80%, transparent 100%)',
               }}
             />
-            <div
-              className="relative h-full rounded-2xl overflow-hidden flex flex-col"
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.38)',
-                border: 'none',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)',
-              }}
-            >
-              <div className="px-4 py-3 border-b flex items-start justify-between gap-3" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    Coach
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                    Ask a question or use live audio.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Link
-                    href="/coach-history"
-                    className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg hover:opacity-80"
-                    style={{ color: 'var(--text-primary)', backgroundColor: 'rgba(255,255,255,0.55)', border: '1px solid var(--border-light)' }}
-                  >
-                    Coach History
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={closeCoachPanel}
-                    className="p-1.5 rounded-lg"
-                    style={{ color: 'var(--text-tertiary)' }}
-                    aria-label="Close panel"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
+            <div className="relative mb-4 shrink-0">
+              <Link
+                href="/coach-history"
+                className="absolute left-0 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold btn-press"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.45)',
+                  border: 'none',
+                  color: 'var(--text-primary)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)',
+                }}
+              >
+                <MessageCircle className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                History
+              </Link>
+              <h2 className="font-display text-xl text-center" style={{ color: 'var(--text-primary)' }}>
+                Coach
+              </h2>
+              <button
+                type="button"
+                onClick={closeCoachPanel}
+                className="absolute right-0 top-1/2 -translate-y-1/2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.45)',
+                  border: 'none',
+                  color: 'var(--text-primary)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)',
+                }}
+              >
+                Close
+              </button>
+            </div>
 
-              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className="rounded-xl px-3 py-2.5"
-                    style={{
-                      backgroundColor: message.role === 'assistant' ? 'var(--bg-warm)' : 'var(--accent-subtle)',
-                      border: '1px solid var(--border-light)',
-                    }}
-                  >
-                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-tertiary)' }}>
-                      {message.role === 'assistant' ? 'Coach' : 'You'}
+            <div className="space-y-4 relative z-[1] flex-1 min-h-0">
+              <div className="rounded-2xl p-4 h-full flex flex-col" style={{ backgroundColor: 'rgba(255,255,255,0.38)', border: 'none', boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.75)' }}>
+                <div className="mt-3 space-y-3 flex-1 min-h-0 overflow-y-auto pr-1">
+                  {messages.length === 0 ? (
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      Ask a question to start the conversation.
                     </p>
-                    <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
-                      {message.text}
+                  ) : messages.map((message) => {
+                    const isAssistant = message.role === 'assistant';
+                    const alreadyTyped = !isAssistant || typedMessageIdsRef.current.has(message.id);
+                    return (
+                      <div
+                        key={message.id}
+                        className="rounded-xl px-3 py-2"
+                        style={{
+                          backgroundColor: isAssistant ? 'rgba(255,255,255,0.45)' : 'rgba(107, 143, 113, 0.12)',
+                          border: 'none',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.65)',
+                        }}
+                      >
+                        <p className="text-[11px] uppercase tracking-[0.08em] font-semibold" style={{ color: 'var(--text-tertiary)' }}>
+                          {isAssistant ? 'Coach' : 'You'}
+                        </p>
+                        <p className="text-sm mt-1 whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>
+                          {isAssistant ? (
+                            <TypewriterText
+                              text={message.text}
+                              alreadyTyped={alreadyTyped}
+                              onDone={() => {
+                                typedMessageIdsRef.current.add(message.id);
+                              }}
+                            />
+                          ) : (
+                            message.text
+                          )}
+                        </p>
+                      </div>
+                    );
+                  })}
+                  {loading && (
+                    <div className="inline-flex items-center gap-2 text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Coach is thinking...
+                    </div>
+                  )}
+                  {liveTranscript && (
+                    <div className="text-xs italic mt-2" style={{ color: 'var(--text-tertiary)' }}>
+                      Listening: {liveTranscript}
+                    </div>
+                  )}
+                  {error && (
+                    <p className="text-xs mt-2" style={{ color: 'var(--status-danger)' }}>
+                      {error}
                     </p>
-                  </div>
-                ))}
-                {loading && (
-                  <div className="inline-flex items-center gap-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Coach is thinking...
-                  </div>
-                )}
-                {liveTranscript && (
-                  <div className="text-xs italic" style={{ color: 'var(--text-tertiary)' }}>
-                    Listening: {liveTranscript}
-                  </div>
-                )}
-                {error && (
-                  <p className="text-xs" style={{ color: 'var(--status-danger)' }}>
-                    {error}
-                  </p>
-                )}
-              </div>
+                  )}
+                </div>
 
-              <div className="px-4 py-3 border-t" style={{ borderColor: 'var(--border-light)' }}>
-                <div className="flex items-center gap-2">
+                <div className="mt-3 flex gap-2">
                   <input
                     type="text"
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter') void sendQuestion(input, 'llm_chat');
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        void sendQuestion(input, 'llm_chat');
+                      }
                     }}
                     placeholder="Ask the coach..."
-                    className="input-field flex-1"
+                    className="flex-1 rounded-xl px-3 py-2 text-sm focus:outline-none"
+                    style={{
+                      border: 'none',
+                      backgroundColor: 'rgba(255,255,255,0.55)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 1px 3px rgba(0,0,0,0.05)',
+                      color: 'var(--text-primary)',
+                    }}
+                    disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={toggleLiveAudio}
-                    className="h-10 w-10 rounded-xl inline-flex items-center justify-center"
+                    className="rounded-xl px-3 py-2 text-sm font-semibold btn-press transition-colors"
                     style={{
-                      backgroundColor: listening ? 'var(--status-danger)' : 'var(--surface)',
-                      color: listening ? 'var(--text-inverse)' : 'var(--text-secondary)',
-                      border: '1px solid var(--border-light)',
+                      backgroundColor: listening ? 'rgba(220, 38, 38, 0.15)' : 'rgba(255,255,255,0.55)',
+                      color: listening ? 'var(--status-danger)' : 'var(--text-primary)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8), 0 1px 3px rgba(0,0,0,0.05)',
                     }}
                     aria-label={listening ? 'Stop live audio' : 'Start live audio'}
                   >
-                    {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                    {listening ? <MicOff size={16} /> : <Mic size={16} />}
                   </button>
                   <button
                     type="button"
                     onClick={() => void sendQuestion(input, 'llm_chat')}
                     disabled={!input.trim() || loading}
-                    className="h-10 px-3 rounded-xl text-xs font-semibold disabled:opacity-60"
-                    style={{ backgroundColor: 'var(--accent)', color: 'var(--text-inverse)' }}
+                    className="rounded-xl px-4 py-2 text-sm font-semibold btn-press disabled:opacity-50"
+                    style={{
+                      background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
+                      color: 'var(--text-inverse)',
+                    }}
                   >
-                    Send
+                    {loading ? 'Sending...' : 'Send'}
                   </button>
-                </div>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                    Live audio is available using your microphone.
-                  </span>
                 </div>
               </div>
             </div>

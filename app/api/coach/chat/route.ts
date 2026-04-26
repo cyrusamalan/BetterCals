@@ -75,6 +75,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsed = coachChatRequestSchema.safeParse(body);
     if (!parsed.success) {
+      console.error('[coach/chat] Validation failed:', parsed.error.flatten().fieldErrors);
       return NextResponse.json(
         { error: 'Invalid request body', details: parsed.error.flatten().fieldErrors },
         { status: 400 },
