@@ -8,6 +8,8 @@ import { ArrowRight, User, Ruler, Weight, Zap, Target, Activity, TrendingDown, M
 interface TDEEFormProps {
   onSubmit: (profile: UserProfile) => void;
   initialValues?: UserProfile;
+  submitLabel?: string;
+  showSubmitArrow?: boolean;
 }
 
 interface FormData {
@@ -56,7 +58,12 @@ function coerceFocusGoals(
   return [];
 }
 
-export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
+export default function TDEEForm({
+  onSubmit,
+  initialValues,
+  submitLabel = 'Continue to Blood Report',
+  showSubmitArrow = true,
+}: TDEEFormProps) {
   const [advancedActivity, setAdvancedActivity] = useState(initialValues?.advancedActivity ?? false);
   const [lifestyleOpen, setLifestyleOpen] = useState(false);
 
@@ -711,8 +718,10 @@ export default function TDEEForm({ onSubmit, initialValues }: TDEEFormProps) {
           boxShadow: '0 2px 8px rgba(107, 143, 113, 0.3)',
         }}
       >
-        Continue to Blood Report
-        <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
+        {submitLabel}
+        {showSubmitArrow && (
+          <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
+        )}
       </button>
     </form>
   );

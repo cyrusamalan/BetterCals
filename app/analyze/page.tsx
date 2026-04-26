@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Heart, Activity, FileText, Droplets, ChevronRight, History, MessageCircle } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
+import { useRouter, useSearchParams } from 'next/navigation';
 import TDEEForm from '@/components/TDEEForm';
 import BloodValuesForm from '@/components/BloodValuesForm';
 import BloodReportUploader from '@/components/BloodReportUploader';
@@ -51,6 +52,9 @@ function sanitizeBloodMarkers(input: BloodMarkers): BloodMarkers {
 }
 
 export default function AnalyzePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const forceProfileEdit = searchParams.get('editProfile') === '1';
   const [isMounted, setIsMounted] = useState(false);
   const [step, setStep] = useState<Step>('profile');
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -130,7 +134,7 @@ export default function AnalyzePage() {
       .then((data) => {
         if (data?.profile) {
           setProfile(normalizeUserProfile(data.profile as UserProfile));
-          if (step === 'profile') {
+          if (!forceProfileEdit && step === 'profile') {
             setStep('blood');
           }
         }
@@ -140,22 +144,29 @@ export default function AnalyzePage() {
       })
       .finally(() => setServerProfileLoaded(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMounted, isAuthLoaded, isSignedIn]);
+  }, [isMounted, isAuthLoaded, isSignedIn, forceProfileEdit]);
 
   const handleProfileSubmit = (data: UserProfile) => {
     setProfile(data);
+    const persistRequest = isSignedIn
+      ? fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile: data }),
+      }).catch(() => {})
+      : Promise.resolve();
+
+    if (forceProfileEdit) {
+      void persistRequest.finally(() => {
+        router.push('/');
+      });
+      return;
+    }
+
     setStep('blood');
     setShowManualEntry(false);
     setEntryMode('manual');
     setEstimateRanges(undefined);
-
-    if (isSignedIn) {
-      fetch('/api/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile: data }),
-      }).catch(() => {});
-    }
   };
 
   const calculateResultWithoutBlood = (profileData: UserProfile) => {
@@ -493,7 +504,12 @@ export default function AnalyzePage() {
                 }}
               >
                 <div className="p-6 sm:p-8">
-                  <TDEEForm onSubmit={handleProfileSubmit} initialValues={profile ?? undefined} />
+                  <TDEEForm
+                    onSubmit={handleProfileSubmit}
+                    initialValues={profile ?? undefined}
+                    submitLabel={forceProfileEdit ? 'Save profile settings' : undefined}
+                    showSubmitArrow={!forceProfileEdit}
+                  />
                 </div>
               </div>
             </div>

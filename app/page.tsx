@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
 import {
@@ -11,7 +11,10 @@ import {
   HeartPulse,
   LineChart,
   History,
-  MessageCircle,
+  UserCog,
+  Settings,
+  LogOut,
+  ChevronDown,
   Play,
   BookOpen,
 } from 'lucide-react';
@@ -100,10 +103,33 @@ function StepCard({
 }
 
 export default function HomePage() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, signOut } = useAuth();
   const [demoOpen, setDemoOpen] = useState(false);
   const [learnOpen, setLearnOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
   const showDashboard = isLoaded && isSignedIn;
+
+  useEffect(() => {
+    const onDocMouseDown = (event: MouseEvent) => {
+      if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
+        setAccountOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, []);
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      await signOut({ redirectUrl: '/' });
+    } finally {
+      setSigningOut(false);
+      setAccountOpen(false);
+    }
+  };
 
   return (
     <div
@@ -138,7 +164,7 @@ export default function HomePage() {
               <>
                 <Link
                   href="/history"
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
                   style={{
                     background: 'var(--border-light)',
                     color: 'var(--text-primary)',
@@ -148,30 +174,60 @@ export default function HomePage() {
                   <History className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
                   History
                 </Link>
-                <Link
-                  href="/coach-history"
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
-                  style={{
-                    background: 'var(--border-light)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border)',
-                  }}
-                >
-                  <MessageCircle className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
-                  Coach
-                </Link>
-                <Link
-                  href="/analyze"
-                  className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold btn-press"
-                  style={{
-                    background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)',
-                    color: 'var(--text-inverse)',
-                    boxShadow: '0 2px 6px rgba(107, 143, 113, 0.2), inset 0 1px 0 rgba(255,255,255,0.15)',
-                  }}
-                >
-                  Continue
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+                <div ref={accountRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAccountOpen((open) => !open)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold btn-press"
+                    style={{
+                      background: 'var(--border-light)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    Account
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${accountOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--text-tertiary)' }} />
+                  </button>
+                  {accountOpen && (
+                    <div
+                      className="absolute right-0 mt-2 w-44 rounded-xl p-1.5 z-50"
+                      style={{
+                        backgroundColor: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        boxShadow: '0 10px 28px rgba(0,0,0,0.12)',
+                      }}
+                    >
+                      <Link
+                        href="/analyze?editProfile=1"
+                        onClick={() => setAccountOpen(false)}
+                        className="w-full inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        <UserCog className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                        Edit profile
+                      </Link>
+                      <Link
+                        href="/settings"
+                        onClick={() => setAccountOpen(false)}
+                        className="w-full inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        <Settings className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                        Settings
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={handleSignOut}
+                        disabled={signingOut}
+                        className="w-full inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors disabled:opacity-60"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        <LogOut className="w-3.5 h-3.5" style={{ color: 'var(--text-tertiary)' }} />
+                        {signingOut ? 'Signing out...' : 'Sign out'}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               <>

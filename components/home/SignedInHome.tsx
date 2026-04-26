@@ -35,6 +35,55 @@ const GOAL_LABELS: Record<UserProfile['goal'], string> = {
   'gain-aggressive': 'Aggressive Bulk',
 };
 
+function goalFromTier(
+  tier: { label: string; dailyChange: number },
+  fallback: UserProfile['goal'],
+): UserProfile['goal'] {
+  const normalized = tier.label.trim().toLowerCase();
+  if (normalized.includes('maintain')) return 'maintain';
+  if (normalized.includes('lose') || tier.dailyChange < 0) {
+    if (tier.dailyChange <= -625) return 'lose-aggressive';
+    if (tier.dailyChange <= -375) return 'lose-moderate';
+    return 'lose-mild';
+  }
+  if (normalized.includes('gain') || tier.dailyChange > 0) {
+    if (tier.dailyChange >= 375) return 'gain-aggressive';
+    return 'gain-lean';
+  }
+  return fallback;
+}
+
+function tierIndexFromGoal(
+  tiers: Array<{ dailyChange: number }>,
+  goal: UserProfile['goal'],
+): number {
+  if (tiers.length === 0) return -1;
+  const targetChange = (() => {
+    switch (goal) {
+      case 'lose-aggressive':
+        return -750;
+      case 'lose-moderate':
+        return -500;
+      case 'lose-mild':
+        return -250;
+      case 'maintain':
+        return 0;
+      case 'gain-lean':
+        return 250;
+      case 'gain-aggressive':
+        return 500;
+      default:
+        return 0;
+    }
+  })();
+
+  return tiers.reduce((bestIdx, tier, idx) => {
+    const bestDist = Math.abs(tiers[bestIdx].dailyChange - targetChange);
+    const currentDist = Math.abs(tier.dailyChange - targetChange);
+    return currentDist < bestDist ? idx : bestIdx;
+  }, 0);
+}
+
 const SLOT_ICON: Record<DietPlanMealSlot, typeof Coffee> = {
   breakfast: Coffee,
   lunch: Sun,
@@ -199,6 +248,7 @@ function mergeTranscriptSegments(existing: string, incoming: string): string {
 export default function SignedInHome() {
   const [analyses, setAnalyses] = useState<AnalysisHistory[] | null>(null);
   const [coachEvents, setCoachEvents] = useState<CoachHistoryEvent[] | null>(null);
+  const [profileGoalOverride, setProfileGoalOverride] = useState<UserProfile['goal'] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [coachState, setCoachState] = useState<'closed' | 'open' | 'closing'>('closed');
@@ -207,15 +257,20 @@ export default function SignedInHome() {
     let cancelled = false;
     (async () => {
       try {
-        const [aResp, cResp] = await Promise.all([
+        const [aResp, cResp, pResp] = await Promise.all([
           fetch('/api/analyses'),
           fetch('/api/coach/history?limit=10'),
+          fetch('/api/profile'),
         ]);
         if (!cancelled) {
           if (aResp.ok) setAnalyses((await aResp.json()) as AnalysisHistory[]);
           else setAnalyses([]);
           if (cResp.ok) setCoachEvents((await cResp.json()) as CoachHistoryEvent[]);
           else setCoachEvents([]);
+          if (pResp.ok) {
+            const data = (await pResp.json()) as { profile?: UserProfile };
+            if (data?.profile?.goal) setProfileGoalOverride(data.profile.goal);
+          }
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load home data');
@@ -274,7 +329,11 @@ export default function SignedInHome() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
             <div className="space-y-5 lg:h-full lg:flex lg:flex-col">
-              <TodaySnapshot analysis={latest} />
+              <TodaySnapshot
+                analysis={latest}
+                goalOverride={profileGoalOverride ?? undefined}
+                onGoalPersist={setProfileGoalOverride}
+              />
               <div className="lg:flex-1">
                 <DietPlanSummary analysis={latest} />
               </div>
@@ -339,26 +398,35 @@ function SectionHeader({ icon: Icon, title, subtitle, action }: {
 
 // ── 1. Today Snapshot ─────────────────────────────────────────────────────
 
-function TodaySnapshot({ analysis }: { analysis: AnalysisHistory }) {
+function TodaySnapshot({
+  analysis,
+  goalOverride,
+  onGoalPersist,
+}: {
+  analysis: AnalysisHistory;
+  goalOverride?: UserProfile['goal'];
+  onGoalPersist?: (goal: UserProfile['goal']) => void;
+}) {
   const { macros } = analysis.result;
   const tiers = analysis.result.calorieTiers ?? [];
   const focusGoals = analysis.profile.focusGoal ?? [];
-  const goalLabel = GOAL_LABELS[analysis.profile.goal] ?? 'Goal';
+  const effectiveGoal = goalOverride ?? analysis.profile.goal;
+  const goalLabel = GOAL_LABELS[effectiveGoal] ?? 'Goal';
   const lastUpdated = new Date(analysis.createdAt);
   const macroCalories = Math.round(
     typeof macros.calories === 'number' && Number.isFinite(macros.calories)
       ? macros.calories
       : ((macros.protein.grams * 4) + (macros.carbs.grams * 4) + (macros.fat.grams * 9)),
   );
-  const defaultTierIndex = tiers.length > 0
-    ? tiers.reduce((bestIdx, tier, idx) => {
-      const bestDist = Math.abs(tiers[bestIdx].dailyCalories - macroCalories);
-      const currentDist = Math.abs(tier.dailyCalories - macroCalories);
-      return currentDist < bestDist ? idx : bestIdx;
-    }, 0)
-    : -1;
+  const defaultTierIndex = tierIndexFromGoal(tiers, effectiveGoal);
   const [showGoalEditor, setShowGoalEditor] = useState(false);
   const [selectedTierIndex, setSelectedTierIndex] = useState(defaultTierIndex);
+  const [savingGoal, setSavingGoal] = useState(false);
+  const [goalSaveError, setGoalSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedTierIndex(defaultTierIndex);
+  }, [defaultTierIndex]);
 
   const selectedTier = selectedTierIndex >= 0 ? tiers[selectedTierIndex] : null;
   const displayCalories = selectedTier ? Math.round(selectedTier.dailyCalories) : macroCalories;
@@ -403,8 +471,35 @@ function TodaySnapshot({ analysis }: { analysis: AnalysisHistory }) {
                   key={`${tier.label}-${tier.dailyCalories}`}
                   type="button"
                   onClick={() => {
+                    if (savingGoal) return;
+                    const nextGoal = goalFromTier(tier, effectiveGoal);
                     setSelectedTierIndex(idx);
-                    setShowGoalEditor(false);
+                    setGoalSaveError(null);
+                    setSavingGoal(true);
+                    fetch('/api/profile', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        profile: {
+                          ...analysis.profile,
+                          goal: nextGoal,
+                        },
+                      }),
+                    })
+                      .then(async (res) => {
+                        if (!res.ok) {
+                          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+                          throw new Error(body?.error ?? 'Could not save goal.');
+                        }
+                        onGoalPersist?.(nextGoal);
+                      })
+                      .catch((err) => {
+                        setGoalSaveError(err instanceof Error ? err.message : 'Could not save goal.');
+                      })
+                      .finally(() => {
+                        setSavingGoal(false);
+                        setShowGoalEditor(false);
+                      });
                   }}
                   className="text-left rounded-lg px-3 py-2 transition-colors"
                   style={{
@@ -421,6 +516,16 @@ function TodaySnapshot({ analysis }: { analysis: AnalysisHistory }) {
               );
             })}
           </div>
+          {goalSaveError && (
+            <p className="mt-2 text-[11px]" style={{ color: 'var(--status-danger)' }}>
+              {goalSaveError}
+            </p>
+          )}
+          {savingGoal && (
+            <p className="mt-2 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+              Saving goal preference...
+            </p>
+          )}
         </div>
       )}
       <div className="flex items-baseline gap-2">
