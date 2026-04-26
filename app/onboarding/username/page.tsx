@@ -20,10 +20,30 @@ export default function UsernameOnboardingPage() {
   const usernameIsValid = useMemo(() => USERNAME_PATTERN.test(username.trim().toLowerCase()), [username]);
   const hasPendingSignUp = Boolean(signUpLoaded && signUp && signUp.status && signUp.status !== 'complete');
 
+  const resolvePostAuthRoute = async (): Promise<string> => {
+    try {
+      const response = await fetch('/api/profile', {
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        return '/analyze';
+      }
+
+      const data = (await response.json()) as { profile?: { goal?: unknown } };
+      return data?.profile?.goal ? '/' : '/analyze';
+    } catch {
+      return '/analyze';
+    }
+  };
+
   useEffect(() => {
     if (!userLoaded || !signUpLoaded) return;
     if (isSignedIn && user?.username) {
-      router.replace('/analyze');
+      void (async () => {
+        const nextRoute = await resolvePostAuthRoute();
+        router.replace(nextRoute);
+      })();
       return;
     }
     if (!isSignedIn && !hasPendingSignUp) {
@@ -48,13 +68,15 @@ export default function UsernameOnboardingPage() {
         const result = await signUp.update({ username: normalizedUsername });
         if (result.status === 'complete' && result.createdSessionId) {
           await setActive({ session: result.createdSessionId });
-          router.push('/analyze');
+          const nextRoute = await resolvePostAuthRoute();
+          router.push(nextRoute);
         } else {
           setError('Sign up could not be completed. Please try again.');
         }
       } else if (user) {
         await user.update({ username: normalizedUsername });
-        router.push('/analyze');
+        const nextRoute = await resolvePostAuthRoute();
+        router.push(nextRoute);
       } else {
         setError('No active sign up found. Please start over.');
       }
