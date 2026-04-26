@@ -74,6 +74,14 @@ export const userProfileSchema = z.object({
   menstrualStatus: z.enum(['regular', 'irregular', 'postmenopausal', 'not-applicable']).optional(),
   takingStatins: z.boolean().optional(),
   takingThyroidMeds: z.boolean().optional(),
+  allergies: z.array(z.enum([
+    'peanuts', 'tree-nuts', 'dairy', 'gluten', 'shellfish', 'eggs', 'soy', 'fish', 'sesame',
+  ])).max(9).optional(),
+  dislikes: z.array(z.string().min(1).max(40)).max(10).optional(),
+  preferredCuisines: z.array(z.enum([
+    'mediterranean', 'asian', 'mexican', 'indian', 'american', 'middle-eastern', 'no-preference',
+  ])).max(7).optional(),
+  cookingTime: z.enum(['quick', 'moderate', 'elaborate']).optional(),
 });
 
 // ── API Request Schemas ────────────────────────────────────────────────────
@@ -173,6 +181,26 @@ export const saveAnalysisSchema = z.object({
       priority: z.union([z.literal(1), z.literal(2), z.literal(3)]),
       relatedMarkers: z.array(z.string()),
     })).optional(),
+    dietPlan: z.object({
+      generatedAt: z.string(),
+      summary: z.string().max(1000),
+      meals: z.array(z.object({
+        slot: z.enum(['breakfast', 'lunch', 'dinner', 'snack']),
+        name: z.string().max(160),
+        timeWindow: z.string().max(60).optional(),
+        calories: z.number(),
+        protein: z.number(),
+        carbs: z.number(),
+        fat: z.number(),
+        ingredients: z.array(z.string().max(200)).max(20),
+        prepNotes: z.string().max(800),
+        rationale: z.string().max(400).optional(),
+      })).max(8),
+      hydrationOz: z.number(),
+      keyPrinciples: z.array(z.string().max(300)).max(8),
+      flags: z.array(z.string().max(120)).max(8).optional(),
+      modelUsed: z.string().max(120).optional(),
+    }).optional(),
     coach: z.object({
       plan: coachPlanSchema,
       messages: z.array(z.object({
@@ -221,6 +249,21 @@ export const saveAnalysisSchema = z.object({
 /** PUT /api/profile — upsert user profile */
 export const saveProfileSchema = z.object({
   profile: userProfileSchema,
+});
+
+/** Adherence checklist schemas */
+const adherenceDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
+
+export const upsertAdherenceSchema = z.object({
+  date: adherenceDateSchema,
+  checks: z.record(z.string().min(1).max(40), z.enum(['yes', 'no'])),
+  totalCount: z.number().int().min(1).max(50),
+});
+
+export const listAdherenceQuerySchema = z.object({
+  from: adherenceDateSchema.optional(),
+  to: adherenceDateSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(180).default(60),
 });
 
 export const coachInitialRequestSchema = z.object({

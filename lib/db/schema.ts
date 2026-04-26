@@ -20,6 +20,20 @@ export const profiles = pgTable('profiles', {
   profile: jsonb('profile').notNull(),
 });
 
+export const adherence = pgTable('adherence', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  eventDate: date('event_date').notNull(),
+  checks: jsonb('checks').notNull(),
+  completedCount: integer('completed_count').notNull().default(0),
+  totalCount: integer('total_count').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('adherence_user_date_idx').on(table.userId, table.eventDate),
+  index('adherence_user_id_idx').on(table.userId),
+]);
+
 export const coachHistory = pgTable('coach_history', {
   id: serial('id').primaryKey(),
   userId: text('user_id').notNull(),

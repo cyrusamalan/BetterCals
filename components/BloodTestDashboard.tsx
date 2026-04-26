@@ -44,7 +44,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
-import Image from 'next/image';
+import BrandHeaderMark from '@/components/BrandHeaderMark';
 import ProfileDropdown from '@/components/ProfileDropdown';
 import CalorieTiersCard from '@/components/dashboard/CalorieTiersCard';
 import RecommendationsPanel from '@/components/dashboard/RecommendationsPanel';
@@ -53,6 +53,7 @@ import BioAgeCard from '@/components/dashboard/BioAgeCard';
 import RestingHeartRateCard from '@/components/dashboard/RestingHeartRateCard';
 import FoodSensitivityCard from '@/components/dashboard/FoodSensitivityCard';
 import ActionPlanCard from '@/components/dashboard/ActionPlanCard';
+import DietPlanCard from '@/components/dashboard/DietPlanCard';
 import PopulationBenchmarksCard from '@/components/dashboard/PopulationBenchmarksCard';
 import { deriveActionPlan, derivePopulationBenchmarks } from '@/lib/derivedInsights';
 import { debugLog } from '@/lib/debugLog';
@@ -968,6 +969,7 @@ export default function BloodTestDashboard({
 }: BloodTestDashboardProps) {
   const { isSignedIn } = useAuth();
   const { tdee, healthScore, insights, deficiencies, risks, calorieTiers, macros, recommendations } = result;
+  const [dietPlan, setDietPlan] = useState(result.dietPlan);
   const grade = getScoreGrade(healthScore.overall);
   const hasMarkers = Object.keys(markers).length > 0;
   const usedAverageMarkers = result.usedAverageMarkers === true;
@@ -1277,7 +1279,12 @@ export default function BloodTestDashboard({
       const res = await fetch('/api/analyses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, markers, result, coach: coachState }),
+        body: JSON.stringify({
+          profile,
+          markers,
+          result: dietPlan ? { ...result, dietPlan } : result,
+          coach: coachState,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -1747,19 +1754,7 @@ export default function BloodTestDashboard({
         <div className="w-full pl-2 sm:pl-3 pr-4 sm:pr-5 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-              <Link href="/" className="flex items-center gap-2.5 sm:gap-3 min-w-0 shrink-0">
-                <Image
-                  src="/logo/bettercals-logo-icon.png"
-                  alt="BetterCals logo"
-                  width={40}
-                  height={40}
-                  className="w-9 h-9 sm:w-10 sm:h-10"
-                  priority
-                />
-                <span className="text-[18px] sm:text-[20px] font-bold font-display" style={{ color: 'var(--text-primary)' }}>
-                  BetterCals
-                </span>
-              </Link>
+              <BrandHeaderMark href="/" sizePx={34} />
             </div>
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
               <div className="relative" ref={exportMenuRef}>
@@ -2491,6 +2486,16 @@ export default function BloodTestDashboard({
                 )}
                 <MacroDonutChart macros={macros} />
               </div>
+            </div>
+            <div className="mt-8 anim-fade-up delay-5">
+              <DietPlanCard
+                profile={profile}
+                markers={markers}
+                result={result}
+                analysisId={savedAnalysisId ?? undefined}
+                initialPlan={dietPlan}
+                onPlanUpdated={setDietPlan}
+              />
             </div>
             {foodFlags.length > 0 && (
               <div className="mt-8 anim-fade-up delay-5">

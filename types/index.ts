@@ -42,7 +42,35 @@ export interface UserProfile {
   // Medication context
   takingStatins?: boolean;
   takingThyroidMeds?: boolean;
+
+  // Diet plan preferences
+  allergies?: Allergy[];
+  dislikes?: string[];
+  preferredCuisines?: Cuisine[];
+  cookingTime?: CookingTime;
 }
+
+export type Allergy =
+  | 'peanuts'
+  | 'tree-nuts'
+  | 'dairy'
+  | 'gluten'
+  | 'shellfish'
+  | 'eggs'
+  | 'soy'
+  | 'fish'
+  | 'sesame';
+
+export type Cuisine =
+  | 'mediterranean'
+  | 'asian'
+  | 'mexican'
+  | 'indian'
+  | 'american'
+  | 'middle-eastern'
+  | 'no-preference';
+
+export type CookingTime = 'quick' | 'moderate' | 'elaborate';
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active';
 
@@ -241,6 +269,32 @@ export interface AnalysisResult {
   estimatedFromQuestionnaire?: boolean;
   actionPlan?: ActionPlanItem[];
   coach?: CoachState;
+  dietPlan?: DietPlan;
+}
+
+export type DietPlanMealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+export interface DietPlanMeal {
+  slot: DietPlanMealSlot;
+  name: string;
+  timeWindow?: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  ingredients: string[];
+  prepNotes: string;
+  rationale?: string;
+}
+
+export interface DietPlan {
+  generatedAt: string;
+  summary: string;
+  meals: DietPlanMeal[];
+  hydrationOz: number;
+  keyPrinciples: string[];
+  flags?: string[];
+  modelUsed?: string;
 }
 
 export interface CoachPriority {

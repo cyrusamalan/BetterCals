@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { User, SlidersHorizontal, ArrowLeft } from 'lucide-react';
-import VitalsMark from '@/components/VitalsMark';
+import BrandHeaderMark from '@/components/BrandHeaderMark';
 
 const NAV_ITEMS = [
   { href: '/settings/account', label: 'Account', icon: User },
@@ -27,12 +27,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     <div className="auth-single-page">
       <header className="auth-topbar">
         <div className="auth-topbar-left">
-          <Link href="/analyze" className="flex items-center gap-3 shrink-0">
-            <VitalsMark sizePx={44} />
-            <span style={{ color: 'var(--text-primary)' }} className="text-[20px] font-bold tracking-tight">
-              BetterCals
-            </span>
-          </Link>
+          <BrandHeaderMark href="/" sizePx={40} />
         </div>
         <div className="auth-topbar-center" />
         <div className="auth-topbar-right">

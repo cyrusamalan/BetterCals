@@ -65,6 +65,7 @@ Basic profile + manual blood entry works without any env vars. Auth and history 
   - `markerMetadata.ts` — marker labels, units, hints, optimal ranges (used by forms + education drawer)
   - `averageMarkers.ts` — population median markers by gender × age band
   - `profileUtils.ts` — legacy profile migration (string focusGoal → array)
+  - `ai/dietPlan.ts` — LLM-driven personalized diet plan generator (reuses `DEEPSEEK_API_KEY` / `LLM_BASE_URL`); validates output and falls back to a deterministic balanced split if the LLM is unavailable or returns invalid JSON
   - `db/` — Neon database singleton + Drizzle schema
 - `types/index.ts` — all shared TypeScript interfaces
 - `proxy.ts` — Clerk middleware (protects API routes)
@@ -140,6 +141,9 @@ GET  /api/analyses       → list user's saved analyses (newest first)
 POST /api/analyses       → save { profile, markers, result } as JSONB
 GET  /api/analyses/[id]  → fetch single analysis (ownership check)
 DELETE /api/analyses/[id] → delete (ownership check)
+POST /api/diet-plan      → on-demand personalized diet plan; rate-limited; if {analysisId} is provided and the requester owns it, the plan is merged into analyses.result.dietPlan (JSONB)
+GET  /api/adherence      → daily checklist history (optional ?from=&to=YYYY-MM-DD&limit=)
+PUT  /api/adherence      → upsert today's checklist row { date, checks, totalCount }; unique on (userId, eventDate)
 ```
 
 ## Key Calculations

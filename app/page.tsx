@@ -15,9 +15,10 @@ import {
   Play,
   BookOpen,
 } from 'lucide-react';
-import VitalsMark from '@/components/VitalsMark';
+import BrandHeaderMark from '@/components/BrandHeaderMark';
 import DemoModal from '@/components/DemoModal';
 import LearnMarkersModal from '@/components/LearnMarkersModal';
+import SignedInHome from '@/components/home/SignedInHome';
 
 function FeatureCard({
   icon,
@@ -99,9 +100,10 @@ function StepCard({
 }
 
 export default function HomePage() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
   const [demoOpen, setDemoOpen] = useState(false);
   const [learnOpen, setLearnOpen] = useState(false);
+  const showDashboard = isLoaded && isSignedIn;
 
   return (
     <div
@@ -118,20 +120,18 @@ export default function HomePage() {
           borderBottom: '1px solid var(--header-border)',
         }}
       >
-        <div className="w-full pl-2 sm:pl-3 pr-4 sm:pr-5 py-3 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-3">
-          <Link href="/" className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
-              <VitalsMark sizePx={32} />
+        <div className="relative w-full pl-2 sm:pl-3 pr-4 sm:pr-5 py-3 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-3">
+          <BrandHeaderMark href="/" sizePx={32} />
+          {showDashboard && (
+            <div className="absolute inset-x-0 hidden sm:flex items-center justify-center pointer-events-none">
+              <h1
+                className="font-display text-xl sm:text-2xl font-semibold tracking-tight"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Dashboard
+              </h1>
             </div>
-            <div className="leading-tight min-w-0">
-              <div className="text-[18px] sm:text-[20px] font-bold font-display" style={{ color: 'var(--text-primary)' }}>
-                BetterCals
-              </div>
-              <div className="hidden sm:block text-[10px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
-                Smart calories + blood marker insights
-              </div>
-            </div>
-          </Link>
+          )}
 
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             {isSignedIn ? (
@@ -200,6 +200,10 @@ export default function HomePage() {
         </div>
       </header>
 
+      {showDashboard ? (
+        <SignedInHome />
+      ) : (
+      <>
       {/* Hero */}
       <main className="max-w-6xl mx-auto px-5 pt-10 pb-16">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
@@ -421,17 +425,13 @@ export default function HomePage() {
           </div>
         </section>
       </main>
+      </>
+      )}
 
       {/* Footer */}
       <footer className="py-10 select-none" style={{ borderTop: '1px solid var(--border-light)' }}>
         <div className="max-w-6xl mx-auto px-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <VitalsMark sizePx={30} />
-            <div>
-              <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>BetterCals</div>
-              <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Smart calorie & lab insights</div>
-            </div>
-          </div>
+          <BrandHeaderMark href="/" sizePx={30} />
           <div className="text-xs space-y-2 sm:text-right" style={{ color: 'var(--text-tertiary)' }}>
             <p>BetterCals provides estimates for informational purposes only. Always consult healthcare professionals for medical advice.</p>
             <p className="flex flex-wrap gap-x-3 gap-y-1 sm:justify-end">

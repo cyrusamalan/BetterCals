@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Trash2 } from 'lucide-react';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
 import type { AnalysisHistory } from '@/types';
 import { normalizeUserProfile } from '@/lib/profileUtils';
@@ -16,6 +16,7 @@ export default function AnalysisDetailPage() {
   const [analysis, setAnalysis] = useState<AnalysisHistory | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -96,13 +97,51 @@ export default function AnalysisDetailPage() {
     );
   }
 
+  async function handleDeleteAnalysis() {
+    if (!analysis) return;
+
+    const shouldDelete = window.confirm('Remove this saved lab report? This cannot be undone.');
+    if (!shouldDelete) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/analyses/${analysis.id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        throw new Error(`Failed to delete analysis (${response.status})`);
+      }
+      router.push('/history');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete analysis.');
+      setDeleting(false);
+    }
+  }
+
   return (
-    <BloodTestDashboard
-      result={analysis.result}
-      markers={analysis.markers}
-      profile={analysis.profile}
-      onReset={() => router.push('/history')}
-      resetLabel="Back to History"
-    />
+    <>
+      <div className="fixed right-4 bottom-4 md:bottom-auto md:top-24 z-40">
+        <button
+          type="button"
+          onClick={handleDeleteAnalysis}
+          disabled={deleting}
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-60"
+          style={{
+            backgroundColor: 'var(--surface)',
+            color: 'var(--status-danger)',
+            border: '1px solid var(--border)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          }}
+        >
+          <Trash2 className="w-4 h-4" />
+          {deleting ? 'Deleting...' : 'Delete Report'}
+        </button>
+      </div>
+      <BloodTestDashboard
+        result={analysis.result}
+        markers={analysis.markers}
+        profile={analysis.profile}
+        onReset={() => router.push('/history')}
+        resetLabel="Back to History"
+      />
+    </>
   );
 }

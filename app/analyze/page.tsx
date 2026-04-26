@@ -9,7 +9,7 @@ import BloodReportUploader from '@/components/BloodReportUploader';
 import BloodTestDashboard from '@/components/BloodTestDashboard';
 import LifestyleEstimateModal from '@/components/LifestyleEstimateModal';
 import type { EstimationResult, MarkerEstimate } from '@/lib/estimateFromQuestionnaire';
-import VitalsMark from '@/components/VitalsMark';
+import BrandHeaderMark from '@/components/BrandHeaderMark';
 import ProfileDropdown from '@/components/ProfileDropdown';
 import Link from 'next/link';
 import {
@@ -333,20 +333,7 @@ export default function AnalyzePage() {
         <div className="w-full pl-2 sm:pl-3 pr-5 py-3.5 grid grid-cols-[auto_1fr_auto] items-center">
           {/* Left: logo */}
           <div className="flex items-center gap-3 justify-start">
-            <div
-              className="w-10 h-10 flex items-center justify-center"
-              style={{ background: 'transparent' }}
-            >
-              <VitalsMark sizePx={34} />
-            </div>
-            <div>
-              <h1
-                className="text-[22px] font-bold font-display"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                BetterCals
-              </h1>
-            </div>
+            <BrandHeaderMark href="/" sizePx={34} />
           </div>
 
           {/* Center: step pills (mobile: compact dots, desktop: full pills) */}

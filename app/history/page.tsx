@@ -12,6 +12,7 @@ import {
   Activity,
   Scale,
   ChevronRight,
+  Trash2,
 } from 'lucide-react';
 import {
   CartesianGrid,
@@ -86,6 +87,7 @@ export default function HistoryPage() {
   const [compareAId, setCompareAId] = useState<number | null>(null);
   const [compareBId, setCompareBId] = useState<number | null>(null);
   const [activeMarker, setActiveMarker] = useState<{ key: keyof BloodMarkers; value: number } | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -232,6 +234,30 @@ export default function HistoryPage() {
     const unchanged = comparisonRows.filter((row) => row.direction === 'unchanged');
     return { improved, worsened, unchanged };
   }, [comparisonRows]);
+
+  async function handleDeleteAnalysis(analysisId: number) {
+    const shouldDelete = window.confirm('Remove this saved lab report from your history? This cannot be undone.');
+    if (!shouldDelete) return;
+
+    setDeletingId(analysisId);
+    try {
+      const response = await fetch(`/api/analyses/${analysisId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to delete analysis (${response.status})`);
+      }
+
+      setAnalyses((prev) => prev.filter((analysis) => analysis.id !== analysisId));
+      setCompareAId((prev) => (prev === analysisId ? null : prev));
+      setCompareBId((prev) => (prev === analysisId ? null : prev));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete analysis');
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   if (!isLoaded || loading) {
     return <HistoryPageSkeleton />;
@@ -526,17 +552,20 @@ export default function HistoryPage() {
               const { result, profile } = analysis;
               const bmi = result.recommendations?.bmi;
               return (
-                <Link
+                <div
                   key={analysis.id}
-                  href={`/history/${analysis.id}`}
-                  className="block relative overflow-hidden rounded-2xl noise transition-all hover:scale-[1.01]"
+                  className="relative overflow-hidden rounded-2xl noise"
                   style={{
                     backgroundColor: 'var(--surface)',
                     border: '1px solid var(--border)',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.03)',
                   }}
                 >
-                  <div className="px-5 py-4">
+                  <Link
+                    href={`/history/${analysis.id}`}
+                    className="block transition-all hover:scale-[1.01]"
+                  >
+                    <div className="px-5 py-4">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <p className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>
@@ -547,6 +576,25 @@ export default function HistoryPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void handleDeleteAnalysis(analysis.id);
+                          }}
+                          disabled={deletingId === analysis.id}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-60"
+                          style={{
+                            backgroundColor: 'var(--bg-warm)',
+                            color: 'var(--status-danger)',
+                            border: '1px solid var(--border-light)',
+                          }}
+                          aria-label={`Delete analysis from ${formatDate(analysis.createdAt)}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          {deletingId === analysis.id ? 'Deleting...' : 'Delete'}
+                        </button>
                         <div
                           className="flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold"
                           style={{
@@ -571,8 +619,9 @@ export default function HistoryPage() {
                         <MetricPill label="Markers" value={Object.keys(analysis.markers).length.toString()} />
                       )}
                     </div>
-                  </div>
-                </Link>
+                    </div>
+                  </Link>
+                </div>
               );
             })}
           </div>

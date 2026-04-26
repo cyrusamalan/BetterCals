@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useSignUp } from '@clerk/nextjs/legacy';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import VitalsMark from '@/components/VitalsMark';
+import BrandHeaderMark from '@/components/BrandHeaderMark';
 
 export default function SignUpPage() {
   const { signUp, isLoaded, setActive } = useSignUp();
@@ -89,8 +89,7 @@ export default function SignUpPage() {
     <div className="auth-single-page">
       <header className="auth-topbar">
         <div className="auth-topbar-left">
-          <VitalsMark sizePx={44} />
-          <span className="text-[20px] font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>BetterCals</span>
+          <BrandHeaderMark href="/" sizePx={40} />
         </div>
 
         <div className="auth-topbar-center" />
